@@ -62,6 +62,7 @@ export function Overlay({ gameRef }: Props) {
           <button
             type="button"
             className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+            onMouseDown={keepPlayFocus}
             onClick={() => g()?.pause()}
             aria-label="Pause"
           >
@@ -70,18 +71,19 @@ export function Overlay({ gameRef }: Props) {
           <div className="flex items-center gap-2">
             {pad.connected ? <PadChip xbox={pad.xbox} /> : null}
             <GhostChip
-              label={camera === "chase" ? "Chase" : "Hood"}
+              label={camera === "hood" ? "Hood" : "Chase"}
+              camera={camera}
               onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
             />
             <button
               type="button"
               className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90"
+              onMouseDown={keepPlayFocus}
               onClick={() => g()?.setMuted(!muted)}
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
             </button>
-          </div>
         </div>
       ) : null}
 
@@ -119,7 +121,7 @@ export function Overlay({ gameRef }: Props) {
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
           {pad.active
             ? "LT/RT brake · L-stick steer · X slide · Y respawn · Menu pause"
-            : "WASD steer and throttle · Space slide · R respawn · Esc pause"}
+            : "WASD steer and throttle · Space slide · R respawn · C camera · Esc pause"}
         </p>
       ) : null}
     </div>
@@ -187,6 +189,7 @@ function Menu({
             <button
               type="button"
               disabled={!ready}
+              onMouseDown={keepPlayFocus}
               onClick={onStart}
               className="h-12 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98] disabled:opacity-50"
             >
@@ -302,8 +305,8 @@ function Hud({
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
         <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
         <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
-        <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
-        <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} />
+        <Meter label="Boost" value={Math.min(1, boost / 1.0)} tone="ok" show={boost > 0.05} />
+        <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} ticks />
       </div>
       {wrongWay ? (
         <p className="absolute left-1/2 top-1/3 -translate-x-1/2 font-display text-3xl tracking-wide text-danger">
@@ -328,23 +331,31 @@ function Meter({
   value,
   tone,
   show,
+  ticks,
 }: {
   label: string;
   value: number;
   tone: "ok" | "gold";
   show: boolean;
+  ticks?: boolean;
 }) {
   if (!show) return null;
+  const filled = Math.max(0, Math.min(1, value));
   return (
     <div className="mt-2 w-20 md:ml-auto">
       <p className={cn("text-[10px] uppercase tracking-widest", tone === "ok" ? "text-ok" : "text-medal-gold")}>
         {label}
       </p>
-      <div className="mt-1 h-1 overflow-hidden rounded-full bg-border">
+      <div className="relative mt-1 h-1 overflow-hidden rounded-full bg-border">
         <div
           className={cn("h-full", tone === "ok" ? "bg-ok" : "bg-medal-gold")}
-          style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%` }}
+          style={{ width: `${Math.round(filled * 100)}%` }}
         />
+        {ticks
+          ? [32, 58, 92].map((p) => (
+              <span key={p} className="absolute top-0 h-full w-px bg-bg/70" style={{ left: `${p}%` }} />
+            ))
+          : null}
       </div>
     </div>
   );
@@ -398,6 +409,7 @@ function Modal({
             <button
               key={a.label}
               type="button"
+              onMouseDown={keepPlayFocus}
               onClick={a.onClick}
               className={cn(
                 "h-11 rounded-md text-sm font-medium",
@@ -413,10 +425,24 @@ function Modal({
   );
 }
 
-function GhostChip({ label, onClick }: { label: string; onClick: () => void }) {
+function keepPlayFocus(e: { preventDefault: () => void }) {
+  e.preventDefault();
+}
+
+function GhostChip({
+  label,
+  camera,
+  onClick,
+}: {
+  label: string;
+  camera: "chase" | "hood";
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
+      data-camera={camera}
+      onMouseDown={keepPlayFocus}
       onClick={onClick}
       className="play-control h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"
     >
