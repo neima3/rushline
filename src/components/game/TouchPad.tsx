@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
-import { HOLD_CANCEL_GRACE_MS, shouldReleaseHold } from "@/game/auto-throttle";
+import { reduceHold } from "@/game/auto-throttle";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -121,6 +121,7 @@ function HoldButton({
   const holdRef = useRef(false);
   const pidRef = useRef<number | null>(null);
   const cancelUntilRef = useRef(0);
+  const fingersRef = useRef(new Set<number>());
   const btnRef = useRef<HTMLDivElement>(null);
   const [held, setHeld] = useState(false);
 
@@ -143,44 +144,60 @@ function HoldButton({
       onHold(0);
     };
 
-    const recapture = (id: number) => {
-      try {
-        el.setPointerCapture(id);
-      } catch {
-        /* capture is optional; window pointerup / late touchend still end it */
-      }
+    const apply = (type: string, extra?: { id?: number; remainingTouches?: number }) => {
+      const next = reduceHold(
+        { held: holdRef.current, cancelUntil: cancelUntilRef.current },
+        {
+          type,
+          now: performance.now(),
+          remainingTouches: extra?.remainingTouches ?? fingersRef.current.size,
+        },
+      );
+      cancelUntilRef.current = next.cancelUntil;
+      if (next.held) press();
+      else release(extra?.id);
     };
 
     const down = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       pidRef.current = e.pointerId;
-      recapture(e.pointerId);
-      press();
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is optional; window pointerup / late touchend still end it */
+      }
+      apply("pointerdown", { id: e.pointerId });
     };
 
     const end = (e: PointerEvent) => {
-      if (e.type === "pointercancel" || e.type === "lostpointercapture") {
-        cancelUntilRef.current = performance.now() + HOLD_CANCEL_GRACE_MS;
-        if (holdRef.current) recapture(e.pointerId);
-        return;
-      }
-      if (!shouldReleaseHold(e.type, performance.now(), cancelUntilRef.current)) return;
-      release(e.pointerId);
+      if (pidRef.current != null && e.pointerId !== pidRef.current) return;
+      apply(e.type, { id: e.pointerId, remainingTouches: fingersRef.current.size });
     };
 
-    const touchEnd = (e: TouchEvent) => {
-      if (
-        !shouldReleaseHold(
-          e.type,
-          performance.now(),
-          cancelUntilRef.current,
-          e.touches.length,
-        )
-      ) {
-        return;
+    const noteFingers = (e: TouchEvent, add: boolean) => {
+      for (const t of Array.from(e.changedTouches)) {
+        if (add) fingersRef.current.add(t.identifier);
+        else fingersRef.current.delete(t.identifier);
       }
-      release();
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.target as Node | null;
+      if (t && t !== el && !el.contains(t)) return;
+      e.preventDefault();
+      noteFingers(e, true);
+      apply("touchstart");
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      let ours = false;
+      for (const t of Array.from(e.changedTouches)) {
+        if (fingersRef.current.has(t.identifier)) ours = true;
+      }
+      noteFingers(e, false);
+      if (!ours) return;
+      apply(e.type, { remainingTouches: fingersRef.current.size });
     };
 
     const opts: AddEventListenerOptions = { passive: false };
@@ -188,8 +205,9 @@ function HoldButton({
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     el.addEventListener("lostpointercapture", end);
-    el.addEventListener("touchend", touchEnd);
-    el.addEventListener("touchcancel", touchEnd);
+    el.addEventListener("touchstart", onTouchStart, opts);
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
     let raf = 0;
     const tick = () => {
       if (holdRef.current) onHold(1);
@@ -202,11 +220,13 @@ function HoldButton({
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
       el.removeEventListener("lostpointercapture", end);
-      el.removeEventListener("touchend", touchEnd);
-      el.removeEventListener("touchcancel", touchEnd);
+      el.removeEventListener("touchstart", onTouchStart, opts);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       if (holdRef.current) onHold(0);
       holdRef.current = false;
       pidRef.current = null;
+      fingersRef.current.clear();
     };
   }, [onHold]);
 
