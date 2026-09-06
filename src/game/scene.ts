@@ -211,11 +211,12 @@ export class World {
     this.camUp.crossVectors(this.camFwd, _right).normalize();
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
-    const lift = portrait ? 3.7 : 2.55;
-    const dist = (mode === "hood" ? 3.1 : 6.8) + (portrait ? 0.35 : 0);
+    const hood = mode === "hood";
+    const lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 3.7 : 2.55;
+    const dist = hood ? 0.52 : 6.8 + (portrait ? 0.35 : 0);
     this.camPos.set(
       snap.px - this.camFwd.x * dist + this.camUp.x * lift,
-      Math.max(snap.py + 1.8, snap.py - this.camFwd.y * dist + this.camUp.y * lift),
+      Math.max(snap.py + (hood ? 1.05 : 1.8), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
       snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
     );
     this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
@@ -260,8 +261,8 @@ export class World {
     this.camPos.y = Math.max(
       this.camPos.y,
       snap.py + minAboveCar,
-      road.y + (helix ? 0.55 : 1.7),
-      near.y + (helix ? 0.45 : 1.45),
+      road.y + (helix ? 0.55 : mode === "hood" ? 1.15 : 1.7),
+      near.y + (helix ? 0.45 : mode === "hood" ? 0.95 : 1.45),
     );
   }
 
