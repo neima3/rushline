@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
+import { isSpuriousHoldEnd } from "@/game/auto-throttle";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -15,7 +16,8 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
   const auto = useGame((s) => s.autoThrottle);
   const padActive = useGame((s) => s.pad.active);
   const touch = useGame((s) => s.touch);
-  const visible = touch && (phase === "race" || phase === "countdown") && !padActive;
+  const racing = phase === "race" || phase === "countdown";
+  const visible = racing && !padActive;
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,9 +70,14 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 pl-[max(0.85rem,env(safe-area-inset-left))] pr-[max(0.85rem,env(safe-area-inset-right))] pb-[max(0.7rem,env(safe-area-inset-bottom))]">
+    <div
+      className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 pl-[max(0.85rem,env(safe-area-inset-left))] pr-[max(0.85rem,env(safe-area-inset-right))] pb-[max(0.7rem,env(safe-area-inset-bottom))] ${
+        touch ? "" : "md:hidden"
+      }`}
+    >
       <div
         ref={steerRef}
+        data-play-control="1"
         className="play-control pointer-events-auto h-32 w-[46%] max-w-60 touch-none rounded-xl border border-border bg-surface/80 select-none"
         aria-label="Steer"
       >
@@ -114,7 +121,7 @@ function HoldButton({
 }) {
   const holdRef = useRef(false);
   const pidRef = useRef<number | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const btnRef = useRef<HTMLDivElement>(null);
   const [held, setHeld] = useState(false);
 
   useEffect(() => {
@@ -140,13 +147,14 @@ function HoldButton({
     };
 
     const end = (e: PointerEvent) => {
-      // iOS Safari often fires pointercancel while the finger is still down
-      // (scroll/zoom heuristic). Keep the hold until pointerup or touchend.
-      if (e.type === "pointercancel") return;
+      if (isSpuriousHoldEnd(e.type)) return;
       release(e.pointerId);
     };
 
-    const touchEnd = () => release();
+    const touchEnd = (e: TouchEvent) => {
+      if (isSpuriousHoldEnd(e.type)) return;
+      release();
+    };
 
     const opts: AddEventListenerOptions = { passive: false };
     el.addEventListener("pointerdown", down, opts);
@@ -167,10 +175,12 @@ function HoldButton({
   }, [onHold]);
 
   return (
-    <button
+    <div
       ref={btnRef}
-      type="button"
+      role="button"
+      tabIndex={0}
       data-play-control="1"
+      aria-label={label}
       aria-pressed={held}
       className={`play-control h-14 min-h-14 w-24 touch-none select-none rounded-lg border text-sm font-medium ${
         accent
@@ -180,6 +190,6 @@ function HoldButton({
       onContextMenu={(e) => e.preventDefault()}
     >
       {label}
-    </button>
+    </div>
   );
 }

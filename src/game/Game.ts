@@ -119,6 +119,9 @@ export class Game {
   }
 
   capturePlayFocus() {
+    // Focusing the canvas on iOS Safari cancels the active pointer
+    // (pointercancel / touchcancel) and drops TouchPad Accel / Brake.
+    if (this.input.touchMode) return;
     const el = this.canvas;
     if (!el) return;
     try {

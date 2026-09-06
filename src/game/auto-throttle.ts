@@ -11,6 +11,11 @@ const TOUCH_LATE_SPEED = 24;
 
 export const BRAKE_LATCH_MS = 340;
 
+/** iOS Safari fires these when the canvas takes focus or a scroll heuristic runs. */
+export function isSpuriousHoldEnd(type: string): boolean {
+  return type === "pointercancel" || type === "touchcancel" || type === "lostpointercapture";
+}
+
 export function autoThrottleCap(opts: {
   trackId: TrackId;
   s: number;

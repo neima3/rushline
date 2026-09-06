@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { autoThrottleCap, latchBrake } from "./auto-throttle.ts";
+import { autoThrottleCap, isSpuriousHoldEnd, latchBrake } from "./auto-throttle.ts";
 
 describe("autoThrottleCap", () => {
   it("holds the car during countdown", () => {
@@ -74,6 +74,16 @@ describe("autoThrottleCap", () => {
       countdown: false,
     });
     assert.equal(early, 0.14);
+  });
+});
+
+describe("isSpuriousHoldEnd", () => {
+  it("ignores canvas-focus and Safari cancel events so Accel stays held", () => {
+    assert.equal(isSpuriousHoldEnd("pointercancel"), true);
+    assert.equal(isSpuriousHoldEnd("touchcancel"), true);
+    assert.equal(isSpuriousHoldEnd("lostpointercapture"), true);
+    assert.equal(isSpuriousHoldEnd("pointerup"), false);
+    assert.equal(isSpuriousHoldEnd("touchend"), false);
   });
 });
 

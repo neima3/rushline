@@ -67,7 +67,10 @@ export function Rushline() {
         ref={canvasRef}
         tabIndex={0}
         className="absolute inset-0 size-full touch-none outline-none"
-        onPointerDown={() => gameRef.current?.capturePlayFocus()}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement | null)?.closest?.("[data-play-control]")) return;
+          gameRef.current?.capturePlayFocus();
+        }}
       />
       <Overlay gameRef={gameRef} />
       <TouchPad
