@@ -1,6 +1,6 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
 import { getTrack, medalFor } from "./track";
-import { autoThrottleCap } from "./auto-throttle";
+import { autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { CarSim, FIXED_DT, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
@@ -272,6 +272,7 @@ export class Game {
       while (this.acc >= FIXED_DT && steps < 5) {
         this.prev = this.car.snap();
         this.car.step(this.track, actions, FIXED_DT);
+        this.car.speed = clampTouchSpeed(this.car.speed, this.input.touchMode);
         if (this.car.justBoost) {
           this.audio.boost();
           this.world.addTrauma(0.28);

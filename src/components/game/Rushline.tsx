@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { Game } from "@/game/Game";
+import { useGame } from "@/game/store";
 import { Overlay } from "./Overlay";
 import { TouchPad } from "./TouchPad";
 
@@ -8,15 +9,27 @@ function isTouchPlay(): boolean {
   return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
 }
 
+function applyTouchDefaults() {
+  if (!isTouchPlay()) return;
+  const store = useGame.getState();
+  store.setTouch(true);
+  store.setAutoThrottle(true);
+}
+
 export function Rushline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
+
+  useLayoutEffect(() => {
+    applyTouchDefaults();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let disposed = false;
     let game: Game | null = null;
+    applyTouchDefaults();
     void import("@/game/Game").then(({ Game }) => {
       if (disposed || !canvasRef.current) return;
       game = new Game(canvasRef.current);

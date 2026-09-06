@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { autoThrottleCap, isSpuriousHoldEnd, latchBrake } from "./auto-throttle.ts";
+import { autoThrottleCap, clampTouchSpeed, isSpuriousHoldEnd, latchBrake } from "./auto-throttle.ts";
 
 describe("autoThrottleCap", () => {
   it("holds the car during countdown", () => {
@@ -84,6 +84,14 @@ describe("isSpuriousHoldEnd", () => {
     assert.equal(isSpuriousHoldEnd("lostpointercapture"), true);
     assert.equal(isSpuriousHoldEnd("pointerup"), false);
     assert.equal(isSpuriousHoldEnd("touchend"), false);
+  });
+});
+
+describe("clampTouchSpeed", () => {
+  it("does not let touch brake reverse from a crawl", () => {
+    assert.equal(clampTouchSpeed(-2, true), 0);
+    assert.equal(clampTouchSpeed(4, true), 4);
+    assert.equal(clampTouchSpeed(-2, false), -2);
   });
 });
 

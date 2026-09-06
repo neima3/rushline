@@ -16,6 +16,12 @@ export function isSpuriousHoldEnd(type: string): boolean {
   return type === "pointercancel" || type === "touchcancel" || type === "lostpointercapture";
 }
 
+/** Touch brake must slow to a stop, not dump the car into reverse from a crawl. */
+export function clampTouchSpeed(speed: number, touchMode: boolean): number {
+  if (touchMode && speed < 0) return 0;
+  return speed;
+}
+
 export function autoThrottleCap(opts: {
   trackId: TrackId;
   s: number;

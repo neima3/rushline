@@ -13,11 +13,10 @@ type Props = {
 
 export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: Props) {
   const phase = useGame((s) => s.phase);
-  const auto = useGame((s) => s.autoThrottle);
-  const padActive = useGame((s) => s.pad.active);
   const touch = useGame((s) => s.touch);
   const racing = phase === "race" || phase === "countdown";
-  const visible = racing && !padActive;
+  // Never gate on padActive — a phantom gamepad unmounts Accel and zeros throttle.
+  const visible = racing;
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,7 +103,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         </button>
         <HoldButton label="Slide" onHold={onSlide} />
         <HoldButton label="Brake" onHold={onBrake} />
-        {!auto ? <HoldButton label="Accel" accent onHold={onThrottle} /> : null}
+        <HoldButton label="Accel" accent onHold={onThrottle} />
       </div>
     </div>
   );
