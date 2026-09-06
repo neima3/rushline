@@ -17,7 +17,7 @@ export function Rushline() {
       game = new Game(canvasRef.current);
       gameRef.current = game;
       const coarse = window.matchMedia("(pointer: coarse)").matches;
-      if (coarse) game.setTouch(true);
+      if (coarse || window.innerWidth < 720) game.setTouch(true);
     });
     return () => {
       disposed = true;

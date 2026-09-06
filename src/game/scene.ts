@@ -77,6 +77,7 @@ export class World {
   private camFwd = new THREE.Vector3(0, 0, -1);
   private camUp = new THREE.Vector3(0, 1, 0);
   trauma = 0;
+  private camHold = 0;
   private clockT = 0;
   private loader = new THREE.TextureLoader();
   private nightLights: THREE.Object3D[] = [];
@@ -194,48 +195,31 @@ export class World {
 
   snapCamera(snap: CarSnap, mode: CameraMode) {
     this.trauma = 0;
-    _fwd.set(snap.fx, snap.fy, snap.fz);
+    this.camHold = 0.45;
+    _fwd.set(snap.fx, 0, snap.fz);
+    if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
     else _fwd.normalize();
-    if (Math.abs(_fwd.dot(_worldUp)) > 0.92) {
-      this.camFwd.set(_fwd.x, 0, _fwd.z);
-      if (this.camFwd.lengthSq() < 1e-6) this.camFwd.set(0, 0, -1);
-      else this.camFwd.normalize();
-    } else {
-      this.camFwd.copy(_fwd);
-    }
+    this.camFwd.copy(_fwd);
     this.camUp.copy(_worldUp);
     _right.crossVectors(this.camUp, this.camFwd);
     if (_right.lengthSq() < 1e-8) _right.set(1, 0, 0);
     _right.normalize();
     this.camUp.crossVectors(this.camFwd, _right).normalize();
 
-    const spd = Math.abs(snap.speed);
-    if (mode === "hood") {
-      this.camPos.set(
-        snap.px + snap.ux * 1.08 - snap.fx * 0.35,
-        snap.py + 0.82,
-        snap.pz + snap.uz * 1.08 - snap.fz * 0.35,
-      );
-      this.lookPos.set(snap.px + snap.fx * 16, snap.py + 0.2, snap.pz + snap.fz * 16);
-    } else {
-      const dist = 6.7 + spd * 0.026;
-      const height = 1.92 + spd * 0.009;
-      this.camPos.set(
-        snap.px - this.camFwd.x * dist + this.camUp.x * height,
-        snap.py - this.camFwd.y * dist + this.camUp.y * height,
-        snap.pz - this.camFwd.z * dist + this.camUp.z * height,
-      );
-      this.lookPos.set(
-        snap.px + this.camFwd.x * 13 + this.camUp.x * 0.28,
-        snap.py + this.camUp.y * 0.28,
-        snap.pz + this.camFwd.z * 13 + this.camUp.z * 0.28,
-      );
-    }
+    const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
+    const lift = portrait ? 3.15 : 2.45;
+    const dist = (mode === "hood" ? 3.4 : 7.4) + (portrait ? 1.1 : 0);
+    this.camPos.set(
+      snap.px - this.camFwd.x * dist + this.camUp.x * lift,
+      Math.max(snap.py + 1.8, snap.py - this.camFwd.y * dist + this.camUp.y * lift),
+      snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
+    );
+    this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
     this.camera.position.copy(this.camPos);
-    this.camera.up.copy(this.camUp);
+    this.camera.up.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
-    this.camera.fov = 58;
+    this.camera.fov = portrait ? 60 : 58;
     this.camera.updateProjectionMatrix();
   }
 
@@ -387,15 +371,29 @@ export class World {
       return;
     }
 
+    this.camHold = Math.max(0, this.camHold - dt);
+    if (this.camHold > 0) {
+      this.camera.position.copy(this.camPos);
+      this.camera.up.copy(_worldUp);
+      this.camera.lookAt(this.lookPos);
+      return;
+    }
+
     _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
     else _fwd.normalize();
+    if (snap.uy > 0.55) {
+      _fwd.y = 0;
+      if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
+      if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
+      else _fwd.normalize();
+    }
     _up.set(snap.ux, snap.uy, snap.uz);
     if (_up.lengthSq() < 1e-8) _up.copy(_worldUp);
     else _up.normalize();
 
     const upDot = THREE.MathUtils.clamp(_up.dot(_worldUp), -1, 1);
-    const rollAmt = snap.airborne ? 0.1 : THREE.MathUtils.clamp(0.28 + upDot * 0.32, 0.08, 0.48);
+    const rollAmt = snap.airborne ? 0.06 : snap.uy > 0.55 ? 0.12 : THREE.MathUtils.clamp(0.28 + upDot * 0.32, 0.08, 0.48);
     _camUpTarget.set(
       _worldUp.x + (_up.x - _worldUp.x) * rollAmt,
       _worldUp.y + (_up.y - _worldUp.y) * rollAmt,
@@ -445,6 +443,7 @@ export class World {
     const k = 1 - Math.exp(-follow * dt);
     this.camPos.lerp(_desired, k);
     this.lookPos.lerp(_look, k);
+    this.camPos.y = Math.max(this.camPos.y, snap.py + 1.55);
 
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
     const shake = reduced ? 0 : this.trauma * this.trauma * 0.5;
@@ -452,6 +451,10 @@ export class World {
     this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.14;
     this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.1;
     this.camera.up.lerp(this.camUp, 1 - Math.exp(-7 * dt));
+    if (this.camera.up.y < 0.55) {
+      this.camera.up.lerp(_worldUp, 0.65);
+      this.camUp.lerp(_worldUp, 0.65);
+    }
     this.camera.lookAt(this.lookPos);
 
     const targetFov = THREE.MathUtils.clamp(54 + spd * 0.15 + (snap.boost > 0 ? 3.2 : 0), 52, 65);

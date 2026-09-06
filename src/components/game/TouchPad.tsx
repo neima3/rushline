@@ -66,7 +66,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
       <div
         ref={steerRef}
-        className="pointer-events-auto h-28 w-[46%] max-w-56 rounded-xl border border-border bg-surface/80"
+        className="pointer-events-auto h-28 w-[46%] max-w-56 touch-none rounded-xl border border-border bg-surface/80"
         aria-label="Steer"
       >
         <div className="flex h-full items-center justify-between px-5 text-sm font-medium text-muted">
@@ -79,7 +79,12 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         <button
           type="button"
           aria-label="Respawn"
-          onPointerDown={onRespawn}
+          data-play-control="1"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRespawn();
+          }}
           className="flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
         >
           <RotateCcw className="size-5" strokeWidth={1.75} />
@@ -104,18 +109,25 @@ function HoldButton({
   return (
     <button
       type="button"
-      className={`h-14 min-h-14 w-24 rounded-lg border text-sm font-medium ${
+      data-play-control="1"
+      className={`h-14 min-h-14 w-24 touch-none rounded-lg border text-sm font-medium ${
         accent
           ? "border-accent bg-accent text-accent-fg"
           : "border-border bg-surface/90 text-fg"
       }`}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         e.currentTarget.setPointerCapture(e.pointerId);
         onHold(1);
       }}
-      onPointerUp={() => onHold(0)}
+      onPointerUp={(e) => {
+        e.preventDefault();
+        onHold(0);
+      }}
       onPointerCancel={() => onHold(0)}
+      onLostPointerCapture={() => onHold(0)}
     >
       {label}
     </button>

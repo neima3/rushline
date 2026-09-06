@@ -37,6 +37,7 @@ export class Game {
   private timeHold = 0;
   private raceClockAt = 0;
   private countdown = -1;
+  private countdownAt = 0;
   private pausedFrom: Phase | null = null;
   private phase: Phase = "menu";
   private camera: CameraMode = "chase";
@@ -152,10 +153,11 @@ export class Game {
     this.raceClockAt = 0;
     this.acc = 0;
     this.countdown = 2.4;
+    this.countdownAt = performance.now();
     this.pausedFrom = null;
     this.recording = [];
     this.phase = "countdown";
-    this.lastT = performance.now();
+    this.lastT = this.countdownAt;
     this.world.snapCamera(this.curr, this.camera);
     useGame.getState().setPhase("countdown");
     useGame.getState().setResults(null);
@@ -172,12 +174,14 @@ export class Game {
     this.audio.unlock();
     this.audio.countdown(3);
     this.capturePlayFocus();
+    requestAnimationFrame(() => this.capturePlayFocus());
   }
 
   pause() {
     if (this.phase !== "race" && this.phase !== "countdown") return;
     this.pausedFrom = this.phase;
     if (this.phase === "race") this.timeHold = this.time;
+    if (this.phase === "countdown") this.countdown = Math.max(0, 2.4 - (performance.now() - this.countdownAt) / 1000);
     this.phase = "paused";
     useGame.getState().setPhase("paused");
   }
@@ -189,6 +193,7 @@ export class Game {
     this.phase = next;
     this.lastT = performance.now();
     if (next === "race") this.raceClockAt = this.lastT;
+    if (next === "countdown") this.countdownAt = this.lastT - (2.4 - this.countdown) * 1000;
     useGame.getState().setPhase(next);
     this.capturePlayFocus();
   }
@@ -244,7 +249,7 @@ export class Game {
     const simulate = this.phase === "race" || this.phase === "countdown";
     if (this.phase === "countdown") {
       const prevC = Math.ceil(this.countdown);
-      this.countdown -= rawDt;
+      this.countdown = 2.4 - (now - this.countdownAt) / 1000;
       const nextC = Math.ceil(this.countdown);
       if (nextC < prevC && nextC >= 0) this.audio.countdown(nextC);
       if (this.countdown <= 0) {

@@ -61,8 +61,9 @@ export class Input {
     this.onPad = () => {
       void navigator.getGamepads?.();
     };
-    this.onPointer = () => {
-      this.focusSurface();
+    this.onPointer = (e: PointerEvent) => {
+      const t = e.target;
+      if (t === this.surface) this.focusSurface();
       this.onPad();
     };
   }
@@ -76,7 +77,7 @@ export class Input {
     document.addEventListener("visibilitychange", this.onBlur);
     window.addEventListener("gamepadconnected", this.onPad);
     window.addEventListener("gamepaddisconnected", this.onPad);
-    window.addEventListener("pointerdown", this.onPointer);
+    window.addEventListener("pointerdown", this.onPad);
     surface?.addEventListener("pointerdown", this.onPointer);
   }
 
@@ -88,7 +89,7 @@ export class Input {
     document.removeEventListener("visibilitychange", this.onBlur);
     window.removeEventListener("gamepadconnected", this.onPad);
     window.removeEventListener("gamepaddisconnected", this.onPad);
-    window.removeEventListener("pointerdown", this.onPointer);
+    window.removeEventListener("pointerdown", this.onPad);
     this.surface?.removeEventListener("pointerdown", this.onPointer);
     this.surface = null;
   }
@@ -166,8 +167,8 @@ export class Input {
     steer += this.touchSteer;
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
-
-    if (this.autoThrottle && throttle < 0.05 && brake < 0.05) throttle = 1;
+    if (brake > 0.05) throttle = 0;
+    else if (this.autoThrottle && throttle < 0.05) throttle = 1;
 
     steer = Math.max(-1, Math.min(1, steer));
 

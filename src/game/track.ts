@@ -388,19 +388,53 @@ export function sampleAt(track: BuiltTrack, s: number): Sample {
   const b = samples[i1]!;
   const span = b.s - a.s || 1;
   const t = Math.max(0, Math.min(1, (ss - a.s) / span));
+  let tx = lerp(a.tx, b.tx, t);
+  let ty = lerp(a.ty, b.ty, t);
+  let tz = lerp(a.tz, b.tz, t);
+  let tl = Math.hypot(tx, ty, tz) || 1;
+  tx /= tl;
+  ty /= tl;
+  tz /= tl;
+  let ux = lerp(a.ux, b.ux, t);
+  let uy = lerp(a.uy, b.uy, t);
+  let uz = lerp(a.uz, b.uz, t);
+  const ud = ux * tx + uy * ty + uz * tz;
+  ux -= tx * ud;
+  uy -= ty * ud;
+  uz -= tz * ud;
+  let ul = Math.hypot(ux, uy, uz);
+  if (ul < 0.2) {
+    ux = 0;
+    uy = 1;
+    uz = 0;
+    ul = 1;
+  }
+  ux /= ul;
+  uy /= ul;
+  uz /= ul;
+  let rx = ty * uz - tz * uy;
+  let ry = tz * ux - tx * uz;
+  let rz = tx * uy - ty * ux;
+  const rl = Math.hypot(rx, ry, rz) || 1;
+  rx /= rl;
+  ry /= rl;
+  rz /= rl;
+  ux = ry * tz - rz * ty;
+  uy = rz * tx - rx * tz;
+  uz = rx * ty - ry * tx;
   return {
     x: lerp(a.x, b.x, t),
     y: lerp(a.y, b.y, t),
     z: lerp(a.z, b.z, t),
-    tx: lerp(a.tx, b.tx, t),
-    ty: lerp(a.ty, b.ty, t),
-    tz: lerp(a.tz, b.tz, t),
-    ux: lerp(a.ux, b.ux, t),
-    uy: lerp(a.uy, b.uy, t),
-    uz: lerp(a.uz, b.uz, t),
-    rx: lerp(a.rx, b.rx, t),
-    ry: lerp(a.ry, b.ry, t),
-    rz: lerp(a.rz, b.rz, t),
+    tx,
+    ty,
+    tz,
+    ux,
+    uy,
+    uz,
+    rx,
+    ry,
+    rz,
     width: lerp(a.width, b.width, t),
     s: ss,
     boost: a.boost || b.boost,

@@ -197,6 +197,7 @@ export class CarSim {
     if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
     if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
     if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
+    if (!this.airborne && height < -0.7) return true;
     if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 14) return true;
     return false;
   }
@@ -310,6 +311,8 @@ export class CarSim {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
+      this.boost = 0;
+      this.speed = Math.min(this.speed, 22);
       this.px += sm.ux * 0.1;
       this.py += sm.uy * 0.1;
       this.pz += sm.uz * 0.1;
@@ -373,12 +376,24 @@ export class CarSim {
       into < 4.2 &&
       (!vertical || this.airTime < 0.55);
 
+    if (Math.abs(lat) > near.width * 0.5 + 1.6 || height < -0.4) {
+      this.boost = 0;
+      const spd = Math.hypot(this.vx, this.vy, this.vz);
+      if (spd > 18) {
+        const k = 18 / spd;
+        this.vx *= k;
+        this.vy *= k;
+        this.vz *= k;
+      }
+    }
+
     if (!canLand && upright && height < 2.1 && height > -0.8 && Math.abs(lat) < half + 5.5 && this.airTime > 0.08) {
       this.airborne = false;
       this.justLand = false;
       this.landLock = LAND_LOCK;
       this.airTime = 0;
       this.airBlend = 0;
+      this.boost = 0;
       this.s = near.s;
       this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
       const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
@@ -572,14 +587,30 @@ function shouldLeaveTrack(speed: number, uy: number) {
 
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
-  let s = Math.max(2, (cp ?? 6) + 1.5);
-  for (let i = 0; i < 48; i++) {
-    const sm = sampleAt(track, s);
-    if (sm.uy > 0.45) return s;
-    s += 2.2;
-    if (track.def.closed && s >= track.length) s -= track.length;
+  const origin = Math.max(2, (cp ?? 6) + 2);
+  const samples = track.samples;
+  const L = track.length || 1;
+  let bestS = 6;
+  let bestScore = -1;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.78 || sm.y < -3) continue;
+    const prev = samples[(i - 1 + samples.length) % samples.length]!;
+    const next = samples[(i + 1) % samples.length]!;
+    if (prev.uy < 0.68 || next.uy < 0.68) continue;
+    let ds = sm.s - origin;
+    if (track.def.closed) {
+      ds = ((ds % L) + L) % L;
+      if (ds > L * 0.5) ds -= L;
+    }
+    if (ds < -3 || ds > 32) continue;
+    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestS = sm.s;
+    }
   }
-  return Math.max(2, (cp ?? 6) + 1.5);
+  return bestScore < 0 ? 6 : bestS;
 }
 
 export const FIXED_DT = FIXED;
