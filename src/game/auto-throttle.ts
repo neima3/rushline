@@ -21,9 +21,13 @@ export function isSpuriousHoldEnd(type: string): boolean {
  * TouchPad Accel ignores cancel so the car keeps rolling. Brake used the same
  * HoldButton, then Safari's cancel storm (`pointercancel` + ghost `pointerup`
  * + `touchend`) released the hold and auto-throttle climbed back (keyboard S
- * still slowed). Keep the hold through that storm; only a real lift after the
- * grace window ends it. `pointerup` during grace is ghost — iOS fires it on
- * the real TouchPad path, not only `touchend`.
+ * still slowed).
+ *
+ * Latch until a confirmed finger-up: zero remaining touches AND no
+ * pointerdown/cancel for HOLD_CANCEL_GRACE_MS. Never release on
+ * pointercancel / lostpointercapture / a solitary ghost pointerup.
+ * Arm grace on down even when no cancel has fired — iOS often sends
+ * pointerup with cancelUntil===0, which used to look like a real lift.
  */
 export function shouldReleaseHold(
   type: string,
@@ -33,6 +37,8 @@ export function shouldReleaseHold(
 ): boolean {
   if (isSpuriousHoldEnd(type)) return false;
   if (remainingTouches > 0) return false;
+  // Unarmed: ghost pointerup with no prior cancel must not clear the latch.
+  if (cancelUntil <= 0) return false;
   if (now < cancelUntil) return false;
   return type === "pointerup" || type === "touchend";
 }
@@ -46,21 +52,25 @@ export type HoldEvent = {
 };
 
 /**
- * TouchPad HoldButton state machine. Pointerdown / touchstart latch the hold;
- * cancel storms only extend grace; a lift after grace with no fingers ends it.
+ * TouchPad HoldButton state machine. Pointerdown / touchstart latch the hold
+ * and arm grace. Cancel storms only extend grace. A lift after grace with
+ * no fingers ends it.
  */
 export function reduceHold(state: HoldLatch, event: HoldEvent): HoldLatch {
   if (event.type === "pointerdown" || event.type === "touchstart") {
-    return { held: true, cancelUntil: state.cancelUntil };
+    return { held: true, cancelUntil: event.now + HOLD_CANCEL_GRACE_MS };
   }
   if (isSpuriousHoldEnd(event.type)) {
-    return { held: state.held, cancelUntil: event.now + HOLD_CANCEL_GRACE_MS };
+    return {
+      held: state.held,
+      cancelUntil: Math.max(state.cancelUntil, event.now + HOLD_CANCEL_GRACE_MS),
+    };
   }
   if (
     state.held &&
     shouldReleaseHold(event.type, event.now, state.cancelUntil, event.remainingTouches ?? 0)
   ) {
-    return { held: false, cancelUntil: state.cancelUntil };
+    return { held: false, cancelUntil: 0 };
   }
   return state;
 }

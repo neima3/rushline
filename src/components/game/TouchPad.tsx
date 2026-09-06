@@ -135,16 +135,16 @@ function HoldButton({
       onHold(1);
     };
 
-    const release = (id?: number) => {
-      if (id != null && pidRef.current != null && id !== pidRef.current) return;
+    const release = () => {
       if (!holdRef.current) return;
       holdRef.current = false;
       pidRef.current = null;
+      fingersRef.current.clear();
       setHeld(false);
       onHold(0);
     };
 
-    const apply = (type: string, extra?: { id?: number; remainingTouches?: number }) => {
+    const apply = (type: string, extra?: { remainingTouches?: number }) => {
       const next = reduceHold(
         { held: holdRef.current, cancelUntil: cancelUntilRef.current },
         {
@@ -155,7 +155,7 @@ function HoldButton({
       );
       cancelUntilRef.current = next.cancelUntil;
       if (next.held) press();
-      else release(extra?.id);
+      else release();
     };
 
     const down = (e: PointerEvent) => {
@@ -167,12 +167,21 @@ function HoldButton({
       } catch {
         /* capture is optional; window pointerup / late touchend still end it */
       }
-      apply("pointerdown", { id: e.pointerId });
+      apply("pointerdown", { remainingTouches: Math.max(1, fingersRef.current.size) });
     };
 
     const end = (e: PointerEvent) => {
       if (pidRef.current != null && e.pointerId !== pidRef.current) return;
-      apply(e.type, { id: e.pointerId, remainingTouches: fingersRef.current.size });
+      // pointercancel / lostpointercapture / pointerup-during-grace are ghost.
+      // Keep remainingTouches > 0 so reduceHold cannot treat them as a lift.
+      const now = performance.now();
+      const ghost =
+        e.type === "pointercancel" ||
+        e.type === "lostpointercapture" ||
+        now < cancelUntilRef.current;
+      apply(e.type, {
+        remainingTouches: ghost ? Math.max(1, fingersRef.current.size) : fingersRef.current.size,
+      });
     };
 
     const noteFingers = (e: TouchEvent, add: boolean) => {
@@ -197,7 +206,11 @@ function HoldButton({
       }
       noteFingers(e, false);
       if (!ours) return;
-      apply(e.type, { remainingTouches: fingersRef.current.size });
+      const now = performance.now();
+      const ghost = e.type === "touchcancel" || now < cancelUntilRef.current;
+      apply(e.type, {
+        remainingTouches: ghost ? Math.max(1, fingersRef.current.size) : fingersRef.current.size,
+      });
     };
 
     const opts: AddEventListenerOptions = { passive: false };
