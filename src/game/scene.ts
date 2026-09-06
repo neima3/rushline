@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./types";
-import { buildTrackMeshes, sampleAt } from "./track";
+import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
@@ -59,7 +59,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
 
 export class World {
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(62, 1, 0.1, 900);
+  camera = new THREE.PerspectiveCamera(62, 1, 0.28, 900);
   renderer: THREE.WebGLRenderer;
   private trackRoot = new THREE.Group();
   private envRoot = new THREE.Group();
@@ -217,11 +217,31 @@ export class World {
       snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
     );
     this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
+    this.keepCameraClear(snap, null, mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
     this.camera.fov = portrait ? 60 : 58;
     this.camera.updateProjectionMatrix();
+  }
+
+  private keepCameraClear(snap: CarSnap, track: BuiltTrack | null, mode: CameraMode) {
+    const minAboveCar = mode === "hood" ? 0.85 : 1.85;
+    this.camPos.y = Math.max(this.camPos.y, snap.py + minAboveCar);
+    if (!track) return;
+    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
+    const hx = this.camPos.x - near.x;
+    const hy = this.camPos.y - near.y;
+    const hz = this.camPos.z - near.z;
+    const height = hx * near.ux + hy * near.uy + hz * near.uz;
+    const floor = mode === "hood" ? 0.7 : 1.55;
+    if (height < floor) {
+      const push = floor - height;
+      this.camPos.x += near.ux * push + _worldUp.x * push * 0.35;
+      this.camPos.y += near.uy * push + _worldUp.y * push * 0.35;
+      this.camPos.z += near.uz * push + _worldUp.z * push * 0.35;
+    }
+    this.camPos.y = Math.max(this.camPos.y, near.y + 1.25, snap.py + minAboveCar);
   }
 
   private loadSky(url: string, fog: number) {
@@ -422,34 +442,31 @@ export class World {
     _right.normalize();
 
     const spd = Math.abs(snap.speed);
+    const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
     if (mode === "hood") {
-      _desired.set(
-        snap.px + snap.ux * 1.08 - snap.fx * 0.35,
-        snap.py + 0.82,
-        snap.pz + snap.uz * 1.08 - snap.fz * 0.35,
-      );
-      _look.set(snap.px + snap.fx * 16 + snap.ux * 0.12, snap.py + 0.2, snap.pz + snap.fz * 16 + snap.uz * 0.12);
+      _desired.set(snap.px - snap.fx * 0.28, snap.py + 1.12 + steep * 0.35, snap.pz - snap.fz * 0.28);
+      _look.set(snap.px + snap.fx * 16, snap.py + 0.35, snap.pz + snap.fz * 16);
     } else {
-      const dist = 6.7 + spd * 0.026 + (snap.airborne ? 1.15 : 0);
-      const height = 1.92 + spd * 0.009 + (snap.airborne ? 1.2 : 0);
-      const lean = -snap.heading * (snap.airborne ? 0.22 : 0.42);
+      const dist = 6.2 + spd * 0.02 + (snap.airborne ? 1.15 : 0) - steep * 1.8;
+      const height = 2.15 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * 2.1;
+      const lean = -snap.heading * (snap.airborne ? 0.16 : 0.28);
       _desired.set(
         snap.px - this.camFwd.x * dist + this.camUp.x * height + _right.x * lean,
         snap.py - this.camFwd.y * dist + this.camUp.y * height,
         snap.pz - this.camFwd.z * dist + this.camUp.z * height + _right.z * lean,
       );
-      const lookDist = 13 + spd * 0.11;
+      const lookDist = 12 + spd * 0.1;
       _look.set(
-        snap.px + this.camFwd.x * lookDist + this.camUp.x * 0.28,
-        snap.py + this.camFwd.y * lookDist + this.camUp.y * 0.28 - (snap.airborne ? 1.05 : 0),
-        snap.pz + this.camFwd.z * lookDist + this.camUp.z * 0.28,
+        snap.px + this.camFwd.x * lookDist,
+        snap.py + 0.55 - (snap.airborne ? 0.7 : 0),
+        snap.pz + this.camFwd.z * lookDist,
       );
     }
     const follow = mode === "hood" ? 14 : snap.airborne ? 8.8 : 11.2;
     const k = 1 - Math.exp(-follow * dt);
     this.camPos.lerp(_desired, k);
     this.lookPos.lerp(_look, k);
-    this.camPos.y = Math.max(this.camPos.y, snap.py + 1.55);
+    this.keepCameraClear(snap, track, mode);
 
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
     const shake = reduced ? 0 : this.trauma * this.trauma * 0.5;

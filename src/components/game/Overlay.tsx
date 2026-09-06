@@ -72,7 +72,7 @@ export function Overlay({ gameRef }: Props) {
             {pad.connected ? <PadChip xbox={pad.xbox} /> : null}
             <div className="hidden gap-2 md:flex">
               <GhostChip
-                label={camera === "chase" ? "Chase" : "Hood"}
+                label={camera === "hood" ? "Hood" : "Chase"}
                 onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
               />
               <button
@@ -422,6 +422,7 @@ function GhostChip({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
+      data-camera={label.toLowerCase()}
       onMouseDown={keepPlayFocus}
       onClick={onClick}
       className="h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"

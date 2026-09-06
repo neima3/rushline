@@ -33,6 +33,8 @@ export class Input {
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
   private lastPadUse = 0;
   touchMode = false;
+  onPauseHotkey: (() => void) | null = null;
+  onCameraHotkey: (() => void) | null = null;
   private queued = { pause: false, camera: false, respawn: false };
   private brakeLatchUntil = 0;
   private edgePrev = {
@@ -52,12 +54,27 @@ export class Input {
 
   constructor() {
     this.onKeyDown = (e) => {
-      if (GAME_CODES.has(e.code)) {
+      const esc = e.code === "Escape" || e.key === "Escape";
+      if (GAME_CODES.has(e.code) || esc) {
         e.preventDefault();
         this.keys.add(e.code);
         if (e.repeat) return;
-        if (e.code === "Escape" || e.code === "KeyP") this.queued.pause = true;
-        if (e.code === "KeyC") this.queued.camera = true;
+        if (esc || e.code === "KeyP") {
+          if (this.onPauseHotkey) {
+            this.onPauseHotkey();
+            this.edgePrev.pause = true;
+          } else {
+            this.queued.pause = true;
+          }
+        }
+        if (e.code === "KeyC") {
+          if (this.onCameraHotkey) {
+            this.onCameraHotkey();
+            this.edgePrev.camera = true;
+          } else {
+            this.queued.camera = true;
+          }
+        }
         if (e.code === "KeyR") this.queued.respawn = true;
       }
     };
@@ -81,7 +98,7 @@ export class Input {
     window.addEventListener("keydown", this.onKeyDown, opts);
     window.addEventListener("keyup", this.onKeyUp, opts);
     window.addEventListener("blur", this.onBlur);
-    document.addEventListener("visibilitychange", this.onBlur);
+    surface?.addEventListener("keydown", this.onKeyDown, opts);
     window.addEventListener("gamepadconnected", this.onPad);
     window.addEventListener("gamepaddisconnected", this.onPad);
     window.addEventListener("pointerdown", this.onPad);
@@ -93,7 +110,7 @@ export class Input {
     window.removeEventListener("keydown", this.onKeyDown, opts);
     window.removeEventListener("keyup", this.onKeyUp, opts);
     window.removeEventListener("blur", this.onBlur);
-    document.removeEventListener("visibilitychange", this.onBlur);
+    this.surface?.removeEventListener("keydown", this.onKeyDown, { capture: true });
     window.removeEventListener("gamepadconnected", this.onPad);
     window.removeEventListener("gamepaddisconnected", this.onPad);
     window.removeEventListener("pointerdown", this.onPad);

@@ -128,11 +128,18 @@ export class CarSim {
     this.landLock = 0;
     this.airBlend = 0;
     this.recoverLock = 0.85;
+    this.landLock = 0.2;
     this.place(track);
-    if (this.uy < 0.62) {
+    if (this.uy < 0.78 || this.airborne) {
       this.s = pickSafeRespawnS(track, -1);
+      this.airborne = false;
       this.place(track);
     }
+    this.heading = 0;
+    this.n = 0;
+    this.airborne = false;
+    this.vx = this.vy = this.vz = 0;
+    this.place(track);
   }
 
   private place(track: BuiltTrack) {

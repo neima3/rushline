@@ -63,6 +63,14 @@ export class Game {
     this.canvas.tabIndex = 0;
     this.canvas.style.outline = "none";
     this.input.attach(this.canvas);
+    this.input.onPauseHotkey = () => {
+      if (this.phase === "race" || this.phase === "countdown") this.pause();
+      else if (this.phase === "paused") this.resume();
+    };
+    this.input.onCameraHotkey = () => {
+      if (this.phase === "menu" || this.phase === "select") return;
+      this.setCamera(this.camera === "chase" ? "hood" : "chase");
+    };
     this.audio.attach();
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.ghost = readSave().ghosts.circuit ?? null;
