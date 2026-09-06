@@ -9,11 +9,30 @@ const OPENING_SPEED = 17;
 const TOUCH_CRUISE = 0.5;
 const TOUCH_LATE_SPEED = 24;
 
-export const BRAKE_LATCH_MS = 340;
+export const BRAKE_LATCH_MS = 520;
+export const HOLD_CANCEL_GRACE_MS = 480;
 
 /** iOS Safari fires these when the canvas takes focus or a scroll heuristic runs. */
 export function isSpuriousHoldEnd(type: string): boolean {
   return type === "pointercancel" || type === "touchcancel" || type === "lostpointercapture";
+}
+
+/**
+ * TouchPad Accel ignores cancel so the car keeps rolling. Brake used the same
+ * HoldButton, then a ghost `touchend` after `pointercancel` released the hold
+ * and auto-throttle climbed back (keyboard S still slowed). Keep the hold
+ * through that cancel storm; only a real pointerup / late touchend ends it.
+ */
+export function shouldReleaseHold(
+  type: string,
+  now: number,
+  cancelUntil: number,
+  remainingTouches = 0,
+): boolean {
+  if (isSpuriousHoldEnd(type)) return false;
+  if (remainingTouches > 0) return false;
+  if (type === "touchend" && now < cancelUntil) return false;
+  return type === "pointerup" || type === "touchend";
 }
 
 /** Touch brake must slow to a stop, not dump the car into reverse from a crawl. */

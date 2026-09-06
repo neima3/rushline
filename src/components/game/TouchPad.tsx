@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
-import { isSpuriousHoldEnd } from "@/game/auto-throttle";
+import { HOLD_CANCEL_GRACE_MS, shouldReleaseHold } from "@/game/auto-throttle";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -120,12 +120,19 @@ function HoldButton({
 }) {
   const holdRef = useRef(false);
   const pidRef = useRef<number | null>(null);
+  const cancelUntilRef = useRef(0);
   const btnRef = useRef<HTMLDivElement>(null);
   const [held, setHeld] = useState(false);
 
   useEffect(() => {
     const el = btnRef.current;
     if (!el) return;
+
+    const press = () => {
+      holdRef.current = true;
+      setHeld(true);
+      onHold(1);
+    };
 
     const release = (id?: number) => {
       if (id != null && pidRef.current != null && id !== pidRef.current) return;
@@ -136,22 +143,43 @@ function HoldButton({
       onHold(0);
     };
 
+    const recapture = (id: number) => {
+      try {
+        el.setPointerCapture(id);
+      } catch {
+        /* capture is optional; window pointerup / late touchend still end it */
+      }
+    };
+
     const down = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       pidRef.current = e.pointerId;
-      holdRef.current = true;
-      setHeld(true);
-      onHold(1);
+      recapture(e.pointerId);
+      press();
     };
 
     const end = (e: PointerEvent) => {
-      if (isSpuriousHoldEnd(e.type)) return;
+      if (e.type === "pointercancel" || e.type === "lostpointercapture") {
+        cancelUntilRef.current = performance.now() + HOLD_CANCEL_GRACE_MS;
+        if (holdRef.current) recapture(e.pointerId);
+        return;
+      }
+      if (!shouldReleaseHold(e.type, performance.now(), cancelUntilRef.current)) return;
       release(e.pointerId);
     };
 
     const touchEnd = (e: TouchEvent) => {
-      if (isSpuriousHoldEnd(e.type)) return;
+      if (
+        !shouldReleaseHold(
+          e.type,
+          performance.now(),
+          cancelUntilRef.current,
+          e.touches.length,
+        )
+      ) {
+        return;
+      }
       release();
     };
 
@@ -159,12 +187,21 @@ function HoldButton({
     el.addEventListener("pointerdown", down, opts);
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
     el.addEventListener("touchend", touchEnd);
     el.addEventListener("touchcancel", touchEnd);
+    let raf = 0;
+    const tick = () => {
+      if (holdRef.current) onHold(1);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
     return () => {
+      cancelAnimationFrame(raf);
       el.removeEventListener("pointerdown", down, opts);
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
+      el.removeEventListener("lostpointercapture", end);
       el.removeEventListener("touchend", touchEnd);
       el.removeEventListener("touchcancel", touchEnd);
       if (holdRef.current) onHold(0);
@@ -181,6 +218,7 @@ function HoldButton({
       data-play-control="1"
       aria-label={label}
       aria-pressed={held}
+      data-held={held ? "1" : "0"}
       className={`play-control h-14 min-h-14 w-24 touch-none select-none rounded-lg border text-sm font-medium ${
         accent
           ? "border-accent bg-accent text-accent-fg"

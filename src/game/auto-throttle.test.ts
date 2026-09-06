@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { autoThrottleCap, clampTouchSpeed, isSpuriousHoldEnd, latchBrake } from "./auto-throttle.ts";
+import {
+  autoThrottleCap,
+  clampTouchSpeed,
+  HOLD_CANCEL_GRACE_MS,
+  isSpuriousHoldEnd,
+  latchBrake,
+  shouldReleaseHold,
+} from "./auto-throttle.ts";
 
 describe("autoThrottleCap", () => {
   it("holds the car during countdown", () => {
@@ -103,8 +110,21 @@ describe("latchBrake", () => {
     const blip = latchBrake(1200, 0, down.latchUntil);
     assert.equal(blip.cutThrottle, true);
     assert.equal(blip.brake, 1);
-    const after = latchBrake(1400, 0, blip.latchUntil);
+    const after = latchBrake(1600, 0, blip.latchUntil);
     assert.equal(after.cutThrottle, false);
     assert.equal(after.brake, 0);
+  });
+});
+
+describe("shouldReleaseHold", () => {
+  it("keeps Accel/Brake held through Safari cancel then ghost touchend", () => {
+    const cancelUntil = 1000 + HOLD_CANCEL_GRACE_MS;
+    assert.equal(shouldReleaseHold("pointercancel", 1010, cancelUntil), false);
+    assert.equal(shouldReleaseHold("touchcancel", 1010, cancelUntil), false);
+    assert.equal(shouldReleaseHold("lostpointercapture", 1010, cancelUntil), false);
+    assert.equal(shouldReleaseHold("touchend", 1100, cancelUntil), false);
+    assert.equal(shouldReleaseHold("touchend", 1100, cancelUntil, 1), false);
+    assert.equal(shouldReleaseHold("pointerup", 1800, cancelUntil), true);
+    assert.equal(shouldReleaseHold("touchend", 1800, cancelUntil), true);
   });
 });
