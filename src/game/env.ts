@@ -225,11 +225,11 @@ function buildNight(
 ) {
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    color: 0x121722,
+    color: 0x121018,
     roughness: 0.62,
     metalness: 0.18,
-    emissive: 0x0a1528,
-    emissiveIntensity: 0.45,
+    emissive: 0x1a0a28,
+    emissiveIntensity: 0.4,
   });
   const n = 40;
   const buildings = new THREE.InstancedMesh(bldgGeo, bldgMat, n);
@@ -272,13 +272,21 @@ function buildNight(
   mats.push(winMat);
 
   const neonGeo = new THREE.BoxGeometry(1, 0.08, 0.08);
-  const neonMat = new THREE.MeshStandardMaterial({
-    color: 0x6ec8ff,
-    emissive: 0x3aa0ff,
+  const neonCyan = new THREE.MeshStandardMaterial({
+    color: 0x3ec8ff,
+    emissive: 0x3ec8ff,
+    emissiveIntensity: 2.4,
+  });
+  const neonMagenta = new THREE.MeshStandardMaterial({
+    color: 0xff3aa0,
+    emissive: 0xff3aa0,
     emissiveIntensity: 2.2,
   });
   const neonN = 48;
-  const neons = new THREE.InstancedMesh(neonGeo, neonMat, neonN);
+  const cyanNeons = new THREE.InstancedMesh(neonGeo, neonCyan, neonN / 2);
+  const magentaNeons = new THREE.InstancedMesh(neonGeo, neonMagenta, neonN / 2);
+  let ci = 0;
+  let mi = 0;
   for (let i = 0; i < neonN; i++) {
     const sm = track.samples[Math.floor((i / neonN) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
@@ -289,11 +297,14 @@ function buildNight(
     _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
     _dummy.scale.set(2.8, 1, 1);
     _dummy.updateMatrix();
-    neons.setMatrixAt(i, _dummy.matrix);
+    if (side > 0) cyanNeons.setMatrixAt(ci++, _dummy.matrix);
+    else magentaNeons.setMatrixAt(mi++, _dummy.matrix);
   }
-  group.add(neons);
+  cyanNeons.count = ci;
+  magentaNeons.count = mi;
+  group.add(cyanNeons, magentaNeons);
   geos.push(neonGeo);
-  mats.push(neonMat);
+  mats.push(neonCyan, neonMagenta);
 }
 
 function decorateTrackside(
@@ -306,8 +317,8 @@ function decorateTrackside(
 ) {
   const lampGeo = new THREE.SphereGeometry(0.22, 8, 8);
   const lampMat = new THREE.MeshStandardMaterial({
-    color: theme === "night" ? 0xaad0ff : 0xfff0c8,
-    emissive: theme === "night" ? 0x6aa0ff : 0xffe0a0,
+    color: theme === "night" ? 0x8ee4ff : 0xfff0c8,
+    emissive: theme === "night" ? 0x3ec8ff : 0xffe0a0,
     emissiveIntensity: theme === "night" ? 1.8 : 0.9,
   });
   const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.6, 6);
@@ -331,7 +342,7 @@ function decorateTrackside(
     lamp.position.set(px + sm.ux * 1.25, py + sm.uy * 1.25, pz + sm.uz * 1.25);
     group.add(pole, lamp);
     if (theme === "night" && realLights < 8) {
-      const pl = new THREE.PointLight(0x8eb8ff, 0.85, 22, 2);
+      const pl = new THREE.PointLight(0x5ec8ff, 0.8, 22, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);

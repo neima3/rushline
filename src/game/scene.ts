@@ -19,38 +19,54 @@ type ThemePack = {
   sun: number;
   sunPos: [number, number, number];
   exposure: number;
+  hemiIntensity: number;
+  sunIntensity: number;
+  fogNear: number;
+  fogFar: number;
   sky: string;
 };
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0x9ec4e6,
+    fog: 0xb7d6f2,
     ground: 0x6ea05a,
-    hemiSky: 0xcfe8ff,
-    hemiGround: 0x8a9a6a,
-    sun: 0xfff4e0,
-    sunPos: [80, 120, 40],
-    exposure: 1.1,
+    hemiSky: 0x7eb6ff,
+    hemiGround: 0xc5cdd6,
+    sun: 0xfff6e6,
+    sunPos: [80, 130, 36],
+    exposure: 1.18,
+    hemiIntensity: 0.88,
+    sunIntensity: 1.55,
+    fogNear: 90,
+    fogFar: 480,
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
-    fog: 0xc9966e,
+    fog: 0xde9a5c,
     ground: 0x8a5a38,
-    hemiSky: 0xffc9a0,
-    hemiGround: 0x6a4028,
-    sun: 0xffd0a0,
-    sunPos: [-60, 40, 80],
-    exposure: 1.02,
+    hemiSky: 0xffb070,
+    hemiGround: 0x9a4e28,
+    sun: 0xffa050,
+    sunPos: [-70, 28, 90],
+    exposure: 1.06,
+    hemiIntensity: 0.72,
+    sunIntensity: 1.35,
+    fogNear: 65,
+    fogFar: 360,
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x0b1220,
-    ground: 0x12161f,
-    hemiSky: 0x1a2a48,
-    hemiGround: 0x08090d,
-    sun: 0xa8c4ff,
-    sunPos: [20, 80, -40],
-    exposure: 0.88,
+    fog: 0x2a1448,
+    ground: 0x121018,
+    hemiSky: 0x2a1850,
+    hemiGround: 0x0a0612,
+    sun: 0x4aa8c8,
+    sunPos: [-40, 70, 20],
+    exposure: 0.84,
+    hemiIntensity: 0.48,
+    sunIntensity: 0.42,
+    fogNear: 45,
+    fogFar: 280,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -148,14 +164,15 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    (this.scene.fog as THREE.Fog).near = theme === "night" ? 50 : 80;
-    (this.scene.fog as THREE.Fog).far = theme === "night" ? 320 : 440;
+    (this.scene.fog as THREE.Fog).near = pack.fogNear;
+    (this.scene.fog as THREE.Fog).far = pack.fogFar;
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
+    this.hemi.intensity = pack.hemiIntensity;
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 0.55 : 1.45;
+    this.sun.intensity = pack.sunIntensity;
     this.renderer.toneMappingExposure = pack.exposure;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
@@ -174,6 +191,7 @@ export class World {
     this.disposables.push(...env.geos, ...env.mats);
     this.textures.push(...env.textures);
     this.nightLights = env.lights;
+    this.car.setThemeLivery(theme);
     this.car.setHeadlights(theme === "night");
     this.loadSky(pack.sky, pack.fog);
 
