@@ -36,8 +36,8 @@ type LiveryPack = {
 const LIVERIES: Record<ThemeId, LiveryPack> = {
   stadium: {
     body: 0xe8e9ed,
-    bodyRough: 0.28,
-    bodyMetal: 0.55,
+    bodyRough: 0.36,
+    bodyMetal: 0.22,
     carbon: 0x141418,
     accentA: 0xc4a574,
     accentAEmissive: 0x3a2a14,
@@ -51,9 +51,9 @@ const LIVERIES: Record<ThemeId, LiveryPack> = {
     glow: 0xdde4ee,
   },
   canyon: {
-    body: 0xcc7040,
+    body: 0xd47848,
     bodyRough: 0.34,
-    bodyMetal: 0.46,
+    bodyMetal: 0.38,
     carbon: 0x2a1c14,
     accentA: 0xe8dcc4,
     accentAEmissive: 0x4a3820,

@@ -42,31 +42,31 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
-    fog: 0xde9a5c,
+    fog: 0xd4a070,
     ground: 0x8a5a38,
-    hemiSky: 0xffb070,
-    hemiGround: 0x9a4e28,
-    sun: 0xffa050,
+    hemiSky: 0xffb878,
+    hemiGround: 0x8a4a28,
+    sun: 0xffb060,
     sunPos: [-70, 28, 90],
     exposure: 1.06,
-    hemiIntensity: 0.72,
-    sunIntensity: 1.35,
-    fogNear: 65,
-    fogFar: 360,
+    hemiIntensity: 0.74,
+    sunIntensity: 1.38,
+    fogNear: 80,
+    fogFar: 420,
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x2a1448,
+    fog: 0x241848,
     ground: 0x121018,
-    hemiSky: 0x2a1850,
-    hemiGround: 0x0a0612,
-    sun: 0x4aa8c8,
+    hemiSky: 0x3a2870,
+    hemiGround: 0x100818,
+    sun: 0x5ec8e0,
     sunPos: [-40, 70, 20],
-    exposure: 0.84,
-    hemiIntensity: 0.48,
-    sunIntensity: 0.42,
-    fogNear: 45,
-    fogFar: 280,
+    exposure: 0.92,
+    hemiIntensity: 0.62,
+    sunIntensity: 0.58,
+    fogNear: 60,
+    fogFar: 380,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -93,6 +93,7 @@ export class World {
   private loader = new THREE.TextureLoader();
   private nightLights: THREE.Object3D[] = [];
   private theme: ThemeId = "stadium";
+  private loadedKey: string | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -154,6 +155,14 @@ export class World {
   }
 
   loadTrack(track: BuiltTrack, theme: ThemeId) {
+    const key = `${track.def.id}:${theme}`;
+    if (this.loadedKey === key && this.trackRoot.children.length > 0) {
+      this.theme = theme;
+      this.car.setThemeLivery(theme);
+      this.car.setHeadlights(theme === "night");
+      return;
+    }
+    this.loadedKey = key;
     this.theme = theme;
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
@@ -200,13 +209,24 @@ export class World {
     this.camera.position.copy(this.camPos);
   }
 
+  private skyUrl: string | null = null;
+
   private loadSky(url: string, fog: number) {
+    if (this.skyMesh && this.skyUrl === url) {
+      const mat = this.skyMesh.material as THREE.MeshBasicMaterial;
+      if (!mat.map) mat.color.set(fog);
+      return;
+    }
     if (this.skyMesh) {
       this.scene.remove(this.skyMesh);
       this.skyMesh.geometry.dispose();
-      (this.skyMesh.material as THREE.Material).dispose();
+      const old = this.skyMesh.material as THREE.MeshBasicMaterial;
+      if (old.map) old.map.dispose();
+      old.dispose();
+      if (this.skyUrl) THREE.Cache.remove(this.skyUrl);
       this.skyMesh = null;
     }
+    this.skyUrl = url;
     const geo = new THREE.SphereGeometry(420, 32, 20);
     const mat = new THREE.MeshBasicMaterial({
       color: fog,
@@ -219,6 +239,10 @@ export class World {
     this.loader.load(
       url,
       (tex) => {
+        if (this.skyUrl !== url) {
+          tex.dispose();
+          return;
+        }
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = 4;
         mat.map = tex;
