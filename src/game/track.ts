@@ -484,12 +484,21 @@ export function sampleAt(track: BuiltTrack, s: number): Sample {
   };
 }
 
+function wrapSigned(ds: number, length: number) {
+  const L = length || 1;
+  let d = ((ds % L) + L) % L;
+  if (d > L * 0.5) d -= L;
+  return d;
+}
+
 export function nearestSample(track: BuiltTrack, x: number, y: number, z: number, hintS: number): Sample {
   const { samples } = track;
   const n = samples.length;
   if (!n) return sampleAt(track, 0);
   const hint = samples.findIndex((sm) => sm.s >= hintS);
   const start = Math.max(0, hint < 0 ? 0 : hint);
+  const hintSm = sampleAt(track, hintS);
+  const L = track.length || 1;
   let best = samples[start]!;
   let bestD = Infinity;
   const window = Math.min(n, 80);
@@ -498,7 +507,13 @@ export function nearestSample(track: BuiltTrack, x: number, y: number, z: number
     if (track.def.closed) i = ((i % n) + n) % n;
     else if (i < 0 || i >= n) continue;
     const sm = samples[i]!;
-    const d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
+    let d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
+    // Closed ribbons overlap at the start/finish. Index neighbors from the
+    // closing stretch sit a few metres left/right of the outbound lane and
+    // win a pure XYZ race — that is the pre-CP1 left-shoulder snap.
+    const align = sm.tx * hintSm.tx + sm.ty * hintSm.ty + sm.tz * hintSm.tz;
+    if (align < 0.12) d += 28;
+    d += Math.abs(wrapSigned(sm.s - hintS, L)) * 0.22;
     if (d < bestD) {
       bestD = d;
       best = sm;

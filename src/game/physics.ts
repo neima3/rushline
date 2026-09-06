@@ -107,7 +107,7 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
-    this.s = pickSafeRespawnS(track, this.lastCp);
+    this.s = pickSafeRespawnS(track, this.lastCp, this.s);
     this.n = 0;
     this.heading = 0;
     this.speed = 9;
@@ -131,7 +131,7 @@ export class CarSim {
     this.landLock = 0.2;
     this.place(track);
     if (this.uy < 0.78 || this.airborne) {
-      this.s = pickSafeRespawnS(track, -1);
+      this.s = pickSafeRespawnS(track, -1, this.s);
       this.airborne = false;
       this.place(track);
     }
@@ -629,19 +629,67 @@ function shouldLeaveTrack(speed: number, uy: number) {
   return uy < -0.42 && speed < STICK_SPEED;
 }
 
-function sampleNearInvert(samples: BuiltTrack["samples"], i: number) {
+function wrapSignedS(ds: number, length: number) {
+  const L = length || 1;
+  let d = ((ds % L) + L) % L;
+  if (d > L * 0.5) d -= L;
+  return d;
+}
+
+function sampleNearInvert(samples: BuiltTrack["samples"], i: number, seamAware = false) {
+  const n = samples.length;
+  const L = samples[n - 1]?.s || 1;
+  const self = samples[i]!;
+  const nearSeam = self.s < 22 || self.s > L - 22;
   for (let k = -8; k <= 8; k++) {
-    const nb = samples[(i + k + samples.length) % samples.length]!;
+    const j = i + k;
+    let nb;
+    if (j >= 0 && j < n) {
+      nb = samples[j]!;
+    } else if (!seamAware) {
+      nb = samples[((j % n) + n) % n]!;
+    } else if (nearSeam) {
+      const wrapped = samples[((j % n) + n) % n]!;
+      if (wrapped.s >= 22 && wrapped.s <= L - 22) continue;
+      nb = wrapped;
+    } else {
+      continue;
+    }
     if (nb.uy < 0.15) return true;
   }
   return false;
 }
 
-export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
+function oppositeRibbonGap(samples: BuiltTrack["samples"], i: number) {
+  const sm = samples[i]!;
+  const n = samples.length;
+  const step = Math.max(1, Math.floor(n / 90));
+  let best = Infinity;
+  for (let j = 0; j < n; j += step) {
+    const other = samples[j]!;
+    if (sm.tx * other.tx + sm.ty * other.ty + sm.tz * other.tz > -0.35) continue;
+    const d = Math.hypot(sm.x - other.x, sm.y - other.y, sm.z - other.z);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function earlyRespawnOrigin(track: BuiltTrack, alongS: number) {
+  const L = track.length || 1;
+  const firstCp = track.checkpoints[0] ?? 80;
+  const raw = Number.isFinite(alongS) ? alongS : 6;
+  const wrapped = track.def.closed ? ((raw % L) + L) % L : Math.max(0, raw);
+  if (wrapped >= firstCp) return 14;
+  return Math.max(14, Math.min(wrapped, firstCp - 8));
+}
+
+export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 6) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
-  const origin = Math.max(2, (cp ?? 6) + 2);
+  const early = lastCp < 0 && track.def.id === "circuit";
+  const origin = early ? earlyRespawnOrigin(track, alongS) : Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;
+  const firstCp = track.checkpoints[0] ?? 80;
   const originSm = sampleAt(track, origin);
   const ox = originSm.tx;
   const oz = originSm.tz;
@@ -650,18 +698,28 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
     if (sm.uy < 0.88 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
-    const prev = samples[(i - 1 + samples.length) % samples.length]!;
-    const next = samples[(i + 1) % samples.length]!;
-    if (prev.uy < 0.7 || next.uy < 0.7) continue;
-    if (sampleNearInvert(samples, i)) continue;
+    if (early && track.def.closed && sm.s > Math.min(firstCp + 6, L * 0.4)) continue;
+    const prev = early
+      ? i > 0
+        ? samples[i - 1]
+        : null
+      : samples[(i - 1 + samples.length) % samples.length]!;
+    const next = early
+      ? i + 1 < samples.length
+        ? samples[i + 1]
+        : null
+      : samples[(i + 1) % samples.length]!;
+    if ((prev && prev.uy < 0.7) || (next && next.uy < 0.7)) continue;
+    if (sampleNearInvert(samples, i, early)) continue;
     if (sm.tx * ox + sm.tz * oz < 0.12) continue;
     let ds = sm.s - origin;
-    if (track.def.closed) {
-      ds = ((ds % L) + L) % L;
-      if (ds > L * 0.5) ds -= L;
-    }
+    if (track.def.closed) ds = wrapSignedS(ds, L);
     if (ds < -2 || ds > 40) continue;
-    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 2.4;
+    let score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 2.4;
+    if (early) {
+      const gap = oppositeRibbonGap(samples, i);
+      score += Math.min(1.2, gap * 0.08);
+    }
     if (score > bestScore) {
       bestScore = score;
       bestS = sm.s;
@@ -670,16 +728,14 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   if (bestScore >= 0) return bestS;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
-    if (sm.uy < 0.82 || sm.y < -3 || sampleNearInvert(samples, i) || Math.abs(sm.ty) > 0.5) continue;
+    if (sm.uy < 0.82 || sm.y < -3 || sampleNearInvert(samples, i, early) || Math.abs(sm.ty) > 0.5) continue;
+    if (early && track.def.closed && sm.s > Math.min(firstCp + 6, L * 0.4)) continue;
     if (sm.tx * ox + sm.tz * oz < 0) continue;
     let ds = sm.s - origin;
-    if (track.def.closed) {
-      ds = ((ds % L) + L) % L;
-      if (ds > L * 0.5) ds -= L;
-    }
+    if (track.def.closed) ds = wrapSignedS(ds, L);
     if (ds >= 0 && ds < 120) return sm.s;
   }
-  return 6;
+  return early ? 14 : 6;
 }
 
 export const FIXED_DT = FIXED;
