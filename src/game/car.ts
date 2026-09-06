@@ -41,7 +41,7 @@ const LIVERIES: Record<ThemeId, LiveryPack> = {
     carbon: 0x141418,
     accentA: 0xc4a574,
     accentAEmissive: 0x3a2a14,
-    accentAEmit: 0.2,
+    accentAEmit: 0.28,
     accentB: 0xc4a574,
     accentBEmissive: 0x3a2a14,
     accentBEmit: 0.2,
@@ -67,20 +67,20 @@ const LIVERIES: Record<ThemeId, LiveryPack> = {
     glow: 0xffc090,
   },
   night: {
-    body: 0x161a24,
-    bodyRough: 0.4,
-    bodyMetal: 0.38,
-    carbon: 0x0c0e14,
+    body: 0x1a2030,
+    bodyRough: 0.42,
+    bodyMetal: 0.28,
+    carbon: 0x12161f,
     accentA: 0x3ec8ff,
     accentAEmissive: 0x3ec8ff,
-    accentAEmit: 1.35,
+    accentAEmit: 0.75,
     accentB: 0xff3aa0,
     accentBEmissive: 0xff3aa0,
-    accentBEmit: 1.15,
-    rim: 0x3ec8ff,
+    accentBEmit: 0.65,
+    rim: 0x8aa4b8,
     rimEmissive: 0x3ec8ff,
-    rimEmit: 0.55,
-    glow: 0x6aa0ff,
+    rimEmit: 0.22,
+    glow: 0x5a80b0,
   },
 };
 
@@ -168,7 +168,7 @@ export function makeCar(ghost: boolean): CarRig {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
   }
-  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), carbon));
+  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), bodyMat));
   wing.position.set(0, 0.62, -1.05);
   for (const x of [-0.58, 0.58]) {
     const plate = add(mesh(new THREE.BoxGeometry(0.04, 0.16, 0.24), carbon));

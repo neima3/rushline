@@ -275,12 +275,12 @@ function buildNight(
   const neonCyan = new THREE.MeshStandardMaterial({
     color: 0x3ec8ff,
     emissive: 0x3ec8ff,
-    emissiveIntensity: 2.4,
+    emissiveIntensity: 1.45,
   });
   const neonMagenta = new THREE.MeshStandardMaterial({
     color: 0xff3aa0,
     emissive: 0xff3aa0,
-    emissiveIntensity: 2.2,
+    emissiveIntensity: 1.3,
   });
   const neonN = 48;
   const cyanNeons = new THREE.InstancedMesh(neonGeo, neonCyan, neonN / 2);
@@ -319,7 +319,7 @@ function decorateTrackside(
   const lampMat = new THREE.MeshStandardMaterial({
     color: theme === "night" ? 0x8ee4ff : 0xfff0c8,
     emissive: theme === "night" ? 0x3ec8ff : 0xffe0a0,
-    emissiveIntensity: theme === "night" ? 1.8 : 0.9,
+    emissiveIntensity: theme === "night" ? 1.15 : 0.9,
   });
   const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.6, 6);
   const poleMat = new THREE.MeshStandardMaterial({
@@ -342,7 +342,7 @@ function decorateTrackside(
     lamp.position.set(px + sm.ux * 1.25, py + sm.uy * 1.25, pz + sm.uz * 1.25);
     group.add(pole, lamp);
     if (theme === "night" && realLights < 8) {
-      const pl = new THREE.PointLight(0x5ec8ff, 0.8, 22, 2);
+      const pl = new THREE.PointLight(0x5ec8ff, 0.55, 20, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);
