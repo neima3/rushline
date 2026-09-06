@@ -10,6 +10,8 @@ const _fwd = new THREE.Vector3();
 const _desired = new THREE.Vector3();
 const _look = new THREE.Vector3();
 const _right = new THREE.Vector3();
+const _camUpTarget = new THREE.Vector3();
+const _worldUp = new THREE.Vector3(0, 1, 0);
 
 type ThemePack = {
   fog: number;
@@ -72,6 +74,8 @@ export class World {
   private textures: THREE.Texture[] = [];
   private camPos = new THREE.Vector3(0, 8, 16);
   private lookPos = new THREE.Vector3();
+  private camFwd = new THREE.Vector3(0, 0, -1);
+  private camUp = new THREE.Vector3(0, 1, 0);
   trauma = 0;
   private clockT = 0;
   private loader = new THREE.TextureLoader();
@@ -178,7 +182,11 @@ export class World {
     this.loadSky(pack.sky, pack.fog);
 
     const start = sampleAt(track, 6);
+    this.camFwd.set(start.tx, start.ty, start.tz).normalize();
+    if (this.camFwd.lengthSq() < 1e-6) this.camFwd.set(0, 0, -1);
+    this.camUp.set(start.ux, start.uy, start.uz).normalize();
     this.camPos.set(start.x - start.tx * 10 + start.ux * 4, start.y + 4, start.z - start.tz * 10 + start.uz * 4);
+    this.lookPos.set(start.x, start.y + 1, start.z);
     this.camera.position.copy(this.camPos);
   }
 
@@ -329,44 +337,74 @@ export class World {
     }
 
     _fwd.set(snap.fx, snap.fy, snap.fz);
+    if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
+    else _fwd.normalize();
     _up.set(snap.ux, snap.uy, snap.uz);
-    _right.crossVectors(_fwd, _up).normalize();
+    if (_up.lengthSq() < 1e-8) _up.copy(_worldUp);
+    else _up.normalize();
+
+    const upDot = THREE.MathUtils.clamp(_up.dot(_worldUp), -1, 1);
+    const rollAmt = snap.airborne ? 0.1 : THREE.MathUtils.clamp(0.28 + upDot * 0.32, 0.08, 0.48);
+    _camUpTarget.set(
+      _worldUp.x + (_up.x - _worldUp.x) * rollAmt,
+      _worldUp.y + (_up.y - _worldUp.y) * rollAmt,
+      _worldUp.z + (_up.z - _worldUp.z) * rollAmt,
+    );
+    if (_camUpTarget.lengthSq() < 1e-8) _camUpTarget.copy(_worldUp);
+    _camUpTarget.normalize();
+
+    const fwdK = 1 - Math.exp(-(snap.airborne ? 3.4 : 7.2) * dt);
+    const upK = 1 - Math.exp(-(snap.airborne ? 2.6 : 5.4) * dt);
+    this.camFwd.lerp(_fwd, fwdK);
+    if (this.camFwd.lengthSq() < 1e-8) this.camFwd.copy(_fwd);
+    else this.camFwd.normalize();
+    this.camUp.lerp(_camUpTarget, upK);
+    if (this.camUp.lengthSq() < 1e-8) this.camUp.copy(_worldUp);
+    else this.camUp.normalize();
+
+    _right.crossVectors(this.camUp, this.camFwd);
+    if (_right.lengthSq() < 1e-8) _right.set(1, 0, 0);
+    _right.normalize();
+
+    const spd = Math.abs(snap.speed);
     if (mode === "hood") {
       _desired.set(
         snap.px + snap.ux * 1.08 - snap.fx * 0.35,
         snap.py + 0.82,
         snap.pz + snap.uz * 1.08 - snap.fz * 0.35,
       );
-      _look.set(snap.px + snap.fx * 14 + snap.ux * 0.15, snap.py + 0.25, snap.pz + snap.fz * 14 + snap.uz * 0.15);
+      _look.set(snap.px + snap.fx * 16 + snap.ux * 0.12, snap.py + 0.2, snap.pz + snap.fz * 16 + snap.uz * 0.12);
     } else {
-      const dist = 7.6 + Math.abs(snap.speed) * 0.05;
-      const height = 2.2 + Math.abs(snap.speed) * 0.014 + (snap.airborne ? 0.8 : 0);
-      const lean = -snap.heading * 0.9;
+      const dist = 6.7 + spd * 0.026 + (snap.airborne ? 1.15 : 0);
+      const height = 1.92 + spd * 0.009 + (snap.airborne ? 1.2 : 0);
+      const lean = -snap.heading * (snap.airborne ? 0.22 : 0.42);
       _desired.set(
-        snap.px - snap.fx * dist + snap.ux * height + _right.x * lean,
-        snap.py - snap.fy * dist + snap.uy * height,
-        snap.pz - snap.fz * dist + snap.uz * height + _right.z * lean,
+        snap.px - this.camFwd.x * dist + this.camUp.x * height + _right.x * lean,
+        snap.py - this.camFwd.y * dist + this.camUp.y * height,
+        snap.pz - this.camFwd.z * dist + this.camUp.z * height + _right.z * lean,
       );
+      const lookDist = 13 + spd * 0.11;
       _look.set(
-        snap.px + snap.fx * 10 + snap.ux * 0.5,
-        snap.py + snap.fy * 10 + snap.uy * 0.5,
-        snap.pz + snap.fz * 10 + snap.uz * 0.5,
+        snap.px + this.camFwd.x * lookDist + this.camUp.x * 0.28,
+        snap.py + this.camFwd.y * lookDist + this.camUp.y * 0.28 - (snap.airborne ? 1.05 : 0),
+        snap.pz + this.camFwd.z * lookDist + this.camUp.z * 0.28,
       );
     }
-    const k = 1 - Math.exp(-(mode === "hood" ? 9 : 5.2) * dt);
+    const follow = mode === "hood" ? 14 : snap.airborne ? 8.8 : 11.2;
+    const k = 1 - Math.exp(-follow * dt);
     this.camPos.lerp(_desired, k);
     this.lookPos.lerp(_look, k);
 
-    this.trauma = Math.max(0, this.trauma - dt * 1.8);
-    const shake = reduced ? 0 : this.trauma * this.trauma;
+    this.trauma = Math.max(0, this.trauma - dt * 2.5);
+    const shake = reduced ? 0 : this.trauma * this.trauma * 0.5;
     this.camera.position.copy(this.camPos);
-    this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.22;
-    this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.16;
-    this.camera.up.lerp(_up.set(snap.ux, snap.uy, snap.uz), 1 - Math.exp(-4 * dt));
+    this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.14;
+    this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.1;
+    this.camera.up.lerp(this.camUp, 1 - Math.exp(-7 * dt));
     this.camera.lookAt(this.lookPos);
 
-    const targetFov = 56 + Math.abs(snap.speed) * 0.32 + (snap.boost > 0 ? 8 : 0);
-    this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4 * dt));
+    const targetFov = THREE.MathUtils.clamp(54 + spd * 0.15 + (snap.boost > 0 ? 3.2 : 0), 52, 65);
+    this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4.2 * dt));
     this.camera.updateProjectionMatrix();
     this.sun.target.position.set(snap.px, snap.py, snap.pz);
     this.sun.position.set(snap.px + 60, snap.py + 95, snap.pz + 36);

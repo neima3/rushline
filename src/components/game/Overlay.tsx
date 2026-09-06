@@ -291,8 +291,8 @@ function Hud({
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-4 text-right">
         <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
         <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
-        <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
-        <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} />
+        <Meter label="Boost" value={Math.min(1, boost / 1.0)} tone="ok" show={boost > 0.05} />
+        <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} ticks />
       </div>
       {wrongWay ? (
         <p className="absolute left-1/2 top-1/3 -translate-x-1/2 font-display text-3xl tracking-wide text-danger">
@@ -317,23 +317,31 @@ function Meter({
   value,
   tone,
   show,
+  ticks,
 }: {
   label: string;
   value: number;
   tone: "ok" | "gold";
   show: boolean;
+  ticks?: boolean;
 }) {
   if (!show) return null;
+  const filled = Math.max(0, Math.min(1, value));
   return (
     <div className="mt-2 w-20 ml-auto">
       <p className={cn("text-[10px] uppercase tracking-widest", tone === "ok" ? "text-ok" : "text-medal-gold")}>
         {label}
       </p>
-      <div className="mt-1 h-1 overflow-hidden rounded-full bg-border">
+      <div className="relative mt-1 h-1 overflow-hidden rounded-full bg-border">
         <div
           className={cn("h-full", tone === "ok" ? "bg-ok" : "bg-medal-gold")}
-          style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%` }}
+          style={{ width: `${Math.round(filled * 100)}%` }}
         />
+        {ticks
+          ? [32, 58, 92].map((p) => (
+              <span key={p} className="absolute top-0 h-full w-px bg-bg/70" style={{ left: `${p}%` }} />
+            ))
+          : null}
       </div>
     </div>
   );

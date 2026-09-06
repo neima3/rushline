@@ -244,17 +244,17 @@ export class Game {
         this.car.step(this.track, actions, FIXED_DT);
         if (this.car.justBoost) {
           this.audio.boost();
-          this.world.addTrauma(0.28);
+          this.world.addTrauma(0.2);
           this.input.rumble("boost");
         }
         if (this.car.justTurbo) {
           this.audio.turbo();
-          this.world.addTrauma(0.22);
+          this.world.addTrauma(0.16);
           this.input.rumble("turbo");
         }
         if (this.car.justLand) {
           this.audio.land();
-          this.world.addTrauma(0.18);
+          this.world.addTrauma(0.12);
           this.input.rumble("land");
         }
         if (this.car.justCp || this.car.justLap) {
