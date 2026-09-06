@@ -212,8 +212,9 @@ export class World {
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const hood = mode === "hood";
-    const lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 3.7 : 2.55;
-    const dist = hood ? 0.52 : 6.8 + (portrait ? 0.35 : 0);
+    const helixSnap = this.builtTrack?.def.id === "helix";
+    const lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 3.7 : helixSnap ? 3.35 : 2.55;
+    const dist = hood ? 0.52 : (helixSnap ? 5.1 : 6.8) + (portrait ? 0.35 : 0);
     this.camPos.set(
       snap.px - this.camFwd.x * dist + this.camUp.x * lift,
       Math.max(snap.py + (hood ? 1.05 : 1.8), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
@@ -236,6 +237,10 @@ export class World {
     if (!track) return;
 
     const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
+      if (helix && uy < 0.35) {
+        this.camPos.y = Math.max(this.camPos.y, y + floor, snap.py + minAboveCar);
+        return;
+      }
       const height = (this.camPos.x - x) * ux + (this.camPos.y - y) * uy + (this.camPos.z - z) * uz;
       if (height >= floor) return;
       const push = floor - height;
@@ -261,9 +266,13 @@ export class World {
     this.camPos.y = Math.max(
       this.camPos.y,
       snap.py + minAboveCar,
-      road.y + (helix ? 0.55 : mode === "hood" ? 1.15 : 1.7),
+      road.y + (helix ? 2.1 : mode === "hood" ? 1.15 : 1.7),
       near.y + (helix ? 0.45 : mode === "hood" ? 0.95 : 1.45),
     );
+    if (helix && near.y > snap.py + 2.2) {
+      const horiz = Math.hypot(this.camPos.x - near.x, this.camPos.z - near.z);
+      if (horiz < near.width * 0.7 + 5) this.camPos.y = Math.max(this.camPos.y, near.y + 2.4);
+    }
   }
 
   private loadSky(url: string, fog: number) {
