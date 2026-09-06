@@ -107,7 +107,7 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
-    this.s = pickSafeRespawnS(track, this.lastCp);
+    this.s = pickSafeRespawnS(track, this.lastCp, this.s);
     this.n = 0;
     this.heading = 0;
     this.speed = 9;
@@ -132,22 +132,14 @@ export class CarSim {
     this.place(track);
     this.flattenRespawn(track);
     if (this.uy < 0.78 || this.airborne) {
-      this.s = pickSafeRespawnS(track, -1);
+      this.s = pickSafeRespawnS(track, -1, this.s);
       this.airborne = false;
       this.place(track);
       this.flattenRespawn(track);
     }
   }
 
-  private flattenRespawn(track: BuiltTrack) {
-    this.heading = 0;
-    this.n = 0;
-    this.airborne = false;
-    this.vx = this.vy = this.vz = 0;
-    this.airTime = 0;
-    this.airBlend = 0;
-    this.speed = Math.min(Math.max(this.speed, 6), 10);
-    this.landLock = Math.max(this.landLock, 0.45);
+  private plantUpright(track: BuiltTrack) {
     const sm = sampleAt(track, this.s);
     let tx = sm.tx;
     let tz = sm.tz;
@@ -159,13 +151,17 @@ export class CarSim {
       tx /= tl;
       tz /= tl;
     }
-    // Helix parallel-transport can leave a sticky twist. Sit on the ribbon when
-    // the sample is upright; otherwise stand above the sample in world-up so we
-    // never ride an inverted normal under the mesh.
-    const onRibbon = sm.uy >= 0.55;
-    if (onRibbon) {
+    this.n = 0;
+    this.heading = 0;
+    this.airborne = false;
+    this.vx = this.vy = this.vz = 0;
+    this.airTime = 0;
+    this.airBlend = 0;
+    // Sit on the ribbon when the sample is upright; otherwise stand above it
+    // in world-up so we never ride an inverted normal under the mesh.
+    if (sm.uy >= 0.55) {
       this.px = sm.x + sm.ux * RIDE;
-      this.py = sm.y + sm.uy * RIDE;
+      this.py = Math.max(sm.y + RIDE, sm.y + sm.uy * RIDE);
       this.pz = sm.z + sm.uz * RIDE;
     } else {
       this.px = sm.x;
@@ -173,6 +169,12 @@ export class CarSim {
       this.pz = sm.z;
     }
     this.setFrame(tx, 0, tz, 0, 1, 0, -tz, 0, tx);
+  }
+
+  private flattenRespawn(track: BuiltTrack) {
+    this.speed = Math.min(Math.max(this.speed, 6), 10);
+    this.landLock = Math.max(this.landLock, 0.45);
+    this.plantUpright(track);
   }
 
   private place(track: BuiltTrack) {
@@ -354,11 +356,12 @@ export class CarSim {
     this.py = sm.y + sm.ry * this.n + sm.uy * RIDE;
     this.pz = sm.z + sm.rz * this.n + sm.uz * RIDE;
     this.setFrame(sm.tx, sm.ty, sm.tz, sm.ux, sm.uy, sm.uz, sm.rx, sm.ry, sm.rz);
+    if (this.recoverLock > 0 && sm.uy < 0.75) this.plantUpright(track);
     this.vx = this.fx * this.speed;
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy) && (this.recoverLock <= 0 || sm.uy < 0.15)) {
+    if (this.recoverLock <= 0 && this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
@@ -637,9 +640,16 @@ function shouldLeaveTrack(speed: number, uy: number) {
 }
 
 function sampleNearInvert(samples: BuiltTrack["samples"], i: number) {
+  const n = samples.length;
+  const L = samples[n - 1]?.s || 1;
+  const self = samples[i]!;
+  const nearSeam = self.s < 30 || self.s > L - 30;
   for (let k = -8; k <= 8; k++) {
-    const nb = samples[(i + k + samples.length) % samples.length]!;
-    if (nb.uy < 0.15) return true;
+    const j = i + k;
+    let nb: (typeof samples)[number] | undefined;
+    if (j >= 0 && j < n) nb = samples[j];
+    else if (!nearSeam) nb = samples[((j % n) + n) % n];
+    if (nb && nb.uy < 0.15) return true;
   }
   return false;
 }
@@ -697,26 +707,27 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
       bestS = sm.s;
     }
   }
-  if (bestScore >= 0) return bestS;
+  if (bestScore >= 0 && sampleAt(track, bestS).uy >= 0.85) return bestS;
 
   for (const dir of [-1, 1] as const) {
     for (let d = 0; d <= 70; d += 1.4) {
       const s = origin + dir * d;
       const sm = sampleAt(track, s);
-      if (sm.uy < 0.7 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
+      if (sm.uy < 0.85 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
       if (stableRunway(track, sm.s, 1, 20) < 10) continue;
       return sm.s;
     }
   }
-  return origin;
+  return sampleAt(track, origin).uy >= 0.85 ? origin : 20;
 }
 
-export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
+export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
   if (track.def.id === "helix") {
-    const origin = Math.max(2, cp ?? 6);
+    const origin = lastCp < 0 ? 20 : Math.max(2, cp ?? 6);
     return pickHelixRespawnS(track, origin);
   }
+  // Circuit / Ridge: same picker as the passing #9 path.
   const origin = Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;

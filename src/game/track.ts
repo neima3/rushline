@@ -171,7 +171,7 @@ function nodeAt(nodes: TrackNode[], i: number, closed: boolean) {
   return nodes[Math.max(0, Math.min(n - 1, i))]!;
 }
 
-export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = false): Sample[] {
+export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = false, stabilizeFlats = false): Sample[] {
   const pts: { x: number; y: number; z: number; width: number; bank: number; boost: boolean; checkpoint: boolean }[] =
     [];
   const n = nodes.length;
@@ -323,7 +323,9 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
     uy = rz * tx - rx * tz;
     uz = rx * ty - ry * tx;
 
-    if (stabilizeUp) {
+    const flattenThis =
+      stabilizeUp || (stabilizeFlats && Math.abs(ty) < 0.52 && p.y < 7);
+    if (flattenThis) {
       let wx = -tx * ty;
       let wy = 1 - ty * ty;
       let wz = -tz * ty;
@@ -394,7 +396,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {
-  const samples = rasterize(def.nodes, def.closed, def.id !== "helix");
+  const samples = rasterize(def.nodes, def.closed, def.id !== "helix", def.id === "helix");
   const length = samples[samples.length - 1]?.s ?? 1;
   const checkpoints: number[] = [];
   const boosts: number[] = [];
@@ -484,7 +486,14 @@ export function sampleAt(track: BuiltTrack, s: number): Sample {
   };
 }
 
-export function nearestSample(track: BuiltTrack, x: number, y: number, z: number, hintS: number): Sample {
+export function nearestSample(
+  track: BuiltTrack,
+  x: number,
+  y: number,
+  z: number,
+  hintS: number,
+  opts?: { noWrap?: boolean; minUy?: number },
+): Sample {
   const { samples } = track;
   const n = samples.length;
   if (!n) return sampleAt(track, 0);
@@ -492,19 +501,28 @@ export function nearestSample(track: BuiltTrack, x: number, y: number, z: number
   const start = Math.max(0, hint < 0 ? 0 : hint);
   let best = samples[start]!;
   let bestD = Infinity;
+  let fallback = best;
+  let fallbackD = Infinity;
   const window = Math.min(n, 80);
+  const minUy = opts?.minUy;
+  const wrap = track.def.closed && !opts?.noWrap;
   for (let k = -window; k <= window; k++) {
     let i = start + k;
-    if (track.def.closed) i = ((i % n) + n) % n;
+    if (wrap) i = ((i % n) + n) % n;
     else if (i < 0 || i >= n) continue;
     const sm = samples[i]!;
     const d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
+    if (d < fallbackD) {
+      fallbackD = d;
+      fallback = sm;
+    }
+    if (minUy != null && sm.uy < minUy) continue;
     if (d < bestD) {
       bestD = d;
       best = sm;
     }
   }
-  return best;
+  return bestD < Infinity ? best : fallback;
 }
 
 export function crossedGate(prev: number, next: number, gate: number, length: number, closed: boolean) {
@@ -781,7 +799,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   roadGeo.setAttribute("normal", new THREE.Float32BufferAttribute(roadNrm, 3));
   roadGeo.setAttribute("uv", new THREE.Float32BufferAttribute(roadUv, 2));
   roadGeo.setAttribute("color", new THREE.Float32BufferAttribute(roadCol, 3));
-  roadGeo.computeVertexNormals();
+  // Keep authored ribbon normals. computeVertexNormals() follows triangle
+  // winding, which faces down and paints the driving surface black at night.
 
   const curbGeo = new THREE.BufferGeometry();
   curbGeo.setAttribute("position", new THREE.Float32BufferAttribute(curbPos, 3));
@@ -799,7 +818,6 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   markGeo.setAttribute("position", new THREE.Float32BufferAttribute(markPos, 3));
   markGeo.setAttribute("normal", new THREE.Float32BufferAttribute(markNrm, 3));
   markGeo.setAttribute("color", new THREE.Float32BufferAttribute(markCol, 3));
-  markGeo.computeVertexNormals();
 
   const railGeo = new THREE.BufferGeometry();
   railGeo.setAttribute("position", new THREE.Float32BufferAttribute(railPos, 3));
