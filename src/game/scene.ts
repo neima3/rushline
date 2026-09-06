@@ -46,13 +46,13 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x101828,
-    ground: 0x12161f,
-    hemiSky: 0x243656,
-    hemiGround: 0x0c1018,
-    sun: 0xb4ccff,
+    fog: 0x1c2c44,
+    ground: 0x1a2230,
+    hemiSky: 0x4a658c,
+    hemiGround: 0x1a2434,
+    sun: 0xd0e4ff,
     sunPos: [20, 80, -40],
-    exposure: 1.02,
+    exposure: 1.22,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -153,14 +153,15 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    (this.scene.fog as THREE.Fog).near = theme === "night" ? 50 : 80;
-    (this.scene.fog as THREE.Fog).far = theme === "night" ? 320 : 440;
+    (this.scene.fog as THREE.Fog).near = theme === "night" ? 22 : 80;
+    (this.scene.fog as THREE.Fog).far = theme === "night" ? 260 : 440;
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 0.55 : 1.45;
+    this.sun.intensity = theme === "night" ? 0.95 : 1.45;
+    this.hemi.intensity = theme === "night" ? 1.05 : 0.75;
     this.renderer.toneMappingExposure = pack.exposure;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;

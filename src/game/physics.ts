@@ -259,6 +259,7 @@ export class CarSim {
     if (slideHeld && !drifting) turn *= 1.08;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
     this.heading += steer * turn * reverse * dt;
+    if (this.s < 72 && steerAbs < 0.22 && !drifting) this.heading *= 1 - 2.2 * dt;
 
     const align = drifting ? 0.26 : steerAbs < 0.1 ? 5.4 : 0.07;
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
@@ -608,22 +609,26 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   const origin = Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;
+  const originSm = sampleAt(track, origin);
+  const ox = originSm.tx;
+  const oz = originSm.tz;
   let bestS = origin;
   let bestScore = -1;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
-    if (sm.uy < 0.78 || sm.y < -3) continue;
+    if (sm.uy < 0.82 || sm.y < -3 || Math.abs(sm.ty) > 0.42) continue;
     const prev = samples[(i - 1 + samples.length) % samples.length]!;
     const next = samples[(i + 1) % samples.length]!;
-    if (prev.uy < 0.68 || next.uy < 0.68) continue;
+    if (prev.uy < 0.7 || next.uy < 0.7) continue;
     if (sampleNearInvert(samples, i)) continue;
+    if (sm.tx * ox + sm.tz * oz < 0.12) continue;
     let ds = sm.s - origin;
     if (track.def.closed) {
       ds = ((ds % L) + L) % L;
       if (ds > L * 0.5) ds -= L;
     }
-    if (ds < -3 || ds > 32) continue;
-    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 1.6;
+    if (ds < -2 || ds > 40) continue;
+    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 2.4;
     if (score > bestScore) {
       bestScore = score;
       bestS = sm.s;
@@ -632,13 +637,14 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   if (bestScore >= 0) return bestS;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
-    if (sm.uy < 0.78 || sm.y < -3 || sampleNearInvert(samples, i)) continue;
+    if (sm.uy < 0.82 || sm.y < -3 || sampleNearInvert(samples, i) || Math.abs(sm.ty) > 0.5) continue;
+    if (sm.tx * ox + sm.tz * oz < 0) continue;
     let ds = sm.s - origin;
     if (track.def.closed) {
       ds = ((ds % L) + L) % L;
       if (ds > L * 0.5) ds -= L;
     }
-    if (ds >= 0 && ds < 80) return sm.s;
+    if (ds >= 0 && ds < 120) return sm.s;
   }
   return 6;
 }

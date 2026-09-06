@@ -175,12 +175,12 @@ export class Input {
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
     const now = performance.now();
-    if (brake > 0.05) this.brakeLatchUntil = now + 240;
+    if (brake > 0.05) this.brakeLatchUntil = now + 340;
     if (now < this.brakeLatchUntil) {
       brake = Math.max(brake, 1);
       throttle = 0;
     } else if (this.autoThrottle && throttle < 0.05) {
-      throttle = this.touchMode ? 0.66 : 1;
+      throttle = this.touchMode ? 0.5 : 1;
     }
 
     steer = Math.max(-1, Math.min(1, steer));

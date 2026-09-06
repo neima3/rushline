@@ -231,7 +231,11 @@ export class Game {
       this.input.touchThrottle < 0.05 &&
       actions.brake < 0.05
     ) {
-      actions.throttle = Math.min(actions.throttle, this.car.speed > 22 ? 0.4 : 0.66);
+      const firstCp = this.track.checkpoints[0] ?? 80;
+      const early = this.car.s < firstCp;
+      const cap = early ? 0.38 : 0.5;
+      actions.throttle = Math.min(actions.throttle, cap);
+      if (this.car.speed > (early ? 17 : 24)) actions.throttle = Math.min(actions.throttle, 0.14);
     }
 
     this.padAcc += dt;

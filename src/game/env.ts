@@ -56,6 +56,17 @@ function trackOutRadius(track: BuiltTrack) {
   return maxR;
 }
 
+function overlapsTrack(track: BuiltTrack, x: number, z: number, radius: number) {
+  const need = radius;
+  for (const sm of track.samples) {
+    const dx = x - sm.x;
+    const dz = z - sm.z;
+    const clear = sm.width * 0.5 + need;
+    if (dx * dx + dz * dz < clear * clear) return true;
+  }
+  return false;
+}
+
 function buildStadium(
   track: BuiltTrack,
   group: THREE.Group,
@@ -161,19 +172,33 @@ function buildCanyon(
   geos: THREE.BufferGeometry[],
   mats: THREE.Material[],
 ) {
+  const ring = trackOutRadius(track) + 36;
   const rockGeo = new THREE.BoxGeometry(1, 1, 1);
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a6240, roughness: 0.96 });
-  const n = 56;
-  const rocks = new THREE.InstancedMesh(rockGeo, rockMat, n);
+  const rockPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; rz: number }[] = [];
+  for (let i = 0; i < 56; i++) {
+    const a = hash(i) * Math.PI * 2;
+    let r = 55 + hash(i + 4) * 170;
+    const h = 10 + hash(i + 8) * 46;
+    const sx = 7 + hash(i + 1) * 20;
+    const sz = 7 + hash(i + 2) * 18;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.6 + 8)) {
+      r = ring + hash(i) * 40;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    rockPlaced.push({ x, y: h / 2 - 10, z, sx, h, sz, ry: a * 0.7, rz: (hash(i + 5) - 0.5) * 0.08 });
+  }
+  const rocks = new THREE.InstancedMesh(rockGeo, rockMat, rockPlaced.length);
   rocks.castShadow = true;
   rocks.receiveShadow = true;
-  for (let i = 0; i < n; i++) {
-    const a = hash(i) * Math.PI * 2;
-    const r = 55 + hash(i + 4) * 170;
-    const h = 10 + hash(i + 8) * 46;
-    _dummy.position.set(Math.cos(a) * r, h / 2 - 10, Math.sin(a) * r);
-    _dummy.scale.set(7 + hash(i + 1) * 20, h, 7 + hash(i + 2) * 18);
-    _dummy.rotation.set(0, a * 0.7, (hash(i + 5) - 0.5) * 0.08);
+  for (let i = 0; i < rockPlaced.length; i++) {
+    const p = rockPlaced[i]!;
+    _dummy.position.set(p.x, p.y, p.z);
+    _dummy.scale.set(p.sx, p.h, p.sz);
+    _dummy.rotation.set(0, p.ry, p.rz);
     _dummy.updateMatrix();
     rocks.setMatrixAt(i, _dummy.matrix);
   }
@@ -183,15 +208,29 @@ function buildCanyon(
 
   const mesaGeo = new THREE.CylinderGeometry(1, 1.4, 1, 6);
   const mesaMat = new THREE.MeshStandardMaterial({ color: 0xb07a4e, roughness: 0.92 });
-  const mesas = new THREE.InstancedMesh(mesaGeo, mesaMat, 14);
-  mesas.castShadow = true;
+  const mesaPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number }[] = [];
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + 0.4;
-    const r = 110 + hash(i + 11) * 80;
+    let r = 110 + hash(i + 11) * 80;
     const h = 18 + hash(i) * 28;
-    _dummy.position.set(Math.cos(a) * r, h / 2 - 8, Math.sin(a) * r);
-    _dummy.scale.set(10 + hash(i + 3) * 10, h, 10 + hash(i + 6) * 10);
-    _dummy.rotation.set(0, a, 0);
+    const sx = 10 + hash(i + 3) * 10;
+    const sz = 10 + hash(i + 6) * 10;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 10)) {
+      r = ring + 18 + hash(i) * 24;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    mesaPlaced.push({ x, y: h / 2 - 8, z, sx, h, sz, ry: a });
+  }
+  const mesas = new THREE.InstancedMesh(mesaGeo, mesaMat, mesaPlaced.length);
+  mesas.castShadow = true;
+  for (let i = 0; i < mesaPlaced.length; i++) {
+    const p = mesaPlaced[i]!;
+    _dummy.position.set(p.x, p.y, p.z);
+    _dummy.scale.set(p.sx, p.h, p.sz);
+    _dummy.rotation.set(0, p.ry, 0);
     _dummy.updateMatrix();
     mesas.setMatrixAt(i, _dummy.matrix);
   }
@@ -232,18 +271,19 @@ function buildNight(
 ) {
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    color: 0x121722,
+    color: 0x1a2436,
     roughness: 0.62,
     metalness: 0.18,
-    emissive: 0x0a1528,
-    emissiveIntensity: 0.45,
+    emissive: 0x152038,
+    emissiveIntensity: 0.7,
   });
+  const ring = trackOutRadius(track) + 40;
   const n = 40;
   const buildings = new THREE.InstancedMesh(bldgGeo, bldgMat, n);
   buildings.castShadow = true;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    const r = 92 + (i % 5) * 16;
+    const r = ring + (i % 5) * 16;
     const h = 10 + (i % 9) * 7;
     _dummy.position.set(Math.cos(a) * r, h / 2 - 5, Math.sin(a) * r);
     _dummy.scale.set(8 + (i % 4) * 2.2, h, 8 + (i % 3) * 3);
@@ -266,7 +306,7 @@ function buildNight(
   const windows = new THREE.InstancedMesh(winGeo, winMat, winN);
   for (let i = 0; i < winN; i++) {
     const a = hash(i) * Math.PI * 2;
-    const r = 90 + (i % 5) * 16;
+    const r = ring + (i % 5) * 16;
     const y = 2 + hash(i + 4) * 28;
     _dummy.position.set(Math.cos(a) * (r - 4.1), y, Math.sin(a) * (r - 4.1));
     _dummy.lookAt(0, y, 0);
@@ -439,7 +479,7 @@ function addTrackRocks(
   for (let i = 0; i < n; i++) {
     const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
-    const d = sm.width * 0.5 + 4 + hash(i) * 6;
+    const d = sm.width * 0.5 + 7 + hash(i) * 6;
     const h = 1.2 + hash(i + 3) * 3;
     _dummy.position.set(sm.x + sm.rx * side * d, sm.y + h * 0.35, sm.z + sm.rz * side * d);
     _dummy.scale.set(1.2 + hash(i) * 2.2, h, 1.2 + hash(i + 2) * 2);
