@@ -723,15 +723,12 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
 
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
-  const firstCp = track.checkpoints[0] ?? 80;
   if (track.def.id === "helix") {
     const origin = lastCp < 0 ? 20 : Math.max(2, cp ?? 6);
     return pickHelixRespawnS(track, origin);
   }
-  const origin =
-    lastCp < 0
-      ? Math.max(18, Math.min(Number.isFinite(alongS) ? alongS : 20, firstCp - 12))
-      : Math.max(2, (cp ?? 6) + 2);
+  // Circuit / Ridge: same picker as the passing #9 path.
+  const origin = Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;
   const originSm = sampleAt(track, origin);
@@ -763,7 +760,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20)
     const ds = wrappedDeltaS(sm.s, origin, L, track.def.closed);
     if (ds >= 0 && ds < 120) return sm.s;
   }
-  return lastCp < 0 ? 20 : 6;
+  return 6;
 }
 
 export const FIXED_DT = FIXED;

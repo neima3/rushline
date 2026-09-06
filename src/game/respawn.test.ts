@@ -33,12 +33,12 @@ describe("leave-track respawn", () => {
     assert.equal(invertedFlats, 0);
   });
 
-  it("parks Circuit and Helix pre-CP R past the finish seam", () => {
+  it("parks Circuit on the #9 island and Helix past the finish seam", () => {
     const circuit = getTrack("circuit");
     const helix = getTrack("helix");
     const cs = pickSafeRespawnS(circuit, -1, 8);
     const hs = pickSafeRespawnS(helix, -1, 8);
-    assert.ok(cs >= 16, `circuit pre-CP s ${cs}`);
+    assert.ok(cs >= 6 && cs < 50, `circuit pre-CP s ${cs}`);
     assert.ok(hs >= 16, `helix pre-CP s ${hs}`);
     assert.ok(sampleAt(circuit, cs).uy > 0.9);
     assert.ok(sampleAt(helix, hs).uy > 0.9);
@@ -76,7 +76,8 @@ describe("leave-track respawn", () => {
       car.py = -6;
       car.airborne = true;
       car.respawn(track);
-      assert.ok(car.s >= 16, `${id} respawn s ${car.s}`);
+      if (id === "helix") assert.ok(car.s >= 16, `${id} respawn s ${car.s}`);
+      else assert.ok(car.s >= 6, `${id} respawn s ${car.s}`);
       assert.ok(car.uy > 0.9, `${id} flatten uy ${car.uy}`);
       assert.equal(car.airborne, false);
       for (let i = 0; i < 50; i++) car.step(track, idle, 1 / 60);

@@ -198,7 +198,10 @@ export class World {
 
   snapCamera(snap: CarSnap, mode: CameraMode) {
     this.trauma = 0;
-    this.camHold = 0.9;
+    const helixSnap = this.builtTrack?.def.id === "helix";
+    // Circuit keeps the #9 hold. Helix Night needs a longer snap so chase
+    // cannot walk under the ribbon on the same frame as R.
+    this.camHold = helixSnap ? 0.9 : 0.55;
     _fwd.set(snap.fx, 0, snap.fz);
     if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -212,25 +215,24 @@ export class World {
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const hood = mode === "hood";
-    const helixSnap = this.builtTrack?.def.id === "helix";
-    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 4.1 : helixSnap ? 3.8 : 2.55;
+    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? (helixSnap ? 4.1 : 3.7) : helixSnap ? 3.8 : 2.55;
     let dist = hood ? 0.52 : (helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0);
-    // Pre-CP R sits near s=6. A 7m chase pull-back walks through the finish
-    // arch / closed-loop seam and reads as under-geo on a phone.
-    if (!hood && snap.s < dist + 6) {
+    // Helix only: pre-CP R sits near the start. A 7m chase pull-back walks
+    // through the finish seam and reads as under-geo at night.
+    if (helixSnap && !hood && snap.s < dist + 6) {
       dist = Math.min(dist, Math.max(2.6, snap.s * 0.4));
       lift += 1.4;
     }
     this.camPos.set(
       snap.px - this.camFwd.x * dist + this.camUp.x * lift,
-      Math.max(snap.py + (hood ? 1.05 : 2.2), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
+      Math.max(snap.py + (hood ? 1.05 : helixSnap ? 2.2 : 1.8), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
       snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
     );
     this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
     this.keepCameraClear(snap, this.builtTrack, mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
-    this.camUp.copy(_worldUp);
+    if (helixSnap) this.camUp.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
     this.camera.fov = portrait ? 60 : 58;
     this.camera.updateProjectionMatrix();
@@ -244,7 +246,7 @@ export class World {
     if (!track) return;
 
     const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
-      if (uy < 0.55) {
+      if (helix && uy < 0.55) {
         this.camPos.y = Math.max(this.camPos.y, y + floor, snap.py + minAboveCar);
         return;
       }
@@ -266,11 +268,12 @@ export class World {
     const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
     liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
 
-    const nearStart = snap.s < 40;
-    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s, {
-      noWrap: nearStart,
-      minUy: 0.55,
-    });
+    const near = helix
+      ? nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s, {
+          noWrap: snap.s < 40,
+          minUy: 0.55,
+        })
+      : nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
     const nearFloor = mode === "hood" ? 0.9 : 1.75;
     liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
 
@@ -284,9 +287,11 @@ export class World {
       const horiz = Math.hypot(this.camPos.x - near.x, this.camPos.z - near.z);
       if (horiz < near.width * 0.7 + 5) this.camPos.y = Math.max(this.camPos.y, near.y + 2.4);
     }
-    // Prod QA: R left the chase cam under the ribbon looking up at the chevrons.
-    // World-Y floor wins over any inverted-normal push.
-    this.camPos.y = Math.max(this.camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.35), road.y + 2.35);
+    // Helix Night only: world-Y floor wins over any inverted-normal push so
+    // R cannot leave the chase cam under the ribbon looking up at chevrons.
+    if (helix) {
+      this.camPos.y = Math.max(this.camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.35), road.y + 2.35);
+    }
   }
 
   private loadSky(url: string, fog: number) {
