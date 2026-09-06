@@ -136,6 +136,7 @@ export function makeCar(ghost: boolean): CarRig {
     pipe.position.set(x, 0.2, -1.18);
   }
 
+  let cabinGlow: THREE.PointLight | null = null;
   if (!ghost) {
     const flameGeo = new THREE.ConeGeometry(0.06, 0.32, 6);
     flameGeo.rotateX(-Math.PI / 2);
@@ -150,6 +151,7 @@ export function makeCar(ghost: boolean): CarRig {
     const glow = new THREE.PointLight(0xdde4ee, 0.45, 7, 2);
     glow.position.set(0, 0.45, 0.2);
     body.add(glow);
+    cabinGlow = glow;
   }
 
   group.add(body);
@@ -217,6 +219,11 @@ export function makeCar(ghost: boolean): CarRig {
 
   const setHeadlights = (on: boolean) => {
     (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.4 : 1.05;
+    if (cabinGlow) cabinGlow.intensity = on ? 0.95 : 0.45;
+    if (!ghost) {
+      (bodyMat as THREE.MeshStandardMaterial).emissive.setHex(on ? 0x243044 : 0x000000);
+      (bodyMat as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.16 : 0;
+    }
   };
 
   return {

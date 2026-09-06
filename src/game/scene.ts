@@ -46,13 +46,13 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x1c2c44,
-    ground: 0x1a2230,
-    hemiSky: 0x4a658c,
-    hemiGround: 0x1a2434,
+    fog: 0x243850,
+    ground: 0x222836,
+    hemiSky: 0x6a88b0,
+    hemiGround: 0x3a5068,
     sun: 0xd0e4ff,
     sunPos: [20, 80, -40],
-    exposure: 1.22,
+    exposure: 1.24,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -67,6 +67,7 @@ export class World {
   private ghost: CarRig;
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
+  private fill: THREE.DirectionalLight;
   private skyMesh: THREE.Mesh | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
@@ -105,6 +106,9 @@ export class World {
     this.hemi = new THREE.HemisphereLight(0xcfe8ff, 0x8a9a6a, 0.75);
     this.sun = new THREE.DirectionalLight(0xfff4e0, 1.45);
     this.sun.position.set(80, 120, 40);
+    this.fill = new THREE.DirectionalLight(0x8ab4d8, 0);
+    this.fill.position.set(12, -42, 18);
+    this.fill.castShadow = false;
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1536, 1536);
     this.sun.shadow.camera.near = 10;
@@ -114,7 +118,7 @@ export class World {
     this.sun.shadow.camera.top = 70;
     this.sun.shadow.camera.bottom = -70;
     this.sun.shadow.bias = -0.0003;
-    this.scene.add(this.hemi, this.sun, this.sun.target);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target);
 
     const groundGeo = new THREE.PlaneGeometry(900, 900);
     groundGeo.rotateX(-Math.PI / 2);
@@ -155,15 +159,19 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    (this.scene.fog as THREE.Fog).near = theme === "night" ? 22 : 80;
-    (this.scene.fog as THREE.Fog).far = theme === "night" ? 260 : 440;
+    (this.scene.fog as THREE.Fog).near = theme === "night" ? 88 : 80;
+    (this.scene.fog as THREE.Fog).far = theme === "night" ? 460 : 440;
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 0.95 : 1.45;
-    this.hemi.intensity = theme === "night" ? 1.05 : 0.75;
+    this.sun.intensity = theme === "night" ? 1.02 : 1.45;
+    this.hemi.intensity = theme === "night" ? 1.32 : 0.75;
+    this.fill.color.set(0x8ab4d8);
+    this.fill.intensity = theme === "night" ? 0.4 : 0;
+    this.fill.position.set(12, -42, 18);
+    this.fill.target.position.set(0, 0, 0);
     this.renderer.toneMappingExposure = pack.exposure;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
@@ -563,6 +571,10 @@ export class World {
     this.sun.target.position.set(snap.px, snap.py, snap.pz);
     this.sun.position.set(snap.px + 60, snap.py + 95, snap.pz + 36);
     this.sun.shadow.camera.updateProjectionMatrix();
+    if (this.fill.intensity > 0) {
+      this.fill.target.position.set(snap.px, snap.py, snap.pz);
+      this.fill.position.set(snap.px + 10, snap.py - 36, snap.pz + 16);
+    }
   }
 
   addTrauma(v: number) {

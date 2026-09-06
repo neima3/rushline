@@ -540,7 +540,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
   stadium: { r: 0.22, g: 0.24, b: 0.27 },
   canyon: { r: 0.28, g: 0.24, b: 0.22 },
-  night: { r: 0.26, g: 0.32, b: 0.44 },
+  night: { r: 0.34, g: 0.40, b: 0.52 },
 };
 
 export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
@@ -734,7 +734,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
       const bTopX = bex + b.ux * catchH * 0.15;
       const bTopY = bey + b.uy * catchH * 0.15;
       const bTopZ = bez + b.uz * catchH * 0.15;
-      const inner = theme === "night" ? { r: 0.16, g: 0.2, b: 0.28 } : { r: 0.82, g: 0.8, b: 0.74 };
+      const inner = theme === "night" ? { r: 0.24, g: 0.3, b: 0.4 } : { r: 0.82, g: 0.8, b: 0.74 };
       pushTri(wallPos, wallNrm, wallCol, null, aex, aey, aez, bTopX, bTopY, bTopZ, aTopX, aTopY, aTopZ, nx, ny, nz, inner);
       pushTri(wallPos, wallNrm, wallCol, null, aex, aey, aez, bex, bey, bez, bTopX, bTopY, bTopZ, nx, ny, nz, inner);
 
@@ -830,11 +830,17 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     vertexColors: true,
     roughness: theme === "night" ? 0.28 : 0.62,
     metalness: theme === "night" ? 0.22 : 0.06,
-    emissive: theme === "night" ? 0x1c334c : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.48 : 0,
+    emissive: theme === "night" ? 0x2a4a68 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.62 : 0,
     side: THREE.DoubleSide,
   });
-  const curbMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.05 });
+  const curbMat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.38,
+    metalness: 0.05,
+    emissive: theme === "night" ? 0x1a2434 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.2 : 0,
+  });
   const wallMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.7,
@@ -847,8 +853,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     vertexColors: true,
     roughness: 0.35,
     metalness: theme === "night" ? 0.55 : 0.4,
-    emissive: theme === "night" ? 0x102030 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.35 : 0,
+    emissive: theme === "night" ? 0x1a3048 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.42 : 0,
   });
   const postGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.85, 5);
   const postMat = new THREE.MeshStandardMaterial({
