@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
-import { reduceHold } from "@/game/auto-throttle";
+import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -101,100 +101,144 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         >
           <RotateCcw className="size-5" strokeWidth={1.75} />
         </button>
-        <HoldButton label="Slide" onHold={onSlide} />
-        <HoldButton label="Brake" onHold={onBrake} />
-        <HoldButton label="Accel" accent onHold={onThrottle} />
+        <DriveCluster onThrottle={onThrottle} onBrake={onBrake} onSlide={onSlide} />
       </div>
     </div>
   );
 }
 
-function HoldButton({
-  label,
-  onHold,
-  accent,
+type Finger = { kind: "brake" | "accel" | "slide"; x: number; y: number };
+
+/**
+ * One pointer router for Slide / Brake / Accel. Post-#13 FAIL: a finger that
+ * started on Accel (or sat on the seam) kept touchThrottle=1 after the chrome
+ * sat on Brake, so Auto+Accel climbed 64→110. One reduceHold latch (same as
+ * #13) plus per-frame hit-test; Brake is exclusive over Accel.
+ */
+function DriveCluster({
+  onThrottle,
+  onBrake,
+  onSlide,
 }: {
-  label: string;
-  onHold: (v: 0 | 1) => void;
-  accent?: boolean;
+  onThrottle: (v: number) => void;
+  onBrake: (v: number) => void;
+  onSlide: (v: 0 | 1) => void;
 }) {
-  const holdRef = useRef(false);
-  const pidRef = useRef<number | null>(null);
-  const cancelUntilRef = useRef(0);
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const slideRef = useRef<HTMLDivElement>(null);
+  const brakeRef = useRef<HTMLDivElement>(null);
+  const accelRef = useRef<HTMLDivElement>(null);
   const fingersRef = useRef(new Set<number>());
-  const btnRef = useRef<HTMLDivElement>(null);
-  const [held, setHeld] = useState(false);
+  const latchRef = useRef<HoldLatch>({ held: false, cancelUntil: 0, downId: null });
+  const spotsRef = useRef(new Map<number, Finger>());
+  const [held, setHeld] = useState({ slide: false, brake: false, accel: false });
 
   useEffect(() => {
-    const el = btnRef.current;
-    if (!el) return;
+    const root = clusterRef.current;
+    if (!root) return;
 
-    const press = () => {
-      holdRef.current = true;
-      setHeld(true);
-      onHold(1);
+    const padRect = (el: HTMLDivElement | null) => {
+      const r = el?.getBoundingClientRect();
+      return { left: r?.left ?? 0, top: r?.top ?? 0, right: r?.right ?? 0, bottom: r?.bottom ?? 0 };
     };
 
-    const release = () => {
-      if (!holdRef.current) return;
-      holdRef.current = false;
-      pidRef.current = null;
-      fingersRef.current.clear();
-      setHeld(false);
-      onHold(0);
+    const hit = (x: number, y: number) =>
+      hitDrivePad(x, y, {
+        brake: padRect(brakeRef.current),
+        accel: padRect(accelRef.current),
+        slide: padRect(slideRef.current),
+      });
+
+    const emit = () => {
+      if (!latchRef.current.held) {
+        onBrake(0);
+        onThrottle(0);
+        onSlide(0);
+        setHeld({ slide: false, brake: false, accel: false });
+        return;
+      }
+      const kinds = new Set<string>();
+      for (const p of spotsRef.current.values()) kinds.add(p.kind);
+      const brake = kinds.has("brake");
+      const accel = kinds.has("accel") && !brake;
+      const slide = kinds.has("slide");
+      onBrake(brake ? 1 : 0);
+      onThrottle(accel ? 1 : 0);
+      onSlide(slide ? 1 : 0);
+      setHeld({ slide, brake, accel });
     };
 
-    const apply = (
+    const applyLatch = (
       type: string,
-      extra?: { remainingTouches?: number; pointerType?: string; pointerId?: number; buttons?: number },
+      extra: {
+        id?: number;
+        x?: number;
+        y?: number;
+        pointerType?: string;
+        buttons?: number;
+        remainingTouches?: number;
+      },
     ) => {
-      const next = reduceHold(
-        { held: holdRef.current, cancelUntil: cancelUntilRef.current, downId: pidRef.current },
-        {
-          type,
-          now: performance.now(),
-          remainingTouches: extra?.remainingTouches ?? fingersRef.current.size,
-          pointerType: extra?.pointerType,
-          pointerId: extra?.pointerId,
-          buttons: extra?.buttons,
-        },
-      );
-      cancelUntilRef.current = next.cancelUntil;
-      if (next.downId != null) pidRef.current = next.downId;
-      if (next.held) press();
-      else release();
+      const next = reduceHold(latchRef.current, {
+        type,
+        now: performance.now(),
+        remainingTouches: extra.remainingTouches ?? fingersRef.current.size,
+        pointerType: extra.pointerType,
+        pointerId: extra.id,
+        buttons: extra.buttons,
+      });
+      latchRef.current = next;
+      if (next.downId != null) latchRef.current.downId = next.downId;
+      if (!next.held) {
+        spotsRef.current.clear();
+        emit();
+        return;
+      }
+      if (extra.id != null && extra.x != null && extra.y != null) {
+        const kind = hit(extra.x, extra.y) ?? spotsRef.current.get(extra.id)?.kind ?? "brake";
+        spotsRef.current.set(extra.id, { kind, x: extra.x, y: extra.y });
+      }
+      emit();
     };
 
     const down = (e: PointerEvent) => {
+      const kind = hit(e.clientX, e.clientY);
+      if (!kind) return;
       e.preventDefault();
       e.stopPropagation();
-      pidRef.current = e.pointerId;
-      // Do not setPointerCapture — capture loss is what emits lostpointercapture
-      // + ghost pointerup while the finger is still on Brake.
-      apply("pointerdown", {
-        remainingTouches: Math.max(1, fingersRef.current.size),
+      applyLatch("pointerdown", {
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
         pointerType: e.pointerType,
-        pointerId: e.pointerId,
         buttons: e.buttons,
+        remainingTouches: Math.max(1, fingersRef.current.size),
       });
     };
 
+    const move = (e: PointerEvent) => {
+      if (!latchRef.current.held) return;
+      e.preventDefault();
+      const prev = spotsRef.current.get(e.pointerId) ?? [...spotsRef.current.values()][0];
+      const kind = hit(e.clientX, e.clientY) ?? prev?.kind ?? "brake";
+      spotsRef.current.set(e.pointerId, { kind, x: e.clientX, y: e.clientY });
+      emit();
+    };
+
     const end = (e: PointerEvent) => {
-      if (pidRef.current != null && e.pointerId !== pidRef.current) return;
-      // Keep remainingTouches > 0 on cancel / lost capture / in-grace ups so
-      // a solitary ghost pointerup cannot look like a lift.
+      if (!latchRef.current.held) return;
       const now = performance.now();
       const ghost =
         e.type === "pointercancel" ||
         e.type === "lostpointercapture" ||
         e.pointerType !== "mouse" ||
-        now < cancelUntilRef.current ||
+        now < latchRef.current.cancelUntil ||
         e.buttons > 0;
-      apply(e.type, {
-        remainingTouches: ghost ? Math.max(1, fingersRef.current.size) : fingersRef.current.size,
+      applyLatch(e.type, {
+        id: e.pointerId,
         pointerType: e.pointerType,
-        pointerId: e.pointerId,
         buttons: e.buttons,
+        remainingTouches: ghost ? Math.max(1, fingersRef.current.size) : fingersRef.current.size,
       });
     };
 
@@ -207,71 +251,107 @@ function HoldButton({
 
     const onTouchStart = (e: TouchEvent) => {
       const t = e.target as Node | null;
-      if (t && t !== el && !el.contains(t)) return;
+      if (t && t !== root && !root.contains(t)) return;
       e.preventDefault();
       noteFingers(e, true);
-      apply("touchstart");
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      applyLatch("touchstart", {
+        id: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY,
+        remainingTouches: Math.max(1, fingersRef.current.size),
+      });
     };
 
     const onTouchEnd = (e: TouchEvent) => {
       let ours = false;
       for (const t of Array.from(e.changedTouches)) {
-        if (fingersRef.current.has(t.identifier)) ours = true;
+        if (fingersRef.current.has(t.identifier) || spotsRef.current.has(t.identifier)) ours = true;
       }
+      if (latchRef.current.held && e.target && root.contains(e.target as Node)) ours = true;
       noteFingers(e, false);
-      if (!ours) return;
+      if (!ours && !latchRef.current.held) return;
       const now = performance.now();
-      const ghost = e.type === "touchcancel" || now < cancelUntilRef.current;
-      const remaining = e.touches.length;
-      apply(e.type, {
-        remainingTouches: ghost ? Math.max(1, remaining) : remaining,
+      const ghost = e.type === "touchcancel" || now < latchRef.current.cancelUntil;
+      applyLatch(e.type, {
+        remainingTouches: ghost ? Math.max(1, e.touches.length) : e.touches.length,
       });
     };
 
     const opts: AddEventListenerOptions = { passive: false };
-    el.addEventListener("pointerdown", down, opts);
+    root.addEventListener("pointerdown", down, opts);
+    window.addEventListener("pointermove", move, opts);
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
-    el.addEventListener("lostpointercapture", end);
-    el.addEventListener("touchstart", onTouchStart, opts);
+    root.addEventListener("lostpointercapture", end);
+    root.addEventListener("touchstart", onTouchStart, opts);
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("touchcancel", onTouchEnd);
     let raf = 0;
     const tick = () => {
-      if (holdRef.current) onHold(1);
+      if (latchRef.current.held) {
+        for (const [id, p] of spotsRef.current) {
+          const kind = hit(p.x, p.y) ?? p.kind;
+          if (kind !== p.kind) spotsRef.current.set(id, { ...p, kind });
+        }
+        emit();
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      el.removeEventListener("pointerdown", down, opts);
+      root.removeEventListener("pointerdown", down, opts);
+      window.removeEventListener("pointermove", move, opts);
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
-      el.removeEventListener("lostpointercapture", end);
-      el.removeEventListener("touchstart", onTouchStart, opts);
+      root.removeEventListener("lostpointercapture", end);
+      root.removeEventListener("touchstart", onTouchStart, opts);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
-      if (holdRef.current) onHold(0);
-      holdRef.current = false;
-      pidRef.current = null;
+      latchRef.current = { held: false, cancelUntil: 0, downId: null };
+      spotsRef.current.clear();
       fingersRef.current.clear();
+      onBrake(0);
+      onThrottle(0);
+      onSlide(0);
     };
-  }, [onHold]);
+  }, [onThrottle, onBrake, onSlide]);
 
   return (
+    <div ref={clusterRef} className="flex flex-col items-end gap-2" data-drive-cluster="1">
+      <PadFace label="Slide" faceRef={slideRef} pressed={held.slide} />
+      <PadFace label="Brake" faceRef={brakeRef} pressed={held.brake} />
+      <PadFace label="Accel" faceRef={accelRef} pressed={held.accel} accent />
+    </div>
+  );
+}
+
+function PadFace({
+  label,
+  faceRef,
+  pressed,
+  accent,
+}: {
+  label: string;
+  faceRef: RefObject<HTMLDivElement | null>;
+  pressed: boolean;
+  accent?: boolean;
+}) {
+  return (
     <div
-      ref={btnRef}
+      ref={faceRef}
       role="button"
       tabIndex={0}
       data-play-control="1"
+      data-control={label.toLowerCase()}
       aria-label={label}
-      aria-pressed={held}
-      data-held={held ? "1" : "0"}
-      className={`play-control h-14 min-h-14 w-24 touch-none select-none rounded-lg border text-sm font-medium ${
-        accent
-          ? "border-accent bg-accent text-accent-fg"
-          : "border-border bg-surface/90 text-fg"
-      } ${held ? "brightness-125" : ""}`}
+      aria-pressed={pressed}
+      data-held={pressed ? "1" : "0"}
+      className={`play-control flex h-14 min-h-14 w-24 items-center justify-center touch-none select-none rounded-lg border text-sm font-medium ${
+        accent ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface/90 text-fg"
+      } ${pressed ? "ring-2 ring-fg brightness-125" : ""}`}
       onContextMenu={(e) => e.preventDefault()}
     >
       {label}

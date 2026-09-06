@@ -1,6 +1,6 @@
 import type { Actions, PadInfo } from "./types";
 import { padInfoFrom, pollPads, rumblePads } from "./gamepad";
-import { latchBrake } from "./auto-throttle";
+import { resolveSampleDrive } from "./auto-throttle";
 
 const GAME_CODES = new Set([
   "KeyW",
@@ -195,17 +195,21 @@ export class Input {
     this.pad = padInfoFrom(gp, active);
 
     steer += this.touchSteer;
-    throttle = Math.max(throttle, this.touchThrottle);
-    brake = Math.max(brake, this.touchBrake);
-    this.manualThrottle = throttle;
-    const latched = latchBrake(performance.now(), brake, this.brakeLatchUntil);
-    this.brakeLatchUntil = latched.latchUntil;
-    if (latched.cutThrottle) {
-      brake = latched.brake;
-      throttle = 0;
-    } else if (this.autoThrottle && throttle < 0.05) {
-      throttle = this.touchMode ? 0.5 : 1;
-    }
+    const drive = resolveSampleDrive({
+      throttle,
+      brake,
+      touchThrottle: this.touchThrottle,
+      touchBrake: this.touchBrake,
+      autoThrottle: this.autoThrottle,
+      touchMode: this.touchMode,
+      now: performance.now(),
+      latchUntil: this.brakeLatchUntil,
+    });
+    this.brakeLatchUntil = drive.latchUntil;
+    this.manualThrottle = drive.manualThrottle;
+    if (this.touchBrake > 0.05) this.touchThrottle = 0;
+    throttle = drive.throttle;
+    brake = drive.brake;
 
     steer = Math.max(-1, Math.min(1, steer));
 
