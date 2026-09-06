@@ -390,23 +390,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
     });
   }
 
-  if (stabilizeUp) alignRibbonRights(samples);
   return samples;
-}
-
-function alignRibbonRights(samples: Sample[]) {
-  for (let i = 1; i < samples.length; i++) {
-    const a = samples[i - 1]!;
-    const b = samples[i]!;
-    if (a.rx * b.rx + a.ry * b.ry + a.rz * b.rz < 0) {
-      b.rx = -b.rx;
-      b.ry = -b.ry;
-      b.rz = -b.rz;
-      b.ux = -b.ux;
-      b.uy = -b.uy;
-      b.uz = -b.uz;
-    }
-  }
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {

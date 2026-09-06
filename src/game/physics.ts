@@ -200,13 +200,13 @@ export class CarSim {
     const dist = Math.hypot(dx, dy, dz);
     const height = dx * near.ux + dy * near.uy + dz * near.uz;
     const lat = dx * near.rx + dy * near.ry + dz * near.rz;
-    if (dist > 14) return true;
-    if (this.airborne && this.airTime > 1.45) return true;
-    if (this.airborne && height < -1.6 && this.airTime > 0.12) return true;
-    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 8 && this.airTime > 0.4) return true;
-    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.05) return true;
-    if (!this.airborne && height < -0.55) return true;
-    if (!this.airborne && this.uy < 0.18 && near.uy > 0.5) return true;
+    if (dist > 16) return true;
+    if (this.airborne && this.airTime > 1.65) return true;
+    if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
+    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
+    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
+    if (!this.airborne && height < -1.1 && (Math.abs(lat) > near.width * 0.3 || dist > 6)) return true;
+    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 18) return true;
     return false;
   }
 
