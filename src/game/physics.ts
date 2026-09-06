@@ -135,11 +135,37 @@ export class CarSim {
       this.airborne = false;
       this.place(track);
     }
+    this.flattenRespawn(track);
+  }
+
+  private flattenRespawn(track: BuiltTrack) {
     this.heading = 0;
     this.n = 0;
     this.airborne = false;
     this.vx = this.vy = this.vz = 0;
-    this.place(track);
+    this.airTime = 0;
+    this.airBlend = 0;
+    this.speed = Math.min(Math.max(this.speed, 6), 10);
+    this.landLock = Math.max(this.landLock, 0.45);
+    const sm = sampleAt(track, this.s);
+    if (track.def.id === "helix") {
+      this.place(track);
+      return;
+    }
+    let tx = sm.tx;
+    let tz = sm.tz;
+    const tl = Math.hypot(tx, tz);
+    if (tl < 1e-5) {
+      tx = 0;
+      tz = -1;
+    } else {
+      tx /= tl;
+      tz /= tl;
+    }
+    this.px = sm.x + sm.ux * RIDE;
+    this.py = sm.y + sm.uy * RIDE;
+    this.pz = sm.z + sm.uz * RIDE;
+    this.setFrame(tx, 0, tz, 0, 1, 0, -tz, 0, tx);
   }
 
   private place(track: BuiltTrack) {
@@ -325,7 +351,7 @@ export class CarSim {
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
+    if (this.recoverLock <= 0 && this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
@@ -623,7 +649,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   let bestScore = -1;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
-    if (sm.uy < 0.82 || sm.y < -3 || Math.abs(sm.ty) > 0.42) continue;
+    if (sm.uy < 0.88 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
     const prev = samples[(i - 1 + samples.length) % samples.length]!;
     const next = samples[(i + 1) % samples.length]!;
     if (prev.uy < 0.7 || next.uy < 0.7) continue;

@@ -46,6 +46,7 @@ export class Input {
     back: false,
   };
   private surface: HTMLElement | null = null;
+  private lastKeyStamp = -1;
   private onKeyDown: (e: KeyboardEvent) => void;
   private onKeyUp: (e: KeyboardEvent) => void;
   private onBlur: () => void;
@@ -54,6 +55,8 @@ export class Input {
 
   constructor() {
     this.onKeyDown = (e) => {
+      if (e.timeStamp && e.timeStamp === this.lastKeyStamp) return;
+      this.lastKeyStamp = e.timeStamp || this.lastKeyStamp;
       const esc = e.code === "Escape" || e.key === "Escape";
       if (GAME_CODES.has(e.code) || esc) {
         e.preventDefault();
@@ -95,10 +98,11 @@ export class Input {
   attach(surface?: HTMLElement) {
     const opts = { capture: true };
     this.surface = surface ?? null;
+    // One window listener only — canvas + document copies of the same handler
+    // toggle pause/camera twice when the play surface is focused.
     window.addEventListener("keydown", this.onKeyDown, opts);
     window.addEventListener("keyup", this.onKeyUp, opts);
     window.addEventListener("blur", this.onBlur);
-    surface?.addEventListener("keydown", this.onKeyDown, opts);
     window.addEventListener("gamepadconnected", this.onPad);
     window.addEventListener("gamepaddisconnected", this.onPad);
     window.addEventListener("pointerdown", this.onPad);
@@ -110,7 +114,6 @@ export class Input {
     window.removeEventListener("keydown", this.onKeyDown, opts);
     window.removeEventListener("keyup", this.onKeyUp, opts);
     window.removeEventListener("blur", this.onBlur);
-    this.surface?.removeEventListener("keydown", this.onKeyDown, { capture: true });
     window.removeEventListener("gamepadconnected", this.onPad);
     window.removeEventListener("gamepaddisconnected", this.onPad);
     window.removeEventListener("pointerdown", this.onPad);

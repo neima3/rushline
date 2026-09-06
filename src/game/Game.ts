@@ -106,6 +106,14 @@ export class Game {
     useGame.getState().setPhase(phase);
   }
 
+  get cam() {
+    return this.camera;
+  }
+
+  get paused() {
+    return this.phase === "paused";
+  }
+
   setCamera(mode: CameraMode) {
     this.camera = mode;
     useGame.getState().setCamera(mode);

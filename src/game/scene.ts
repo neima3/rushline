@@ -82,6 +82,7 @@ export class World {
   private loader = new THREE.TextureLoader();
   private nightLights: THREE.Object3D[] = [];
   private theme: ThemeId = "stadium";
+  private builtTrack: BuiltTrack | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -143,6 +144,7 @@ export class World {
   }
 
   loadTrack(track: BuiltTrack, theme: ThemeId) {
+    this.builtTrack = track;
     this.theme = theme;
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
@@ -217,7 +219,7 @@ export class World {
       snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
     );
     this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
-    this.keepCameraClear(snap, null, mode);
+    this.keepCameraClear(snap, this.builtTrack, mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
@@ -226,22 +228,41 @@ export class World {
   }
 
   private keepCameraClear(snap: CarSnap, track: BuiltTrack | null, mode: CameraMode) {
-    const minAboveCar = mode === "hood" ? 0.85 : 1.85;
+    const helix = track?.def.id === "helix";
+    const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
+    const minAboveCar = (mode === "hood" ? 0.95 : 2.05) + steep * (helix ? 0.25 : 1.15);
     this.camPos.y = Math.max(this.camPos.y, snap.py + minAboveCar);
     if (!track) return;
-    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
-    const hx = this.camPos.x - near.x;
-    const hy = this.camPos.y - near.y;
-    const hz = this.camPos.z - near.z;
-    const height = hx * near.ux + hy * near.uy + hz * near.uz;
-    const floor = mode === "hood" ? 0.7 : 1.55;
-    if (height < floor) {
+
+    const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
+      const height = (this.camPos.x - x) * ux + (this.camPos.y - y) * uy + (this.camPos.z - z) * uz;
+      if (height >= floor) return;
       const push = floor - height;
-      this.camPos.x += near.ux * push + _worldUp.x * push * 0.35;
-      this.camPos.y += near.uy * push + _worldUp.y * push * 0.35;
-      this.camPos.z += near.uz * push + _worldUp.z * push * 0.35;
-    }
-    this.camPos.y = Math.max(this.camPos.y, near.y + 1.25, snap.py + minAboveCar);
+      if (helix) {
+        this.camPos.x += ux * push;
+        this.camPos.y += uy * push;
+        this.camPos.z += uz * push;
+      } else {
+        this.camPos.x += ux * push * 0.2;
+        this.camPos.y += push;
+        this.camPos.z += uz * push * 0.2;
+      }
+    };
+
+    const road = sampleAt(track, snap.s);
+    const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
+    liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
+
+    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
+    const nearFloor = mode === "hood" ? 0.9 : 1.75;
+    liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
+
+    this.camPos.y = Math.max(
+      this.camPos.y,
+      snap.py + minAboveCar,
+      road.y + (helix ? 0.55 : 1.7),
+      near.y + (helix ? 0.45 : 1.45),
+    );
   }
 
   private loadSky(url: string, fog: number) {
@@ -400,15 +421,16 @@ export class World {
       return;
     }
 
+    const helix = track?.def.id === "helix";
     _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
     else _fwd.normalize();
     if (mode !== "hood") {
-      _fwd.y *= 0.12;
+      _fwd.y *= helix ? 0.12 : 0.03;
       if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
       if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
       else _fwd.normalize();
-    } else if (snap.uy > 0.55) {
+    } else if (!helix || snap.uy > 0.55) {
       _fwd.y = 0;
       if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
       if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -419,7 +441,19 @@ export class World {
     else _up.normalize();
 
     const upDot = THREE.MathUtils.clamp(_up.dot(_worldUp), -1, 1);
-    const rollAmt = mode === "hood" ? (snap.airborne ? 0.06 : 0.1) : snap.airborne ? 0.04 : snap.uy > 0.55 ? 0.08 : THREE.MathUtils.clamp(0.12 + upDot * 0.1, 0.04, 0.18);
+    const rollAmt = helix
+      ? mode === "hood"
+        ? snap.airborne
+          ? 0.06
+          : 0.1
+        : snap.airborne
+          ? 0.04
+          : snap.uy > 0.55
+            ? 0.08
+            : THREE.MathUtils.clamp(0.12 + upDot * 0.1, 0.04, 0.18)
+      : snap.airborne
+        ? 0.03
+        : 0.045;
     _camUpTarget.set(
       _worldUp.x + (_up.x - _worldUp.x) * rollAmt,
       _worldUp.y + (_up.y - _worldUp.y) * rollAmt,
@@ -444,21 +478,26 @@ export class World {
     const spd = Math.abs(snap.speed);
     const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
     if (mode === "hood") {
-      _desired.set(snap.px - snap.fx * 0.28, snap.py + 1.12 + steep * 0.35, snap.pz - snap.fz * 0.28);
-      _look.set(snap.px + snap.fx * 16, snap.py + 0.35, snap.pz + snap.fz * 16);
+      const back = 0.42 + (!helix ? steep * 0.55 : 0);
+      const lift = 1.2 + steep * (helix ? 0.35 : 0.95);
+      _desired.set(snap.px - _fwd.x * back, snap.py + lift, snap.pz - _fwd.z * back);
+      _look.set(snap.px + _fwd.x * 16, snap.py + 0.38 + steep * 0.15, snap.pz + _fwd.z * 16);
     } else {
-      const dist = 6.2 + spd * 0.02 + (snap.airborne ? 1.15 : 0) - steep * 1.8;
-      const height = 2.15 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * 2.1;
-      const lean = -snap.heading * (snap.airborne ? 0.16 : 0.28);
+      const dist = 6.5 + spd * 0.02 + (snap.airborne ? 1.15 : 0) + (helix ? -steep * 0.5 : steep * 1.2);
+      const height = 2.3 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * (helix ? 1.5 : 2.8);
+      const lean = -snap.heading * (snap.airborne ? 0.16 : helix ? 0.28 : 0.18);
+      const upx = helix ? this.camUp.x : 0;
+      const upy = helix ? this.camUp.y : 1;
+      const upz = helix ? this.camUp.z : 0;
       _desired.set(
-        snap.px - this.camFwd.x * dist + this.camUp.x * height + _right.x * lean,
-        snap.py - this.camFwd.y * dist + this.camUp.y * height,
-        snap.pz - this.camFwd.z * dist + this.camUp.z * height + _right.z * lean,
+        snap.px - this.camFwd.x * dist + upx * height + _right.x * lean,
+        snap.py - (helix ? this.camFwd.y * dist : 0) + upy * height,
+        snap.pz - this.camFwd.z * dist + upz * height + _right.z * lean,
       );
       const lookDist = 12 + spd * 0.1;
       _look.set(
         snap.px + this.camFwd.x * lookDist,
-        snap.py + 0.55 - (snap.airborne ? 0.7 : 0),
+        snap.py + 0.55 - (snap.airborne ? 0.7 : 0) + (!helix ? steep * 0.25 : 0),
         snap.pz + this.camFwd.z * lookDist,
       );
     }
@@ -474,7 +513,10 @@ export class World {
     this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.14;
     this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.1;
     this.camera.up.lerp(this.camUp, 1 - Math.exp(-7 * dt));
-    if (this.camera.up.y < 0.55) {
+    if (!helix && this.camera.up.y < 0.82) {
+      this.camera.up.lerp(_worldUp, 0.85);
+      this.camUp.lerp(_worldUp, 0.85);
+    } else if (this.camera.up.y < 0.55) {
       this.camera.up.lerp(_worldUp, 0.65);
       this.camUp.lerp(_worldUp, 0.65);
     }
