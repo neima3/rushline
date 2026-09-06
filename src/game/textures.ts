@@ -34,7 +34,7 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
       ? [38, 42, 48]
       : theme === "canyon"
         ? [46, 40, 38]
-        : [22, 26, 36];
+        : [36, 42, 56];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -71,7 +71,7 @@ export function makeGroundTexture(theme: ThemeId): THREE.CanvasTexture {
       ? [92, 138, 72]
       : theme === "canyon"
         ? [138, 88, 52]
-        : [14, 16, 22];
+        : [22, 28, 36];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;

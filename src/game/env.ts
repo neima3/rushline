@@ -380,7 +380,7 @@ function decorateTrackside(
     lamp.position.set(px + sm.ux * 1.25, py + sm.uy * 1.25, pz + sm.uz * 1.25);
     group.add(pole, lamp);
     if (theme === "night" && realLights < 8) {
-      const pl = new THREE.PointLight(0x8eb8ff, 0.85, 22, 2);
+      const pl = new THREE.PointLight(0x8eb8ff, 1.0, 40, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);
