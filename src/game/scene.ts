@@ -188,6 +188,55 @@ export class World {
     this.camPos.set(start.x - start.tx * 10 + start.ux * 4, start.y + 4, start.z - start.tz * 10 + start.uz * 4);
     this.lookPos.set(start.x, start.y + 1, start.z);
     this.camera.position.copy(this.camPos);
+    this.camera.up.copy(this.camUp);
+    this.camera.lookAt(this.lookPos);
+  }
+
+  snapCamera(snap: CarSnap, mode: CameraMode) {
+    this.trauma = 0;
+    _fwd.set(snap.fx, snap.fy, snap.fz);
+    if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
+    else _fwd.normalize();
+    if (Math.abs(_fwd.dot(_worldUp)) > 0.92) {
+      this.camFwd.set(_fwd.x, 0, _fwd.z);
+      if (this.camFwd.lengthSq() < 1e-6) this.camFwd.set(0, 0, -1);
+      else this.camFwd.normalize();
+    } else {
+      this.camFwd.copy(_fwd);
+    }
+    this.camUp.copy(_worldUp);
+    _right.crossVectors(this.camUp, this.camFwd);
+    if (_right.lengthSq() < 1e-8) _right.set(1, 0, 0);
+    _right.normalize();
+    this.camUp.crossVectors(this.camFwd, _right).normalize();
+
+    const spd = Math.abs(snap.speed);
+    if (mode === "hood") {
+      this.camPos.set(
+        snap.px + snap.ux * 1.08 - snap.fx * 0.35,
+        snap.py + 0.82,
+        snap.pz + snap.uz * 1.08 - snap.fz * 0.35,
+      );
+      this.lookPos.set(snap.px + snap.fx * 16, snap.py + 0.2, snap.pz + snap.fz * 16);
+    } else {
+      const dist = 6.7 + spd * 0.026;
+      const height = 1.92 + spd * 0.009;
+      this.camPos.set(
+        snap.px - this.camFwd.x * dist + this.camUp.x * height,
+        snap.py - this.camFwd.y * dist + this.camUp.y * height,
+        snap.pz - this.camFwd.z * dist + this.camUp.z * height,
+      );
+      this.lookPos.set(
+        snap.px + this.camFwd.x * 13 + this.camUp.x * 0.28,
+        snap.py + this.camUp.y * 0.28,
+        snap.pz + this.camFwd.z * 13 + this.camUp.z * 0.28,
+      );
+    }
+    this.camera.position.copy(this.camPos);
+    this.camera.up.copy(this.camUp);
+    this.camera.lookAt(this.lookPos);
+    this.camera.fov = 58;
+    this.camera.updateProjectionMatrix();
   }
 
   private loadSky(url: string, fog: number) {

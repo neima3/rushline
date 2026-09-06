@@ -40,15 +40,19 @@ export class Input {
     confirm: false,
     back: false,
   };
+  private surface: HTMLElement | null = null;
   private onKeyDown: (e: KeyboardEvent) => void;
   private onKeyUp: (e: KeyboardEvent) => void;
   private onBlur: () => void;
   private onPad: () => void;
+  private onPointer: (e: PointerEvent) => void;
 
   constructor() {
     this.onKeyDown = (e) => {
-      if (GAME_CODES.has(e.code)) e.preventDefault();
-      this.keys.add(e.code);
+      if (GAME_CODES.has(e.code)) {
+        e.preventDefault();
+        this.keys.add(e.code);
+      }
     };
     this.onKeyUp = (e) => {
       this.keys.delete(e.code);
@@ -57,26 +61,46 @@ export class Input {
     this.onPad = () => {
       void navigator.getGamepads?.();
     };
+    this.onPointer = () => {
+      this.focusSurface();
+      this.onPad();
+    };
   }
 
-  attach() {
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
+  attach(surface?: HTMLElement) {
+    const opts = { capture: true };
+    this.surface = surface ?? null;
+    window.addEventListener("keydown", this.onKeyDown, opts);
+    window.addEventListener("keyup", this.onKeyUp, opts);
     window.addEventListener("blur", this.onBlur);
     document.addEventListener("visibilitychange", this.onBlur);
     window.addEventListener("gamepadconnected", this.onPad);
     window.addEventListener("gamepaddisconnected", this.onPad);
-    window.addEventListener("pointerdown", this.onPad);
+    window.addEventListener("pointerdown", this.onPointer);
+    surface?.addEventListener("pointerdown", this.onPointer);
   }
 
   detach() {
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
+    const opts = { capture: true };
+    window.removeEventListener("keydown", this.onKeyDown, opts);
+    window.removeEventListener("keyup", this.onKeyUp, opts);
     window.removeEventListener("blur", this.onBlur);
     document.removeEventListener("visibilitychange", this.onBlur);
     window.removeEventListener("gamepadconnected", this.onPad);
     window.removeEventListener("gamepaddisconnected", this.onPad);
-    window.removeEventListener("pointerdown", this.onPad);
+    window.removeEventListener("pointerdown", this.onPointer);
+    this.surface?.removeEventListener("pointerdown", this.onPointer);
+    this.surface = null;
+  }
+
+  focusSurface() {
+    const el = this.surface;
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      el.focus();
+    }
   }
 
   setKeys(codes: string[]) {

@@ -34,7 +34,12 @@ export function Rushline() {
 
   return (
     <main className="game-root relative h-dvh w-full overflow-hidden bg-bg">
-      <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
+      <canvas
+        ref={canvasRef}
+        tabIndex={0}
+        className="absolute inset-0 size-full touch-none outline-none"
+        onPointerDown={() => gameRef.current?.capturePlayFocus()}
+      />
       <Overlay gameRef={gameRef} />
       <TouchPad
         onSteer={onSteer}

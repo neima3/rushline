@@ -68,6 +68,10 @@ body {
   -webkit-user-select: none;
 }
 
+.game-root canvas:focus {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

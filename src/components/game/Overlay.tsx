@@ -62,6 +62,7 @@ export function Overlay({ gameRef }: Props) {
           <button
             type="button"
             className="flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+            onMouseDown={keepPlayFocus}
             onClick={() => g()?.pause()}
             aria-label="Pause"
           >
@@ -77,6 +78,7 @@ export function Overlay({ gameRef }: Props) {
               <button
                 type="button"
                 className="flex size-11 items-center justify-center rounded-md border border-border bg-surface/90"
+                onMouseDown={keepPlayFocus}
                 onClick={() => g()?.setMuted(!muted)}
                 aria-label={muted ? "Unmute" : "Mute"}
               >
@@ -121,7 +123,7 @@ export function Overlay({ gameRef }: Props) {
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
           {pad.active
             ? "LT/RT brake · L-stick steer · X slide · Y respawn · Menu pause"
-            : "WASD steer and throttle · Space slide · R respawn · Esc pause"}
+            : "WASD steer and throttle · Space slide · R respawn · C camera · Esc pause"}
         </p>
       ) : null}
     </div>
@@ -186,6 +188,7 @@ function Menu({
             <button
               type="button"
               disabled={!ready}
+              onMouseDown={keepPlayFocus}
               onClick={onStart}
               className="h-12 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98] disabled:opacity-50"
             >
@@ -395,6 +398,7 @@ function Modal({
             <button
               key={a.label}
               type="button"
+              onMouseDown={keepPlayFocus}
               onClick={a.onClick}
               className={cn(
                 "h-11 rounded-md text-sm font-medium",
@@ -410,10 +414,15 @@ function Modal({
   );
 }
 
+function keepPlayFocus(e: { preventDefault: () => void }) {
+  e.preventDefault();
+}
+
 function GhostChip({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
+      onMouseDown={keepPlayFocus}
       onClick={onClick}
       className="h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"
     >

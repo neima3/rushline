@@ -68,6 +68,7 @@ export class CarSim {
   justTurbo = false;
   justLand = false;
   skipInterp = true;
+  justRespawn = false;
   private wasSlide = false;
   private airTime = 0;
   private landLock = 0;
@@ -94,6 +95,7 @@ export class CarSim {
     this.justFinish = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = false;
     this.skipInterp = true;
     this.wasSlide = false;
     this.airTime = 0;
@@ -103,17 +105,21 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
-    const cp = this.lastCp >= 0 ? track.checkpoints[this.lastCp] : 6;
-    this.s = Math.max(2, (cp ?? 6) + 1.5);
+    this.s = pickSafeRespawnS(track, this.lastCp);
     this.n = 0;
     this.heading = 0;
     this.speed = 9;
     this.airborne = false;
     this.vx = this.vy = this.vz = 0;
     this.boost = 0;
+    this.slideAmt = 0;
     this.driftCharge = 0;
+    this.wrongWay = 0;
+    this.wallHit = 0;
+    this.justBoost = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = true;
     this.wasSlide = false;
     this.skipInterp = true;
     this.airTime = 0;
@@ -165,6 +171,7 @@ export class CarSim {
     this.justFinish = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = false;
     this.wallHit = Math.max(0, this.wallHit - dt);
     this.landLock = Math.max(0, this.landLock - dt);
     const prevS = this.s;
@@ -173,7 +180,25 @@ export class CarSim {
     else this.stepGround(track, actions, dt);
 
     this.detectGates(track, prevS);
-    if (this.py < -40) this.respawn(track);
+    if (this.needsRecover(track)) this.respawn(track);
+  }
+
+  private needsRecover(track: BuiltTrack) {
+    if (this.py < -12) return true;
+    const near = nearestSample(track, this.px, this.py, this.pz, this.s);
+    const dx = this.px - near.x;
+    const dy = this.py - near.y;
+    const dz = this.pz - near.z;
+    const dist = Math.hypot(dx, dy, dz);
+    const height = dx * near.ux + dy * near.uy + dz * near.uz;
+    const lat = dx * near.rx + dy * near.ry + dz * near.rz;
+    if (dist > 22) return true;
+    if (this.airborne && this.airTime > 1.65) return true;
+    if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
+    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
+    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
+    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 14) return true;
+    return false;
   }
 
   private releaseTurbo() {
@@ -245,14 +270,14 @@ export class CarSim {
     const sm = sampleAt(track, this.s);
     const half = sm.width * 0.5 - 0.72;
     if (this.n > half) {
-      this.n = half;
-      this.heading += 0.1;
-      this.speed *= 0.9;
+      this.n = half - 0.06;
+      this.heading = clamp(this.heading + 0.2, 0.08, maxYaw);
+      this.speed *= 0.82;
       this.wallHit = 0.16;
     } else if (this.n < -half) {
-      this.n = -half;
-      this.heading -= 0.1;
-      this.speed *= 0.9;
+      this.n = -half + 0.06;
+      this.heading = clamp(this.heading - 0.2, -maxYaw, -0.08);
+      this.speed *= 0.82;
       this.wallHit = 0.16;
     }
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
@@ -338,12 +363,31 @@ export class CarSim {
       if (this.s < 0) this.s += L;
     }
 
+    const upright = near.uy > 0.35;
+    const vertical = near.uy < 0.2;
+    const onFace = height < 1.15 && height > -0.35;
     const canLand =
       this.airTime > 0.055 &&
-      height < 1.25 &&
-      height > -0.55 &&
-      Math.abs(lat) < half &&
-      into < 5.5;
+      onFace &&
+      Math.abs(lat) < near.width * 0.5 + 0.85 &&
+      into < 4.2 &&
+      (!vertical || this.airTime < 0.55);
+
+    if (!canLand && upright && height < 2.1 && height > -0.8 && Math.abs(lat) < half + 5.5 && this.airTime > 0.08) {
+      this.airborne = false;
+      this.justLand = false;
+      this.landLock = LAND_LOCK;
+      this.airTime = 0;
+      this.airBlend = 0;
+      this.s = near.s;
+      this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
+      const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
+      this.speed = clamp(vt * 0.94, -MAX_REV, MAX_BOOST);
+      this.heading = clamp(this.heading * 0.45, -0.4, 0.4);
+      this.skipInterp = true;
+      this.place(track);
+      return;
+    }
 
     if (canLand) {
       const impact = Math.max(0, -into);
@@ -457,37 +501,46 @@ export class CarSim {
 }
 
 export function lerpSnap(a: CarSnap, b: CarSnap, t: number): CarSnap {
+  const u = clamp(t, 0, 1);
   const jump =
     (b.px - a.px) ** 2 + (b.py - a.py) ** 2 + (b.pz - a.pz) ** 2;
   if (b.airborne !== a.airborne && jump > 6) return b;
   _quat.set(a.qx, a.qy, a.qz, a.qw);
   _qb.set(b.qx, b.qy, b.qz, b.qw);
-  _quat.slerp(_qb, t);
+  _quat.slerp(_qb, u);
+  const fx = lerp(a.fx, b.fx, u);
+  const fy = lerp(a.fy, b.fy, u);
+  const fz = lerp(a.fz, b.fz, u);
+  const fl = Math.hypot(fx, fy, fz) || 1;
+  const ux = lerp(a.ux, b.ux, u);
+  const uy = lerp(a.uy, b.uy, u);
+  const uz = lerp(a.uz, b.uz, u);
+  const ul = Math.hypot(ux, uy, uz) || 1;
   return {
-    s: lerp(a.s, b.s, t),
-    n: lerp(a.n, b.n, t),
-    heading: lerp(a.heading, b.heading, t),
-    speed: lerp(a.speed, b.speed, t),
+    s: lerp(a.s, b.s, u),
+    n: lerp(a.n, b.n, u),
+    heading: lerp(a.heading, b.heading, u),
+    speed: lerp(a.speed, b.speed, u),
     airborne: b.airborne,
-    px: lerp(a.px, b.px, t),
-    py: lerp(a.py, b.py, t),
-    pz: lerp(a.pz, b.pz, t),
+    px: lerp(a.px, b.px, u),
+    py: lerp(a.py, b.py, u),
+    pz: lerp(a.pz, b.pz, u),
     qx: _quat.x,
     qy: _quat.y,
     qz: _quat.z,
     qw: _quat.w,
-    yaw: lerp(a.yaw, b.yaw, t),
-    boost: lerp(a.boost, b.boost, t),
-    slide: lerp(a.slide, b.slide, t),
-    driftCharge: lerp(a.driftCharge, b.driftCharge, t),
+    yaw: lerp(a.yaw, b.yaw, u),
+    boost: lerp(a.boost, b.boost, u),
+    slide: lerp(a.slide, b.slide, u),
+    driftCharge: lerp(a.driftCharge, b.driftCharge, u),
     justTurbo: b.justTurbo,
     justLand: b.justLand,
-    fx: lerp(a.fx, b.fx, t),
-    fy: lerp(a.fy, b.fy, t),
-    fz: lerp(a.fz, b.fz, t),
-    ux: lerp(a.ux, b.ux, t),
-    uy: lerp(a.uy, b.uy, t),
-    uz: lerp(a.uz, b.uz, t),
+    fx: fx / fl,
+    fy: fy / fl,
+    fz: fz / fl,
+    ux: ux / ul,
+    uy: uy / ul,
+    uz: uz / ul,
   };
 }
 
@@ -517,4 +570,17 @@ function shouldLeaveTrack(speed: number, uy: number) {
   return uy < -0.42 && speed < STICK_SPEED;
 }
 
+export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
+  const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
+  let s = Math.max(2, (cp ?? 6) + 1.5);
+  for (let i = 0; i < 48; i++) {
+    const sm = sampleAt(track, s);
+    if (sm.uy > 0.45) return s;
+    s += 2.2;
+    if (track.def.closed && s >= track.length) s -= track.length;
+  }
+  return Math.max(2, (cp ?? 6) + 1.5);
+}
+
 export const FIXED_DT = FIXED;
+export const MAX_PHYS_STEPS = 8;
