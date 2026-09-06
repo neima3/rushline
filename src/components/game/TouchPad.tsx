@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
-import { hitDrivePad, reduceHold } from "@/game/auto-throttle";
+import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -129,7 +129,7 @@ function DriveCluster({
   const brakeRef = useRef<HTMLDivElement>(null);
   const accelRef = useRef<HTMLDivElement>(null);
   const fingersRef = useRef(new Set<number>());
-  const latchRef = useRef({ held: false, cancelUntil: 0, downId: null as number | null });
+  const latchRef = useRef<HoldLatch>({ held: false, cancelUntil: 0, downId: null });
   const spotsRef = useRef(new Map<number, Finger>());
   const [held, setHeld] = useState({ slide: false, brake: false, accel: false });
 
