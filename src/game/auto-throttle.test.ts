@@ -302,6 +302,50 @@ describe("hitDrivePad", () => {
 });
 
 describe("resolveSampleDrive + resolveRaceDrive (post-#13 wiring)", () => {
+  it("touchBrake is not inverted: 1 means brake, 0 lets Auto fill", () => {
+    const held = resolveSampleDrive({
+      throttle: 0,
+      brake: 0,
+      touchThrottle: 0,
+      touchBrake: 1,
+      autoThrottle: true,
+      touchMode: true,
+      now: 0,
+      latchUntil: 0,
+    });
+    assert.equal(held.throttle, 0, "inverted wiring would treat hold as throttle");
+    assert.equal(held.brake, 1);
+
+    const released = resolveSampleDrive({
+      throttle: 0,
+      brake: 0,
+      touchThrottle: 0,
+      touchBrake: 0,
+      autoThrottle: true,
+      touchMode: true,
+      now: 10_000,
+      latchUntil: 0,
+    });
+    assert.ok(released.throttle >= 0.5, "Auto must still fill when Brake is up");
+    assert.equal(released.brake, 0);
+  });
+
+  it("Auto does not refill after applyTouchDrive while touchBrake is asserted", () => {
+    const race = resolveRaceDrive({
+      throttle: 0.5,
+      brake: 0,
+      touchThrottle: 0,
+      touchBrake: 1,
+      autoThrottle: true,
+      touchMode: true,
+      now: 0,
+      latchUntil: 0,
+      cap: 1,
+    });
+    assert.equal(race.throttle, 0);
+    assert.equal(race.brake, 1);
+  });
+
   it("zeros throttle every frame while touchBrake is held under Auto, even if Accel is also 1", () => {
     let latchUntil = 0;
     for (let i = 0; i < 180; i++) {
