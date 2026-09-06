@@ -52,6 +52,7 @@ export class Game {
   private raf = 0;
   private menuYPrev = 0;
   private padAcc = 0;
+  private camSnapAfterSim = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -342,11 +343,18 @@ export class Game {
           this.input.rumble("crash");
         }
         if (this.car.justFinish) this.onFinish();
-        if (this.car.justRespawn) this.afterSimRespawn();
+        if (this.car.justRespawn) {
+          this.camSnapAfterSim = true;
+          this.afterSimRespawn();
+        }
         this.acc -= FIXED_DT;
         steps++;
       }
-      if (this.car.justRespawn) this.acc = 0;
+      if (this.car.justRespawn || this.camSnapAfterSim) {
+        this.acc = 0;
+        this.afterSimRespawn();
+        this.camSnapAfterSim = false;
+      }
       this.curr = this.car.snap();
       if (this.car.skipInterp || this.car.justRespawn || Math.abs(this.curr.s - this.prev.s) > 40) {
         this.prev = this.curr;
@@ -473,6 +481,7 @@ export class Game {
 
   private applyRespawn() {
     this.car.respawn(this.track);
+    this.camSnapAfterSim = true;
     this.afterSimRespawn();
   }
 

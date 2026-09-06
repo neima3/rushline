@@ -198,7 +198,7 @@ export class World {
 
   snapCamera(snap: CarSnap, mode: CameraMode) {
     this.trauma = 0;
-    this.camHold = 0.55;
+    this.camHold = 0.9;
     _fwd.set(snap.fx, 0, snap.fz);
     if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -213,17 +213,24 @@ export class World {
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const hood = mode === "hood";
     const helixSnap = this.builtTrack?.def.id === "helix";
-    const lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 3.7 : helixSnap ? 3.35 : 2.55;
-    const dist = hood ? 0.52 : (helixSnap ? 5.1 : 6.8) + (portrait ? 0.35 : 0);
+    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 4.1 : helixSnap ? 3.35 : 2.55;
+    let dist = hood ? 0.52 : (helixSnap ? 5.1 : 6.8) + (portrait ? 0.35 : 0);
+    // Pre-CP R sits near s=6. A 7m chase pull-back walks through the finish
+    // arch / closed-loop seam and reads as under-geo on a phone.
+    if (!hood && snap.s < dist + 6) {
+      dist = Math.min(dist, Math.max(2.6, snap.s * 0.4));
+      lift += 1.4;
+    }
     this.camPos.set(
       snap.px - this.camFwd.x * dist + this.camUp.x * lift,
-      Math.max(snap.py + (hood ? 1.05 : 1.8), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
+      Math.max(snap.py + (hood ? 1.05 : 2.2), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
       snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
     );
     this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
     this.keepCameraClear(snap, this.builtTrack, mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
+    this.camUp.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
     this.camera.fov = portrait ? 60 : 58;
     this.camera.updateProjectionMatrix();
@@ -237,7 +244,7 @@ export class World {
     if (!track) return;
 
     const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
-      if (helix && uy < 0.35) {
+      if (uy < 0.55) {
         this.camPos.y = Math.max(this.camPos.y, y + floor, snap.py + minAboveCar);
         return;
       }
@@ -259,7 +266,11 @@ export class World {
     const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
     liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
 
-    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
+    const nearStart = snap.s < 40;
+    const near = nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s, {
+      noWrap: nearStart,
+      minUy: 0.55,
+    });
     const nearFloor = mode === "hood" ? 0.9 : 1.75;
     liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
 

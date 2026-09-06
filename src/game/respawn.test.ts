@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { getTrack, sampleAt } from "./track.ts";
+import { CarSim, pickSafeRespawnS } from "./physics.ts";
+
+const idle = {
+  throttle: 0,
+  brake: 0,
+  steer: 0,
+  slide: 0,
+  respawn: false,
+  restart: false,
+  pause: false,
+  camera: false,
+  confirm: false,
+  back: false,
+  menuY: 0,
+};
+
+describe("leave-track respawn", () => {
+  it("keeps Helix flats upright after the first loop", () => {
+    const helix = getTrack("helix");
+    const opening = sampleAt(helix, 20);
+    assert.ok(opening.uy > 0.9, `opening uy ${opening.uy}`);
+    const postLoop = sampleAt(helix, 136);
+    assert.ok(postLoop.uy > 0.85, `post-loop uy ${postLoop.uy}`);
+    const corkscrewFlat = sampleAt(helix, 162);
+    assert.ok(corkscrewFlat.uy > 0.45, `corkscrew-approach uy ${corkscrewFlat.uy}`);
+    let invertedFlats = 0;
+    for (const sm of helix.samples) {
+      if (Math.abs(sm.ty) < 0.4 && sm.y < 6 && sm.uy < 0.35) invertedFlats++;
+    }
+    assert.equal(invertedFlats, 0);
+  });
+
+  it("parks Circuit and Helix pre-CP R past the finish seam", () => {
+    const circuit = getTrack("circuit");
+    const helix = getTrack("helix");
+    const cs = pickSafeRespawnS(circuit, -1, 8);
+    const hs = pickSafeRespawnS(helix, -1, 8);
+    assert.ok(cs >= 16, `circuit pre-CP s ${cs}`);
+    assert.ok(hs >= 16, `helix pre-CP s ${hs}`);
+    assert.ok(sampleAt(circuit, cs).uy > 0.9);
+    assert.ok(sampleAt(helix, hs).uy > 0.9);
+  });
+
+  it("holds an upright on-ribbon pose after R plus physics steps", () => {
+    for (const id of ["circuit", "helix"] as const) {
+      const track = getTrack(id);
+      const car = new CarSim();
+      car.reset(track);
+      car.n = 18;
+      car.py = -6;
+      car.airborne = true;
+      car.respawn(track);
+      assert.ok(car.s >= 16, `${id} respawn s ${car.s}`);
+      assert.ok(car.uy > 0.9, `${id} flatten uy ${car.uy}`);
+      assert.equal(car.airborne, false);
+      for (let i = 0; i < 50; i++) car.step(track, idle, 1 / 60);
+      assert.ok(car.uy > 0.85, `${id} after steps uy ${car.uy}`);
+      assert.equal(car.airborne, false);
+      assert.ok(car.py > -1, `${id} py ${car.py}`);
+    }
+  });
+});
