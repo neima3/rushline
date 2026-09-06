@@ -128,12 +128,15 @@ describe("shouldReleaseHold", () => {
     assert.equal(shouldReleaseHold("touchend", 1100, cancelUntil), false);
     assert.equal(shouldReleaseHold("touchend", 1100, cancelUntil, 1), false);
     assert.equal(shouldReleaseHold("pointerup", 1100, cancelUntil), false);
-    assert.equal(shouldReleaseHold("pointerup", 1800, cancelUntil), true);
+    assert.equal(shouldReleaseHold("pointerup", 1800, cancelUntil), false);
+    assert.equal(shouldReleaseHold("pointerup", 1800, cancelUntil, 0, "touch"), false);
+    assert.equal(shouldReleaseHold("pointerup", 1800, cancelUntil, 0, "mouse"), true);
     assert.equal(shouldReleaseHold("touchend", 1800, cancelUntil), true);
   });
 
   it("never releases on a solitary ghost pointerup when grace is unarmed", () => {
     assert.equal(shouldReleaseHold("pointerup", 80, 0, 0), false);
+    assert.equal(shouldReleaseHold("pointerup", 80, 0, 0, "touch"), false);
     assert.equal(shouldReleaseHold("touchend", 80, 0, 0), false);
   });
 });
@@ -149,24 +152,28 @@ describe("reduceHold", () => {
     s = reduceHold(s, { type: "touchend", now: 1018, remainingTouches: 0 });
     assert.equal(s.held, true);
     s = reduceHold(s, { type: "pointercancel", now: 8400 });
-    s = reduceHold(s, { type: "pointerup", now: 8410, remainingTouches: 0 });
+    s = reduceHold(s, { type: "pointerup", now: 8410, remainingTouches: 0, pointerType: "touch" });
     assert.equal(s.held, true);
-    s = reduceHold(s, { type: "pointerup", now: 31000, remainingTouches: 0 });
+    s = reduceHold(s, { type: "pointerup", now: 31000, remainingTouches: 0, pointerType: "touch" });
+    assert.equal(s.held, true, "late ghost pointerup must not release a touch hold");
+    s = reduceHold(s, { type: "touchend", now: 31100, remainingTouches: 0 });
     assert.equal(s.held, false);
   });
 
   it("stays held on ghost pointerup with no prior cancel, then releases on a real lift after 1s", () => {
-    let s = reduceHold({ held: false, cancelUntil: 0 }, { type: "pointerdown", now: 1000 });
+    let s = reduceHold({ held: false, cancelUntil: 0 }, { type: "pointerdown", now: 1000, pointerId: 7 });
     assert.ok(s.cancelUntil > 1000, "down must arm grace even without cancel");
-    s = reduceHold(s, { type: "pointerup", now: 1016, remainingTouches: 0 });
+    s = reduceHold(s, { type: "pointerup", now: 1016, remainingTouches: 0, pointerType: "touch", pointerId: 7 });
     assert.equal(s.held, true, "ghost pointerup (no cancel) must not clear the latch");
     s = reduceHold(s, { type: "pointercancel", now: 1100 });
     s = reduceHold(s, { type: "lostpointercapture", now: 1101 });
-    s = reduceHold(s, { type: "pointerup", now: 1104, remainingTouches: 0 });
+    s = reduceHold(s, { type: "pointerup", now: 1104, remainingTouches: 0, pointerType: "touch", pointerId: 7 });
     s = reduceHold(s, { type: "touchend", now: 1108, remainingTouches: 0 });
     assert.equal(s.held, true, "cancel storm must not clear the latch");
-    s = reduceHold(s, { type: "pointerup", now: 2000, remainingTouches: 0 });
-    assert.equal(s.held, false, "confirmed lift after 1s with zero touches must release");
+    s = reduceHold(s, { type: "pointerup", now: 4000, remainingTouches: 0, pointerType: "touch", pointerId: 7 });
+    assert.equal(s.held, true, "late solitary pointerup after grace is still ghost");
+    s = reduceHold(s, { type: "touchend", now: 4100, remainingTouches: 0 });
+    assert.equal(s.held, false, "confirmed touchend after 1s with zero touches must release");
   });
 });
 
@@ -225,7 +232,10 @@ describe("applyTouchDrive + auto-throttle", () => {
       if (i === 20) {
         hold = reduceHold(hold, { type: "pointercancel", now });
         hold = reduceHold(hold, { type: "lostpointercapture", now: now + 1 });
-        hold = reduceHold(hold, { type: "pointerup", now: now + 2, remainingTouches: 0 });
+        hold = reduceHold(hold, { type: "pointerup", now: now + 2, remainingTouches: 0, pointerType: "touch" });
+      }
+      if (i === 120) {
+        hold = reduceHold(hold, { type: "pointerup", now, remainingTouches: 0, pointerType: "touch" });
       }
       const touchBrake = hold.held ? 1 : 0;
       const filled = touchBrake > 0 ? 0 : 0.5;
@@ -265,5 +275,11 @@ describe("applyTouchDrive + auto-throttle", () => {
     });
     assert.equal(drive.throttle, 1);
     assert.equal(drive.brake, 0);
+  });
+
+  it("mouse pointerup after grace is a confirmed lift", () => {
+    let s = reduceHold({ held: false, cancelUntil: 0 }, { type: "pointerdown", now: 1000, pointerType: "mouse" });
+    s = reduceHold(s, { type: "pointerup", now: 2000, remainingTouches: 0, pointerType: "mouse" });
+    assert.equal(s.held, false);
   });
 });
