@@ -44,6 +44,29 @@ describe("leave-track respawn", () => {
     assert.ok(sampleAt(helix, hs).uy > 0.9);
   });
 
+  it("recovers Helix post-CP1 and repeated R onto an upright island", () => {
+    const helix = getTrack("helix");
+    const car = new CarSim();
+    car.reset(helix);
+    car.lastCp = 0;
+    car.s = helix.checkpoints[0]! + 8;
+    car.n = 20;
+    car.py = -8;
+    car.airborne = true;
+    for (let r = 0; r < 4; r++) {
+      car.n = 20;
+      car.py = -8;
+      car.airborne = true;
+      car.respawn(helix);
+      assert.ok(car.uy > 0.9, `R${r} uy ${car.uy}`);
+      assert.equal(car.airborne, false);
+      assert.ok(car.py > -0.2, `R${r} py ${car.py}`);
+      const sm = sampleAt(helix, car.s);
+      assert.ok(sm.uy > 0.85, `R${r} sample uy ${sm.uy} at s=${car.s}`);
+      for (let i = 0; i < 20; i++) car.step(helix, idle, 1 / 60);
+    }
+  });
+
   it("holds an upright on-ribbon pose after R plus physics steps", () => {
     for (const id of ["circuit", "helix"] as const) {
       const track = getTrack(id);

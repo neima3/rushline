@@ -213,8 +213,8 @@ export class World {
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const hood = mode === "hood";
     const helixSnap = this.builtTrack?.def.id === "helix";
-    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 4.1 : helixSnap ? 3.35 : 2.55;
-    let dist = hood ? 0.52 : (helixSnap ? 5.1 : 6.8) + (portrait ? 0.35 : 0);
+    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? 4.1 : helixSnap ? 3.8 : 2.55;
+    let dist = hood ? 0.52 : (helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0);
     // Pre-CP R sits near s=6. A 7m chase pull-back walks through the finish
     // arch / closed-loop seam and reads as under-geo on a phone.
     if (!hood && snap.s < dist + 6) {
@@ -277,13 +277,16 @@ export class World {
     this.camPos.y = Math.max(
       this.camPos.y,
       snap.py + minAboveCar,
-      road.y + (helix ? 2.1 : mode === "hood" ? 1.15 : 1.7),
-      near.y + (helix ? 0.45 : mode === "hood" ? 0.95 : 1.45),
+      road.y + (helix ? 2.6 : mode === "hood" ? 1.15 : 1.7),
+      near.y + (helix && near.uy < 0.7 ? 0 : helix ? 2.2 : mode === "hood" ? 0.95 : 1.45),
     );
-    if (helix && near.y > snap.py + 2.2) {
+    if (helix && near.y > snap.py + 2.2 && near.uy > 0.7) {
       const horiz = Math.hypot(this.camPos.x - near.x, this.camPos.z - near.z);
       if (horiz < near.width * 0.7 + 5) this.camPos.y = Math.max(this.camPos.y, near.y + 2.4);
     }
+    // Prod QA: R left the chase cam under the ribbon looking up at the chevrons.
+    // World-Y floor wins over any inverted-normal push.
+    this.camPos.y = Math.max(this.camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.35), road.y + 2.35);
   }
 
   private loadSky(url: string, fog: number) {
@@ -507,12 +510,15 @@ export class World {
       const dist = 6.5 + spd * 0.02 + (snap.airborne ? 1.15 : 0) + (helix ? -steep * 0.5 : steep * 1.2);
       const height = 2.3 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * (helix ? 1.5 : 2.8);
       const lean = -snap.heading * (snap.airborne ? 0.16 : helix ? 0.28 : 0.18);
-      const upx = helix ? this.camUp.x : 0;
-      const upy = helix ? this.camUp.y : 1;
-      const upz = helix ? this.camUp.z : 0;
+      // Flats (including every R recovery) use world-up like Circuit. Only ride
+      // helix cam-up through a real invert — otherwise chase dives under-geo.
+      const helixInvert = helix && snap.uy < 0.55;
+      const upx = helixInvert ? this.camUp.x : 0;
+      const upy = helixInvert ? this.camUp.y : 1;
+      const upz = helixInvert ? this.camUp.z : 0;
       _desired.set(
         snap.px - this.camFwd.x * dist + upx * height + _right.x * lean,
-        snap.py - (helix ? this.camFwd.y * dist : 0) + upy * height,
+        snap.py - (helixInvert ? this.camFwd.y * dist : 0) + upy * height,
         snap.pz - this.camFwd.z * dist + upz * height + _right.z * lean,
       );
       const lookDist = 12 + spd * 0.1;
@@ -537,6 +543,9 @@ export class World {
     if (!helix && this.camera.up.y < 0.82) {
       this.camera.up.lerp(_worldUp, 0.85);
       this.camUp.lerp(_worldUp, 0.85);
+    } else if (helix && snap.uy > 0.55) {
+      this.camera.up.lerp(_worldUp, 0.75);
+      this.camUp.lerp(_worldUp, 0.75);
     } else if (this.camera.up.y < 0.55) {
       this.camera.up.lerp(_worldUp, 0.65);
       this.camUp.lerp(_worldUp, 0.65);

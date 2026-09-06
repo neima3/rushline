@@ -161,7 +161,7 @@ export class CarSim {
     // in world-up so we never ride an inverted normal under the mesh.
     if (sm.uy >= 0.55) {
       this.px = sm.x + sm.ux * RIDE;
-      this.py = sm.y + sm.uy * RIDE;
+      this.py = Math.max(sm.y + RIDE, sm.y + sm.uy * RIDE);
       this.pz = sm.z + sm.uz * RIDE;
     } else {
       this.px = sm.x;
@@ -707,18 +707,18 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
       bestS = sm.s;
     }
   }
-  if (bestScore >= 0) return bestS;
+  if (bestScore >= 0 && sampleAt(track, bestS).uy >= 0.85) return bestS;
 
   for (const dir of [-1, 1] as const) {
     for (let d = 0; d <= 70; d += 1.4) {
       const s = origin + dir * d;
       const sm = sampleAt(track, s);
-      if (sm.uy < 0.7 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
+      if (sm.uy < 0.85 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
       if (stableRunway(track, sm.s, 1, 20) < 10) continue;
       return sm.s;
     }
   }
-  return origin;
+  return sampleAt(track, origin).uy >= 0.85 ? origin : 20;
 }
 
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20) {
