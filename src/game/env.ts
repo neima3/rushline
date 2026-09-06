@@ -184,11 +184,12 @@ function buildCanyon(
     const sz = 7 + hash(i + 2) * 18;
     let x = Math.cos(a) * r;
     let z = Math.sin(a) * r;
-    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.6 + 8)) {
-      r = ring + hash(i) * 40;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.85 + 18)) {
+      r = ring + 28 + hash(i) * 50;
       x = Math.cos(a) * r;
       z = Math.sin(a) * r;
     }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 14)) continue;
     rockPlaced.push({ x, y: h / 2 - 10, z, sx, h, sz, ry: a * 0.7, rz: (hash(i + 5) - 0.5) * 0.08 });
   }
   const rocks = new THREE.InstancedMesh(rockGeo, rockMat, rockPlaced.length);
@@ -217,11 +218,12 @@ function buildCanyon(
     const sz = 10 + hash(i + 6) * 10;
     let x = Math.cos(a) * r;
     let z = Math.sin(a) * r;
-    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 10)) {
-      r = ring + 18 + hash(i) * 24;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.9 + 20)) {
+      r = ring + 32 + hash(i) * 36;
       x = Math.cos(a) * r;
       z = Math.sin(a) * r;
     }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.75 + 16)) continue;
     mesaPlaced.push({ x, y: h / 2 - 8, z, sx, h, sz, ry: a });
   }
   const mesas = new THREE.InstancedMesh(mesaGeo, mesaMat, mesaPlaced.length);
@@ -479,7 +481,7 @@ function addTrackRocks(
   for (let i = 0; i < n; i++) {
     const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
-    const d = sm.width * 0.5 + 7 + hash(i) * 6;
+    const d = sm.width * 0.5 + 12 + hash(i) * 6;
     const h = 1.2 + hash(i + 3) * 3;
     _dummy.position.set(sm.x + sm.rx * side * d, sm.y + h * 0.35, sm.z + sm.rz * side * d);
     _dummy.scale.set(1.2 + hash(i) * 2.2, h, 1.2 + hash(i + 2) * 2);
