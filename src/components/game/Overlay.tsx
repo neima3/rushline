@@ -84,6 +84,7 @@ export function Overlay({ gameRef }: Props) {
             >
               {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
             </button>
+          </div>
         </div>
       ) : null}
 
