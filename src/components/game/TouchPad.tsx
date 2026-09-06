@@ -135,44 +135,67 @@ function HoldButton({
       onHold(1);
     };
 
-    const release = (id?: number) => {
-      if (id != null && pidRef.current != null && id !== pidRef.current) return;
+    const release = () => {
       if (!holdRef.current) return;
       holdRef.current = false;
       pidRef.current = null;
+      fingersRef.current.clear();
       setHeld(false);
       onHold(0);
     };
 
-    const apply = (type: string, extra?: { id?: number; remainingTouches?: number }) => {
+    const apply = (
+      type: string,
+      extra?: { remainingTouches?: number; pointerType?: string; pointerId?: number; buttons?: number },
+    ) => {
       const next = reduceHold(
-        { held: holdRef.current, cancelUntil: cancelUntilRef.current },
+        { held: holdRef.current, cancelUntil: cancelUntilRef.current, downId: pidRef.current },
         {
           type,
           now: performance.now(),
           remainingTouches: extra?.remainingTouches ?? fingersRef.current.size,
+          pointerType: extra?.pointerType,
+          pointerId: extra?.pointerId,
+          buttons: extra?.buttons,
         },
       );
       cancelUntilRef.current = next.cancelUntil;
+      if (next.downId != null) pidRef.current = next.downId;
       if (next.held) press();
-      else release(extra?.id);
+      else release();
     };
 
     const down = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       pidRef.current = e.pointerId;
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        /* capture is optional; window pointerup / late touchend still end it */
-      }
-      apply("pointerdown", { id: e.pointerId });
+      // Do not setPointerCapture — capture loss is what emits lostpointercapture
+      // + ghost pointerup while the finger is still on Brake.
+      apply("pointerdown", {
+        remainingTouches: Math.max(1, fingersRef.current.size),
+        pointerType: e.pointerType,
+        pointerId: e.pointerId,
+        buttons: e.buttons,
+      });
     };
 
     const end = (e: PointerEvent) => {
       if (pidRef.current != null && e.pointerId !== pidRef.current) return;
-      apply(e.type, { id: e.pointerId, remainingTouches: fingersRef.current.size });
+      // Keep remainingTouches > 0 on cancel / lost capture / in-grace ups so
+      // a solitary ghost pointerup cannot look like a lift.
+      const now = performance.now();
+      const ghost =
+        e.type === "pointercancel" ||
+        e.type === "lostpointercapture" ||
+        e.pointerType !== "mouse" ||
+        now < cancelUntilRef.current ||
+        e.buttons > 0;
+      apply(e.type, {
+        remainingTouches: ghost ? Math.max(1, fingersRef.current.size) : fingersRef.current.size,
+        pointerType: e.pointerType,
+        pointerId: e.pointerId,
+        buttons: e.buttons,
+      });
     };
 
     const noteFingers = (e: TouchEvent, add: boolean) => {
@@ -197,7 +220,12 @@ function HoldButton({
       }
       noteFingers(e, false);
       if (!ours) return;
-      apply(e.type, { remainingTouches: fingersRef.current.size });
+      const now = performance.now();
+      const ghost = e.type === "touchcancel" || now < cancelUntilRef.current;
+      const remaining = e.touches.length;
+      apply(e.type, {
+        remainingTouches: ghost ? Math.max(1, remaining) : remaining,
+      });
     };
 
     const opts: AddEventListenerOptions = { passive: false };

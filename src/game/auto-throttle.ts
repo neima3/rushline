@@ -18,49 +18,78 @@ export function isSpuriousHoldEnd(type: string): boolean {
 }
 
 /**
- * TouchPad Accel ignores cancel so the car keeps rolling. Brake used the same
- * HoldButton, then Safari's cancel storm (`pointercancel` + ghost `pointerup`
- * + `touchend`) released the hold and auto-throttle climbed back (keyboard S
- * still slowed). Keep the hold through that storm; only a real lift after the
- * grace window ends it. `pointerup` during grace is ghost — iOS fires it on
- * the real TouchPad path, not only `touchend`.
+ * HoldButton stays latched until a confirmed finger-up. A solitary
+ * `pointerup` is never that confirmation on touch — iOS Safari and Chrome
+ * device-mode fire it (often with cancelUntil===0, no prior cancel) while
+ * the finger is still down. Auto-throttle then refills to cruise (~62 km/h)
+ * and Accel "PASS" is smoke, not a Manual Accel hold.
+ *
+ * Confirmed lift: zero remaining touches, grace armed and expired, and
+ * either `touchend` or a mouse `pointerup`. Never release on pointercancel /
+ * lostpointercapture / touchcancel / touch pointerup.
  */
 export function shouldReleaseHold(
   type: string,
   now: number,
   cancelUntil: number,
   remainingTouches = 0,
+  pointerType?: string,
+  buttons = 0,
 ): boolean {
   if (isSpuriousHoldEnd(type)) return false;
   if (remainingTouches > 0) return false;
+  if (buttons > 0) return false;
+  // Unarmed: ghost pointerup with no prior cancel must not clear the latch.
+  if (cancelUntil <= 0) return false;
   if (now < cancelUntil) return false;
-  return type === "pointerup" || type === "touchend";
+  if (type === "touchend") return true;
+  // Ignore every touch/pen pointerup for the active id — ghost or late.
+  return type === "pointerup" && pointerType === "mouse";
 }
 
-export type HoldLatch = { held: boolean; cancelUntil: number };
+export type HoldLatch = { held: boolean; cancelUntil: number; downId?: number | null };
 
 export type HoldEvent = {
   type: string;
   now: number;
   remainingTouches?: number;
+  pointerType?: string;
+  pointerId?: number;
+  buttons?: number;
 };
 
 /**
- * TouchPad HoldButton state machine. Pointerdown / touchstart latch the hold;
- * cancel storms only extend grace; a lift after grace with no fingers ends it.
+ * TouchPad HoldButton state machine. Pointerdown / touchstart latch the hold
+ * and arm grace. Cancel storms and touch pointerup are ignored. A mouse up
+ * or touchend after grace with no fingers ends it.
  */
 export function reduceHold(state: HoldLatch, event: HoldEvent): HoldLatch {
   if (event.type === "pointerdown" || event.type === "touchstart") {
-    return { held: true, cancelUntil: state.cancelUntil };
+    return {
+      held: true,
+      cancelUntil: event.now + HOLD_CANCEL_GRACE_MS,
+      downId: event.pointerId ?? state.downId ?? null,
+    };
   }
   if (isSpuriousHoldEnd(event.type)) {
-    return { held: state.held, cancelUntil: event.now + HOLD_CANCEL_GRACE_MS };
+    return {
+      held: state.held,
+      cancelUntil: Math.max(state.cancelUntil, event.now + HOLD_CANCEL_GRACE_MS),
+      downId: state.downId,
+    };
   }
   if (
     state.held &&
-    shouldReleaseHold(event.type, event.now, state.cancelUntil, event.remainingTouches ?? 0)
+    shouldReleaseHold(
+      event.type,
+      event.now,
+      state.cancelUntil,
+      event.remainingTouches ?? 0,
+      event.pointerType,
+      event.buttons ?? 0,
+    )
   ) {
-    return { held: false, cancelUntil: state.cancelUntil };
+    return { held: false, cancelUntil: 0, downId: null };
   }
   return state;
 }
