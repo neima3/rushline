@@ -1,0 +1,37 @@
+# deps & build
+node_modules/
+dist/
+.output/
+.nitro/
+.tanstack/
+.vercel/
+*.local
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# logs & caches
+*.log
+.cache/
+.vite/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# sandbox internals (do not ship)
+artifacts/
+.node_modules.lock
+.grok/status
+.grok/preview.log
+.grok/skills/
+.grok/references/
+
+# app-builder QA dumps
+screenshots/app-builder-*
