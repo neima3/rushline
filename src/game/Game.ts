@@ -256,6 +256,8 @@ export class Game {
 
     const actions = this.input.sample();
     if (this.injectSteer != null) actions.steer = this.injectSteer;
+    // Same resolveRaceDrive path the tests use: sample() already ran
+    // resolveSampleDrive (Brake exclusive). applyTouchDrive is the loop gate.
     const drive = applyTouchDrive({
       throttle: actions.throttle,
       brake: actions.brake,
@@ -434,11 +436,13 @@ export class Game {
   }
 
   setTouchThrottle(v: number) {
+    if (this.input.touchBrake > 0.05 && v > 0) return;
     this.input.touchThrottle = v;
   }
 
   setTouchBrake(v: number) {
-    this.input.touchBrake = v;
+    this.input.touchBrake = v > 0.05 ? 1 : 0;
+    if (v > 0.05) this.input.touchThrottle = 0;
   }
 
   setTouchSlide(v: number) {

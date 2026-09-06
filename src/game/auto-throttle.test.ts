@@ -4,10 +4,13 @@ import {
   applyTouchDrive,
   autoThrottleCap,
   clampTouchSpeed,
+  hitDrivePad,
   HOLD_CANCEL_GRACE_MS,
   isSpuriousHoldEnd,
   latchBrake,
   reduceHold,
+  resolveRaceDrive,
+  resolveSampleDrive,
   shouldReleaseHold,
   stepLongitudinalSpeed,
 } from "./auto-throttle.ts";
@@ -281,5 +284,122 @@ describe("applyTouchDrive + auto-throttle", () => {
     let s = reduceHold({ held: false, cancelUntil: 0 }, { type: "pointerdown", now: 1000, pointerType: "mouse" });
     s = reduceHold(s, { type: "pointerup", now: 2000, remainingTouches: 0, pointerType: "mouse" });
     assert.equal(s.held, false);
+  });
+});
+
+const QA_PADS = {
+  slide: { left: 0, top: 0, right: 96, bottom: 56 },
+  brake: { left: 0, top: 64, right: 96, bottom: 120 },
+  accel: { left: 0, top: 128, right: 96, bottom: 184 },
+};
+
+describe("hitDrivePad", () => {
+  it("prefers Brake on the Accel/Brake seam so Accel cannot steal", () => {
+    assert.equal(hitDrivePad(48, 148, QA_PADS), "accel");
+    assert.equal(hitDrivePad(48, 92, QA_PADS), "brake");
+    assert.equal(hitDrivePad(48, 124, QA_PADS), "brake");
+  });
+});
+
+describe("resolveSampleDrive + resolveRaceDrive (post-#13 wiring)", () => {
+  it("zeros throttle every frame while touchBrake is held under Auto, even if Accel is also 1", () => {
+    let latchUntil = 0;
+    for (let i = 0; i < 180; i++) {
+      const now = 1000 + i * (1000 / 60);
+      const sampled = resolveSampleDrive({
+        throttle: 0,
+        brake: 0,
+        touchThrottle: 1,
+        touchBrake: 1,
+        autoThrottle: true,
+        touchMode: true,
+        now,
+        latchUntil,
+      });
+      latchUntil = sampled.latchUntil;
+      assert.equal(sampled.throttle, 0, `sample throttle at ${i}`);
+      assert.equal(sampled.brake, 1, `sample brake at ${i}`);
+      assert.equal(sampled.touchThrottle, 0);
+      const drive = applyTouchDrive({
+        throttle: sampled.throttle,
+        brake: sampled.brake,
+        touchBrake: 1,
+        autoThrottle: true,
+        manualThrottle: sampled.manualThrottle,
+        cap: 0.5,
+      });
+      assert.equal(drive.throttle, 0, `loop throttle at ${i}`);
+      assert.equal(drive.brake, 1);
+    }
+  });
+
+  it("post-#13 FAIL: speed falls for 3s after Accel→Brake move + late touch pointerup (no touchend)", () => {
+    let hold = reduceHold({ held: false, cancelUntil: 0 }, { type: "pointerdown", now: 0, pointerType: "touch" });
+    let kind = hitDrivePad(48, 148, QA_PADS);
+    assert.equal(kind, "accel");
+
+    let speed = 17.8;
+    let prev = speed;
+    let latchUntil = 0;
+
+    for (let i = 0; i < 180; i++) {
+      const now = i * (1000 / 60);
+      if (i === 18) kind = hitDrivePad(48, 92, QA_PADS);
+      if (i === 20) {
+        hold = reduceHold(hold, { type: "pointercancel", now, pointerType: "touch" });
+        hold = reduceHold(hold, { type: "lostpointercapture", now: now + 1, pointerType: "touch" });
+        hold = reduceHold(hold, { type: "pointerup", now: now + 2, remainingTouches: 0, pointerType: "touch" });
+      }
+      if (i === 90) {
+        hold = reduceHold(hold, { type: "pointerup", now, remainingTouches: 0, pointerType: "touch" });
+      }
+      assert.equal(hold.held, true, `hold dropped at frame ${i}`);
+
+      const touchBrake = hold.held && kind === "brake" ? 1 : 0;
+      const touchThrottle = hold.held && kind === "accel" ? 1 : 0;
+      const race = resolveRaceDrive({
+        throttle: 0,
+        brake: 0,
+        touchThrottle,
+        touchBrake,
+        autoThrottle: true,
+        touchMode: true,
+        now,
+        latchUntil,
+        cap: 0.5,
+      });
+      latchUntil = race.latchUntil;
+
+      if (i >= 18) {
+        assert.equal(kind, "brake");
+        assert.equal(race.throttle, 0, `Auto/Accel wrote throttle at frame ${i}`);
+        assert.equal(race.brake, 1, `brake not latched at frame ${i}`);
+        speed = stepLongitudinalSpeed(speed, race.throttle, race.brake, 1 / 60);
+        if (speed > 0.4) {
+          assert.ok(speed < prev + 1e-9, `speed rose ${prev} → ${speed} at frame ${i}`);
+        }
+        prev = speed;
+      } else {
+        speed = stepLongitudinalSpeed(speed, race.throttle, race.brake, 1 / 60);
+        prev = speed;
+      }
+    }
+    assert.ok(speed < 10, `expected a drop from ~64 km/h under Brake, got ${speed} m/s`);
+  });
+
+  it("keeps Manual Accel (Auto off) when touchBrake is up", () => {
+    const race = resolveRaceDrive({
+      throttle: 0,
+      brake: 0,
+      touchThrottle: 1,
+      touchBrake: 0,
+      autoThrottle: false,
+      touchMode: true,
+      now: 0,
+      latchUntil: 0,
+      cap: 0.5,
+    });
+    assert.equal(race.throttle, 1);
+    assert.equal(race.brake, 0);
   });
 });

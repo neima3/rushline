@@ -94,6 +94,120 @@ export function reduceHold(state: HoldLatch, event: HoldEvent): HoldLatch {
   return state;
 }
 
+export type PadRect = { left: number; top: number; right: number; bottom: number };
+export type DriveKind = "brake" | "accel" | "slide";
+
+function containsPad(r: PadRect, x: number, y: number) {
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+function inflatePad(r: PadRect, pad: number): PadRect {
+  return { left: r.left - pad, top: r.top - pad, right: r.right + pad, bottom: r.bottom + pad };
+}
+
+/**
+ * Pedal cluster hit-test. Brake wins overlaps (including a small slop so a
+ * fat Chrome device-mode touch on the Accel/Brake seam cannot steal Accel).
+ */
+export function hitDrivePad(
+  x: number,
+  y: number,
+  pads: { brake: PadRect; accel: PadRect; slide: PadRect },
+  brakeSlop = 10,
+): DriveKind | null {
+  if (containsPad(inflatePad(pads.brake, brakeSlop), x, y)) return "brake";
+  if (containsPad(pads.accel, x, y)) return "accel";
+  if (containsPad(pads.slide, x, y)) return "slide";
+  return null;
+}
+
+/**
+ * Input.sample throttle/brake merge. Touch Brake is exclusive: Accel and Auto
+ * cannot write throttle while touchBrake is asserted.
+ */
+export function resolveSampleDrive(input: {
+  throttle: number;
+  brake: number;
+  touchThrottle: number;
+  touchBrake: number;
+  autoThrottle: boolean;
+  touchMode: boolean;
+  now: number;
+  latchUntil: number;
+}): {
+  throttle: number;
+  brake: number;
+  manualThrottle: number;
+  latchUntil: number;
+  touchThrottle: number;
+} {
+  const touchThrottle = input.touchBrake > 0.05 ? 0 : input.touchThrottle;
+  let throttle = Math.max(input.throttle, touchThrottle);
+  let brake = Math.max(input.brake, input.touchBrake);
+
+  if (input.touchBrake > 0.05) {
+    throttle = 0;
+    brake = 1;
+  }
+
+  const manualThrottle = input.touchBrake > 0.05 ? 0 : throttle;
+  const latched = latchBrake(input.now, brake, input.latchUntil);
+
+  if (input.touchBrake > 0.05 || latched.cutThrottle) {
+    return {
+      throttle: 0,
+      brake: 1,
+      manualThrottle,
+      latchUntil: latched.latchUntil,
+      touchThrottle,
+    };
+  }
+
+  if (input.autoThrottle && throttle < 0.05) {
+    throttle = input.touchMode ? 0.5 : 1;
+  }
+  return {
+    throttle,
+    brake,
+    manualThrottle,
+    latchUntil: latched.latchUntil,
+    touchThrottle,
+  };
+}
+
+/**
+ * Full race-loop drive: Input.sample merge then applyTouchDrive. Tests and
+ * Game.loop must stay on this path so Auto cannot refill under a Brake hold.
+ */
+export function resolveRaceDrive(input: {
+  throttle: number;
+  brake: number;
+  touchThrottle: number;
+  touchBrake: number;
+  autoThrottle: boolean;
+  touchMode: boolean;
+  now: number;
+  latchUntil: number;
+  cap: number;
+}): {
+  throttle: number;
+  brake: number;
+  manualThrottle: number;
+  latchUntil: number;
+  touchThrottle: number;
+} {
+  const sampled = resolveSampleDrive(input);
+  const drive = applyTouchDrive({
+    throttle: sampled.throttle,
+    brake: sampled.brake,
+    touchBrake: input.touchBrake,
+    autoThrottle: input.autoThrottle,
+    manualThrottle: sampled.manualThrottle,
+    cap: input.cap,
+  });
+  return { ...sampled, throttle: drive.throttle, brake: drive.brake };
+}
+
 /**
  * Game-loop override: latched touch brake beats auto-throttle for the whole
  * press. Same function the race loop uses so tests hit the real wiring.
