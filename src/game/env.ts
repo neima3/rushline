@@ -50,6 +50,12 @@ export function buildEnvironment(track: BuiltTrack, theme: ThemeId): EnvBuild {
   return { group, lights, geos, mats, textures };
 }
 
+function trackOutRadius(track: BuiltTrack) {
+  let maxR = 0;
+  for (const sm of track.samples) maxR = Math.max(maxR, Math.hypot(sm.x, sm.z));
+  return maxR;
+}
+
 function buildStadium(
   track: BuiltTrack,
   group: THREE.Group,
@@ -57,6 +63,7 @@ function buildStadium(
   mats: THREE.Material[],
   lights: THREE.Object3D[],
 ) {
+  const ring = trackOutRadius(track) + 52;
   const standGeo = new THREE.BoxGeometry(1, 1, 1);
   const standMat = new THREE.MeshStandardMaterial({
     color: 0xcfc8ba,
@@ -69,7 +76,7 @@ function buildStadium(
   stands.receiveShadow = true;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    _dummy.position.set(Math.cos(a) * 158, 6.2, Math.sin(a) * 158);
+    _dummy.position.set(Math.cos(a) * ring, 6.2, Math.sin(a) * ring);
     _dummy.scale.set(22, 12.5, 28);
     _dummy.lookAt(0, 6.2, 0);
     _dummy.updateMatrix();
@@ -84,7 +91,7 @@ function buildStadium(
   const seats = new THREE.InstancedMesh(seatGeo, seatMat, n);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    _dummy.position.set(Math.cos(a) * 150, 8.4, Math.sin(a) * 150);
+    _dummy.position.set(Math.cos(a) * (ring - 8), 8.4, Math.sin(a) * (ring - 8));
     _dummy.scale.set(18, 6.5, 18);
     _dummy.lookAt(0, 8.4, 0);
     _dummy.updateMatrix();
@@ -100,7 +107,7 @@ function buildStadium(
   const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, crowdN);
   for (let i = 0; i < crowdN; i++) {
     const a = (i / crowdN) * Math.PI * 2 + hash(i) * 0.04;
-    const r = 146 + hash(i + 3) * 16;
+    const r = ring - 12 + hash(i + 3) * 16;
     const y = 6.6 + hash(i + 7) * 7;
     _dummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
     _dummy.scale.set(1, 0.7 + hash(i + 2) * 0.6, 1);
@@ -125,8 +132,8 @@ function buildStadium(
   poles.castShadow = true;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + 0.18;
-    const x = Math.cos(a) * 128;
-    const z = Math.sin(a) * 128;
+    const x = Math.cos(a) * (ring - 24);
+    const z = Math.sin(a) * (ring - 24);
     _dummy.position.set(x, 8, z);
     _dummy.rotation.set(0, 0, 0);
     _dummy.scale.set(1, 1, 1);
@@ -144,7 +151,7 @@ function buildStadium(
   geos.push(poleGeo, lampGeo);
   mats.push(poleMat, lampMat);
 
-  addTrees(group, geos, mats, 36, 95, 175, 0x3f6b38);
+  addTrees(group, geos, mats, 36, ring + 8, ring + 70, 0x3f6b38);
   addBanners(track, group, geos, mats, 0xf4f4f2, 0x2a2e36);
 }
 
