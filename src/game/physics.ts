@@ -130,12 +130,13 @@ export class CarSim {
     this.recoverLock = 0.85;
     this.landLock = 0.2;
     this.place(track);
+    this.flattenRespawn(track);
     if (this.uy < 0.78 || this.airborne) {
       this.s = pickSafeRespawnS(track, -1);
       this.airborne = false;
       this.place(track);
+      this.flattenRespawn(track);
     }
-    this.flattenRespawn(track);
   }
 
   private flattenRespawn(track: BuiltTrack) {
@@ -148,10 +149,6 @@ export class CarSim {
     this.speed = Math.min(Math.max(this.speed, 6), 10);
     this.landLock = Math.max(this.landLock, 0.45);
     const sm = sampleAt(track, this.s);
-    if (track.def.id === "helix") {
-      this.place(track);
-      return;
-    }
     let tx = sm.tx;
     let tz = sm.tz;
     const tl = Math.hypot(tx, tz);
@@ -162,9 +159,19 @@ export class CarSim {
       tx /= tl;
       tz /= tl;
     }
-    this.px = sm.x + sm.ux * RIDE;
-    this.py = sm.y + sm.uy * RIDE;
-    this.pz = sm.z + sm.uz * RIDE;
+    // Helix parallel-transport can leave a sticky twist. Sit on the ribbon when
+    // the sample is upright; otherwise stand above the sample in world-up so we
+    // never ride an inverted normal under the mesh.
+    const onRibbon = sm.uy >= 0.55;
+    if (onRibbon) {
+      this.px = sm.x + sm.ux * RIDE;
+      this.py = sm.y + sm.uy * RIDE;
+      this.pz = sm.z + sm.uz * RIDE;
+    } else {
+      this.px = sm.x;
+      this.py = sm.y + RIDE;
+      this.pz = sm.z;
+    }
     this.setFrame(tx, 0, tz, 0, 1, 0, -tz, 0, tx);
   }
 
@@ -351,7 +358,7 @@ export class CarSim {
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (this.recoverLock <= 0 && this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
+    if (this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy) && (this.recoverLock <= 0 || sm.uy < 0.15)) {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
@@ -637,8 +644,79 @@ function sampleNearInvert(samples: BuiltTrack["samples"], i: number) {
   return false;
 }
 
+function wrappedDeltaS(s: number, origin: number, length: number, closed: boolean) {
+  let ds = s - origin;
+  if (closed) {
+    ds = ((ds % length) + length) % length;
+    if (ds > length * 0.5) ds -= length;
+  }
+  return ds;
+}
+
+function stableRunway(track: BuiltTrack, s: number, dir: 1 | -1, limit: number) {
+  const L = track.length || 1;
+  let travelled = 0;
+  let prev = s;
+  const step = 1.2;
+  while (travelled < limit) {
+    const next = prev + dir * step;
+    const sm = sampleAt(track, next);
+    if (sm.uy < 0.55 || Math.abs(sm.ty) > 0.55 || sm.y < -3) break;
+    travelled += step;
+    prev = next;
+    if (!track.def.closed && (prev <= 0 || prev >= L)) break;
+  }
+  return travelled;
+}
+
+function pickHelixRespawnS(track: BuiltTrack, origin: number) {
+  const samples = track.samples;
+  const L = track.length || 1;
+  const originSm = sampleAt(track, origin);
+  const ox = originSm.tx;
+  const oz = originSm.tz;
+  let bestS = origin;
+  let bestScore = -1;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.78 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
+    const prev = samples[(i - 1 + samples.length) % samples.length]!;
+    const next = samples[(i + 1) % samples.length]!;
+    if (prev.uy < 0.55 || next.uy < 0.55) continue;
+    if (sampleNearInvert(samples, i)) continue;
+    if (sm.tx * ox + sm.tz * oz < -0.15) continue;
+    const ds = wrappedDeltaS(sm.s, origin, L, true);
+    if (ds < -52 || ds > 22) continue;
+    const fwd = stableRunway(track, sm.s, 1, 28);
+    const back = stableRunway(track, sm.s, -1, 28);
+    if (fwd < 12) continue;
+    if (back < 8 && ds < 0) continue;
+    const score = sm.uy * 4 + fwd * 0.04 - Math.abs(ds) * 0.35 + (sm.y > -0.5 ? 0.3 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestS = sm.s;
+    }
+  }
+  if (bestScore >= 0) return bestS;
+
+  for (const dir of [-1, 1] as const) {
+    for (let d = 0; d <= 70; d += 1.4) {
+      const s = origin + dir * d;
+      const sm = sampleAt(track, s);
+      if (sm.uy < 0.7 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
+      if (stableRunway(track, sm.s, 1, 20) < 10) continue;
+      return sm.s;
+    }
+  }
+  return origin;
+}
+
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
+  if (track.def.id === "helix") {
+    const origin = Math.max(2, cp ?? 6);
+    return pickHelixRespawnS(track, origin);
+  }
   const origin = Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;
@@ -655,11 +733,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
     if (prev.uy < 0.7 || next.uy < 0.7) continue;
     if (sampleNearInvert(samples, i)) continue;
     if (sm.tx * ox + sm.tz * oz < 0.12) continue;
-    let ds = sm.s - origin;
-    if (track.def.closed) {
-      ds = ((ds % L) + L) % L;
-      if (ds > L * 0.5) ds -= L;
-    }
+    const ds = wrappedDeltaS(sm.s, origin, L, track.def.closed);
     if (ds < -2 || ds > 40) continue;
     const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 2.4;
     if (score > bestScore) {
@@ -672,11 +746,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
     const sm = samples[i]!;
     if (sm.uy < 0.82 || sm.y < -3 || sampleNearInvert(samples, i) || Math.abs(sm.ty) > 0.5) continue;
     if (sm.tx * ox + sm.tz * oz < 0) continue;
-    let ds = sm.s - origin;
-    if (track.def.closed) {
-      ds = ((ds % L) + L) % L;
-      if (ds > L * 0.5) ds -= L;
-    }
+    const ds = wrappedDeltaS(sm.s, origin, L, track.def.closed);
     if (ds >= 0 && ds < 120) return sm.s;
   }
   return 6;
