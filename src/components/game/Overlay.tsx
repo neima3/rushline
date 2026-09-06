@@ -58,10 +58,10 @@ export function Overlay({ gameRef }: Props) {
       ) : null}
 
       {phase === "race" || phase === "countdown" ? (
-        <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-3 right-3 flex items-start justify-between">
+        <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
             type="button"
-            className="flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+            className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
             onClick={() => g()?.pause()}
             aria-label="Pause"
           >
@@ -69,20 +69,18 @@ export function Overlay({ gameRef }: Props) {
           </button>
           <div className="flex items-center gap-2">
             {pad.connected ? <PadChip xbox={pad.xbox} /> : null}
-            <div className="hidden gap-2 md:flex">
-              <GhostChip
-                label={camera === "chase" ? "Chase" : "Hood"}
-                onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
-              />
-              <button
-                type="button"
-                className="flex size-11 items-center justify-center rounded-md border border-border bg-surface/90"
-                onClick={() => g()?.setMuted(!muted)}
-                aria-label={muted ? "Unmute" : "Mute"}
-              >
-                {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-              </button>
-            </div>
+            <GhostChip
+              label={camera === "chase" ? "Chase" : "Hood"}
+              onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
+            />
+            <button
+              type="button"
+              className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90"
+              onClick={() => g()?.setMuted(!muted)}
+              aria-label={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </button>
           </div>
         </div>
       ) : null}
@@ -166,7 +164,10 @@ function Menu({
 }) {
   return (
     <div className="pointer-events-auto absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-bg via-bg/80 to-transparent md:justify-center">
-      <div className="flex max-h-full w-full max-w-lg flex-col gap-6 overflow-auto px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-16 md:ml-10 md:px-0">
+      <div
+        data-allow-scroll
+        className="flex max-h-full w-full max-w-lg flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:px-0"
+      >
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
           <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
@@ -275,8 +276,14 @@ function Hud({
 }) {
   return (
     <>
-      <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] left-1/2 flex -translate-x-1/2 flex-col items-center">
-        <p className="font-display text-5xl tabular-nums leading-none tracking-tight md:text-6xl">{formatTime(time)}</p>
+      <div className="absolute top-[max(3.5rem,calc(env(safe-area-inset-top)+2.75rem))] left-1/2 flex -translate-x-1/2 flex-col items-center">
+        <p className="font-display text-4xl tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl">
+          {formatTime(time)}
+        </p>
+        <p className="mt-1 font-display text-2xl tabular-nums leading-none md:hidden">
+          {formatSpeed(speed)}
+          <span className="ml-1 text-[10px] font-sans uppercase tracking-widest text-muted">km/h</span>
+        </p>
         <div className="mt-2 flex items-center gap-3 text-xs font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
             <Flag className="size-3" />
@@ -287,8 +294,12 @@ function Hud({
           </span>
           <MedalRow medal={medal} compact />
         </div>
+        <div className="mt-1 flex gap-3 md:hidden">
+          <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
+          <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} />
+        </div>
       </div>
-      <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-4 text-right">
+      <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
         <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
         <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
         <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
@@ -325,7 +336,7 @@ function Meter({
 }) {
   if (!show) return null;
   return (
-    <div className="mt-2 w-20 ml-auto">
+    <div className="mt-2 w-20 md:ml-auto">
       <p className={cn("text-[10px] uppercase tracking-widest", tone === "ok" ? "text-ok" : "text-medal-gold")}>
         {label}
       </p>
@@ -407,7 +418,7 @@ function GhostChip({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"
+      className="play-control h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"
     >
       {label}
     </button>

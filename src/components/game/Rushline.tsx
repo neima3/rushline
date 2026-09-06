@@ -3,6 +3,11 @@ import type { Game } from "@/game/Game";
 import { Overlay } from "./Overlay";
 import { TouchPad } from "./TouchPad";
 
+function isTouchPlay(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
+}
+
 export function Rushline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
@@ -16,11 +21,35 @@ export function Rushline() {
       if (disposed || !canvasRef.current) return;
       game = new Game(canvasRef.current);
       gameRef.current = game;
-      const coarse = window.matchMedia("(pointer: coarse)").matches;
-      if (coarse) game.setTouch(true);
+      if (isTouchPlay()) game.setTouch(true);
     });
+
+    const syncTouch = () => {
+      if (isTouchPlay()) gameRef.current?.setTouch(true);
+    };
+    const mq = window.matchMedia("(pointer: coarse)");
+    mq.addEventListener("change", syncTouch);
+    window.addEventListener("resize", syncTouch);
+
+    const blockScrollZoom = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("[data-allow-scroll]")) return;
+      e.preventDefault();
+    };
+    const opts: AddEventListenerOptions = { passive: false };
+    document.addEventListener("touchmove", blockScrollZoom, opts);
+    document.addEventListener("gesturestart", blockScrollZoom, opts);
+    document.addEventListener("gesturechange", blockScrollZoom, opts);
+    document.addEventListener("gestureend", blockScrollZoom, opts);
+
     return () => {
       disposed = true;
+      mq.removeEventListener("change", syncTouch);
+      window.removeEventListener("resize", syncTouch);
+      document.removeEventListener("touchmove", blockScrollZoom, opts);
+      document.removeEventListener("gesturestart", blockScrollZoom, opts);
+      document.removeEventListener("gesturechange", blockScrollZoom, opts);
+      document.removeEventListener("gestureend", blockScrollZoom, opts);
       game?.dispose();
       gameRef.current = null;
     };
@@ -34,7 +63,12 @@ export function Rushline() {
 
   return (
     <main className="game-root relative h-dvh w-full overflow-hidden bg-bg">
-      <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
+      <canvas
+        ref={canvasRef}
+        tabIndex={0}
+        className="absolute inset-0 size-full touch-none outline-none"
+        onPointerDown={() => gameRef.current?.capturePlayFocus()}
+      />
       <Overlay gameRef={gameRef} />
       <TouchPad
         onSteer={onSteer}

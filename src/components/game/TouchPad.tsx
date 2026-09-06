@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
 import { RotateCcw } from "lucide-react";
 
@@ -14,7 +14,8 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
   const phase = useGame((s) => s.phase);
   const auto = useGame((s) => s.autoThrottle);
   const padActive = useGame((s) => s.pad.active);
-  const visible = (phase === "race" || phase === "countdown") && !padActive;
+  const touch = useGame((s) => s.touch);
+  const visible = touch && (phase === "race" || phase === "countdown") && !padActive;
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,27 +36,31 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
       onSteer(Math.max(-1, Math.min(1, steer)));
     };
     const down = (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       ids.add(e.pointerId);
-      el.setPointerCapture(e.pointerId);
       read(e);
     };
     const move = (e: PointerEvent) => {
       if (!ids.has(e.pointerId)) return;
+      e.preventDefault();
       read(e);
     };
     const up = (e: PointerEvent) => {
+      if (!ids.has(e.pointerId)) return;
       ids.delete(e.pointerId);
       if (ids.size === 0) onSteer(0);
     };
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
+    const opts: AddEventListenerOptions = { passive: false };
+    el.addEventListener("pointerdown", down, opts);
+    window.addEventListener("pointermove", move, opts);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     return () => {
-      el.removeEventListener("pointerdown", down);
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
+      el.removeEventListener("pointerdown", down, opts);
+      window.removeEventListener("pointermove", move, opts);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       onSteer(0);
     };
   }, [onSteer, onThrottle, onBrake, onSlide, visible]);
@@ -63,10 +68,10 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
   if (!visible) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-3 pl-[max(0.85rem,env(safe-area-inset-left))] pr-[max(0.85rem,env(safe-area-inset-right))] pb-[max(0.7rem,env(safe-area-inset-bottom))]">
       <div
         ref={steerRef}
-        className="pointer-events-auto h-28 w-[46%] max-w-56 rounded-xl border border-border bg-surface/80"
+        className="play-control pointer-events-auto h-32 w-[46%] max-w-60 touch-none rounded-xl border border-border bg-surface/80 select-none"
         aria-label="Steer"
       >
         <div className="flex h-full items-center justify-between px-5 text-sm font-medium text-muted">
@@ -79,8 +84,14 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         <button
           type="button"
           aria-label="Respawn"
-          onPointerDown={onRespawn}
-          className="flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+          data-play-control="1"
+          className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+          onContextMenu={(e) => e.preventDefault()}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRespawn();
+          }}
         >
           <RotateCcw className="size-5" strokeWidth={1.75} />
         </button>
@@ -101,21 +112,72 @@ function HoldButton({
   onHold: (v: 0 | 1) => void;
   accent?: boolean;
 }) {
+  const holdRef = useRef(false);
+  const pidRef = useRef<number | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [held, setHeld] = useState(false);
+
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+
+    const release = (id?: number) => {
+      if (id != null && pidRef.current != null && id !== pidRef.current) return;
+      if (!holdRef.current) return;
+      holdRef.current = false;
+      pidRef.current = null;
+      setHeld(false);
+      onHold(0);
+    };
+
+    const down = (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pidRef.current = e.pointerId;
+      holdRef.current = true;
+      setHeld(true);
+      onHold(1);
+    };
+
+    const end = (e: PointerEvent) => {
+      // iOS Safari often fires pointercancel while the finger is still down
+      // (scroll/zoom heuristic). Keep the hold until pointerup or touchend.
+      if (e.type === "pointercancel") return;
+      release(e.pointerId);
+    };
+
+    const touchEnd = () => release();
+
+    const opts: AddEventListenerOptions = { passive: false };
+    el.addEventListener("pointerdown", down, opts);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    el.addEventListener("touchend", touchEnd);
+    el.addEventListener("touchcancel", touchEnd);
+    return () => {
+      el.removeEventListener("pointerdown", down, opts);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      el.removeEventListener("touchend", touchEnd);
+      el.removeEventListener("touchcancel", touchEnd);
+      if (holdRef.current) onHold(0);
+      holdRef.current = false;
+      pidRef.current = null;
+    };
+  }, [onHold]);
+
   return (
     <button
+      ref={btnRef}
       type="button"
-      className={`h-14 min-h-14 w-24 rounded-lg border text-sm font-medium ${
+      data-play-control="1"
+      aria-pressed={held}
+      className={`play-control h-14 min-h-14 w-24 touch-none select-none rounded-lg border text-sm font-medium ${
         accent
           ? "border-accent bg-accent text-accent-fg"
           : "border-border bg-surface/90 text-fg"
-      }`}
+      } ${held ? "brightness-125" : ""}`}
       onContextMenu={(e) => e.preventDefault()}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        onHold(1);
-      }}
-      onPointerUp={() => onHold(0)}
-      onPointerCancel={() => onHold(0)}
     >
       {label}
     </button>

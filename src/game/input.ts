@@ -1,5 +1,6 @@
 import type { Actions, PadInfo } from "./types";
 import { padInfoFrom, pollPads, rumblePads } from "./gamepad";
+import { latchBrake } from "./auto-throttle";
 
 const GAME_CODES = new Set([
   "KeyW",
@@ -30,8 +31,12 @@ export class Input {
   touchBrake = 0;
   touchSlide = 0;
   autoThrottle = false;
+  touchMode = false;
+  /** Throttle from keys / pad / touch before auto-throttle fills in. */
+  manualThrottle = 0;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
   private lastPadUse = 0;
+  private brakeLatchUntil = 0;
   private edgePrev = {
     respawn: false,
     restart: false,
@@ -142,8 +147,15 @@ export class Input {
     steer += this.touchSteer;
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
-
-    if (this.autoThrottle && throttle < 0.05 && brake < 0.05) throttle = 1;
+    this.manualThrottle = throttle;
+    const latched = latchBrake(performance.now(), brake, this.brakeLatchUntil);
+    this.brakeLatchUntil = latched.latchUntil;
+    if (latched.cutThrottle) {
+      brake = latched.brake;
+      throttle = 0;
+    } else if (this.autoThrottle && throttle < 0.05) {
+      throttle = this.touchMode ? 0.5 : 1;
+    }
 
     steer = Math.max(-1, Math.min(1, steer));
 
