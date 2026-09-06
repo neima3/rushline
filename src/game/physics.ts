@@ -73,6 +73,7 @@ export class CarSim {
   private airTime = 0;
   private landLock = 0;
   private airBlend = 0;
+  private recoverLock = 0;
 
   reset(track: BuiltTrack) {
     this.s = 6;
@@ -101,6 +102,7 @@ export class CarSim {
     this.airTime = 0;
     this.landLock = 0;
     this.airBlend = 0;
+    this.recoverLock = 0;
     this.place(track);
   }
 
@@ -125,6 +127,7 @@ export class CarSim {
     this.airTime = 0;
     this.landLock = 0;
     this.airBlend = 0;
+    this.recoverLock = 0.85;
     this.place(track);
   }
 
@@ -174,13 +177,14 @@ export class CarSim {
     this.justRespawn = false;
     this.wallHit = Math.max(0, this.wallHit - dt);
     this.landLock = Math.max(0, this.landLock - dt);
+    this.recoverLock = Math.max(0, this.recoverLock - dt);
     const prevS = this.s;
 
     if (this.airborne) this.stepAir(track, actions, dt);
     else this.stepGround(track, actions, dt);
 
     this.detectGates(track, prevS);
-    if (this.needsRecover(track)) this.respawn(track);
+    if (this.recoverLock <= 0 && this.needsRecover(track)) this.respawn(track);
   }
 
   private needsRecover(track: BuiltTrack) {
@@ -197,7 +201,7 @@ export class CarSim {
     if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
     if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
     if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
-    if (!this.airborne && height < -0.7) return true;
+    if (!this.airborne && height < -1.1 && (Math.abs(lat) > near.width * 0.3 || dist > 6)) return true;
     if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 14) return true;
     return false;
   }

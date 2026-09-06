@@ -171,7 +171,7 @@ function nodeAt(nodes: TrackNode[], i: number, closed: boolean) {
   return nodes[Math.max(0, Math.min(n - 1, i))]!;
 }
 
-export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
+export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = false): Sample[] {
   const pts: { x: number; y: number; z: number; width: number; bank: number; boost: boolean; checkpoint: boolean }[] =
     [];
   const n = nodes.length;
@@ -323,6 +323,43 @@ export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
     uy = rz * tx - rx * tz;
     uz = rx * ty - ry * tx;
 
+    if (stabilizeUp && uy < 0.62) {
+      if (uy < 0) {
+        ux = -ux;
+        uy = -uy;
+        uz = -uz;
+      }
+      let wx = -tx * ty;
+      let wy = 1 - ty * ty;
+      let wz = -tz * ty;
+      const wl = Math.hypot(wx, wy, wz) || 1;
+      wx /= wl;
+      wy /= wl;
+      wz /= wl;
+      const k = uy < 0.25 ? 1 : 0.72;
+      ux += (wx - ux) * k;
+      uy += (wy - uy) * k;
+      uz += (wz - uz) * k;
+      const d = ux * tx + uy * ty + uz * tz;
+      ux -= tx * d;
+      uy -= ty * d;
+      uz -= tz * d;
+      const ul2 = Math.hypot(ux, uy, uz) || 1;
+      ux /= ul2;
+      uy /= ul2;
+      uz /= ul2;
+      rx = ty * uz - tz * uy;
+      ry = tz * ux - tx * uz;
+      rz = tx * uy - ty * ux;
+      const rl2 = Math.hypot(rx, ry, rz) || 1;
+      rx /= rl2;
+      ry /= rl2;
+      rz /= rl2;
+      ux = ry * tz - rz * ty;
+      uy = rz * tx - rx * tz;
+      uz = rx * ty - ry * tx;
+    }
+
     if (i > 0) {
       const prev = pts[i - 1]!;
       arc += Math.hypot(p.x - prev.x, p.y - prev.y, p.z - prev.z);
@@ -352,7 +389,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {
-  const samples = rasterize(def.nodes, def.closed);
+  const samples = rasterize(def.nodes, def.closed, def.id !== "helix");
   const length = samples[samples.length - 1]?.s ?? 1;
   const checkpoints: number[] = [];
   const boosts: number[] = [];
