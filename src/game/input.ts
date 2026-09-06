@@ -30,6 +30,8 @@ export class Input {
   touchBrake = 0;
   touchSlide = 0;
   autoThrottle = false;
+  /** Throttle from keys / pad / touch before auto-throttle fills in. */
+  manualThrottle = 0;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
   private lastPadUse = 0;
   touchMode = false;
@@ -194,6 +196,7 @@ export class Input {
     steer += this.touchSteer;
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
+    this.manualThrottle = throttle;
     const now = performance.now();
     if (brake > 0.05) this.brakeLatchUntil = now + 340;
     if (now < this.brakeLatchUntil) {

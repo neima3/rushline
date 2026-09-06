@@ -100,7 +100,7 @@ export class CarSim {
     this.skipInterp = true;
     this.wasSlide = false;
     this.airTime = 0;
-    this.landLock = 0;
+    this.landLock = track.def.id === "canyon" ? 2.6 : 0;
     this.airBlend = 0;
     this.recoverLock = 0;
     this.place(track);
@@ -351,7 +351,12 @@ export class CarSim {
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (this.recoverLock <= 0 && this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
+    if (
+      this.recoverLock <= 0 &&
+      this.landLock <= 0 &&
+      !(track.def.id === "canyon" && this.s < 120) &&
+      shouldLeaveTrack(this.speed, sm.uy)
+    ) {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
