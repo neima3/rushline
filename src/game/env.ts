@@ -125,8 +125,8 @@ function buildStadium(
   poles.castShadow = true;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + 0.18;
-    const x = Math.cos(a) * 78;
-    const z = Math.sin(a) * 78;
+    const x = Math.cos(a) * 128;
+    const z = Math.sin(a) * 128;
     _dummy.position.set(x, 8, z);
     _dummy.rotation.set(0, 0, 0);
     _dummy.scale.set(1, 1, 1);

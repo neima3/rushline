@@ -216,8 +216,7 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
     const rawDt = (now - this.lastT) / 1000;
     this.lastT = now;
-    if (rawDt <= 0) return;
-    const dt = Math.min(rawDt, 0.1);
+    const dt = rawDt > 0 ? Math.min(rawDt, 0.1) : 0;
 
     const store = useGame.getState();
     this.input.autoThrottle = store.autoThrottle;

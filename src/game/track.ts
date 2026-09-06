@@ -323,31 +323,36 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
     uy = rz * tx - rx * tz;
     uz = rx * ty - ry * tx;
 
-    if (stabilizeUp && uy < 0.62) {
-      if (uy < 0) {
-        ux = -ux;
-        uy = -uy;
-        uz = -uz;
-      }
+    if (stabilizeUp) {
       let wx = -tx * ty;
       let wy = 1 - ty * ty;
       let wz = -tz * ty;
-      const wl = Math.hypot(wx, wy, wz) || 1;
-      wx /= wl;
-      wy /= wl;
-      wz /= wl;
-      const k = uy < 0.25 ? 1 : 0.72;
-      ux += (wx - ux) * k;
-      uy += (wy - uy) * k;
-      uz += (wz - uz) * k;
-      const d = ux * tx + uy * ty + uz * tz;
-      ux -= tx * d;
-      uy -= ty * d;
-      uz -= tz * d;
-      const ul2 = Math.hypot(ux, uy, uz) || 1;
-      ux /= ul2;
-      uy /= ul2;
-      uz /= ul2;
+      const wl = Math.hypot(wx, wy, wz);
+      if (wl < 0.12) {
+        if (uy < 0) {
+          ux = -ux;
+          uy = -uy;
+          uz = -uz;
+        }
+      } else {
+        ux = wx / wl;
+        uy = wy / wl;
+        uz = wz / wl;
+        if (p.bank) {
+          const sB = Math.sin(p.bank);
+          const cB = Math.cos(p.bank);
+          const one = 1 - cB;
+          const ax = tx;
+          const ay = ty;
+          const az = tz;
+          const nux = ux * (cB + ax * ax * one) + uy * (ax * ay * one - az * sB) + uz * (ax * az * one + ay * sB);
+          const nuy = ux * (ay * ax * one + az * sB) + uy * (cB + ay * ay * one) + uz * (ay * az * one - ax * sB);
+          const nuz = ux * (az * ax * one - ay * sB) + uy * (az * ay * one + ax * sB) + uz * (cB + az * az * one);
+          ux = nux;
+          uy = nuy;
+          uz = nuz;
+        }
+      }
       rx = ty * uz - tz * uy;
       ry = tz * ux - tx * uz;
       rz = tx * uy - ty * ux;
@@ -385,7 +390,23 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
     });
   }
 
+  if (stabilizeUp) alignRibbonRights(samples);
   return samples;
+}
+
+function alignRibbonRights(samples: Sample[]) {
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1]!;
+    const b = samples[i]!;
+    if (a.rx * b.rx + a.ry * b.ry + a.rz * b.rz < 0) {
+      b.rx = -b.rx;
+      b.ry = -b.ry;
+      b.rz = -b.rz;
+      b.ux = -b.ux;
+      b.uy = -b.uy;
+      b.uz = -b.uz;
+    }
+  }
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {
@@ -809,6 +830,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     metalness: theme === "night" ? 0.22 : 0.06,
     emissive: theme === "night" ? 0x1c334c : 0x000000,
     emissiveIntensity: theme === "night" ? 0.32 : 0,
+    side: THREE.DoubleSide,
   });
   const curbMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.05 });
   const wallMat = new THREE.MeshStandardMaterial({
@@ -1018,6 +1040,12 @@ export function getTrack(id: TrackId): BuiltTrack {
     builtCache.set(id, t);
   }
   return t;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    builtCache.clear();
+  });
 }
 
 export function allTrackDefs(): TrackDef[] {

@@ -200,13 +200,13 @@ export class CarSim {
     const dist = Math.hypot(dx, dy, dz);
     const height = dx * near.ux + dy * near.uy + dz * near.uz;
     const lat = dx * near.rx + dy * near.ry + dz * near.rz;
-    if (dist > 16) return true;
-    if (this.airborne && this.airTime > 1.65) return true;
-    if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
-    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
-    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
-    if (!this.airborne && height < -1.1 && (Math.abs(lat) > near.width * 0.3 || dist > 6)) return true;
-    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 18) return true;
+    if (dist > 14) return true;
+    if (this.airborne && this.airTime > 1.45) return true;
+    if (this.airborne && height < -1.6 && this.airTime > 0.12) return true;
+    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 8 && this.airTime > 0.4) return true;
+    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.05) return true;
+    if (!this.airborne && height < -0.55) return true;
+    if (!this.airborne && this.uy < 0.18 && near.uy > 0.5) return true;
     return false;
   }
 
@@ -386,11 +386,11 @@ export class CarSim {
       into < 4.2 &&
       (!vertical || this.airTime < 0.55);
 
-    if (Math.abs(lat) > near.width * 0.5 + 1.6 || height < -0.4) {
+    if (Math.abs(lat) > near.width * 0.5 + 1.2 || height < -0.25) {
       this.boost = 0;
       const spd = Math.hypot(this.vx, this.vy, this.vz);
-      if (spd > 18) {
-        const k = 18 / spd;
+      if (spd > 16) {
+        const k = 16 / spd;
         this.vx *= k;
         this.vy *= k;
         this.vz *= k;
@@ -407,7 +407,7 @@ export class CarSim {
       this.s = near.s;
       this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
       const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
-      this.speed = clamp(vt * 0.94, -MAX_REV, MAX_BOOST);
+      this.speed = clamp(vt * 0.72, -MAX_REV, MAX_SPEED);
       this.heading = clamp(this.heading * 0.45, -0.4, 0.4);
       this.skipInterp = true;
       this.place(track);
@@ -623,7 +623,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
       if (ds > L * 0.5) ds -= L;
     }
     if (ds < -3 || ds > 32) continue;
-    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0);
+    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 1.6;
     if (score > bestScore) {
       bestScore = score;
       bestS = sm.s;
