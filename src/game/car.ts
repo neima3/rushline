@@ -216,7 +216,7 @@ export function makeCar(ghost: boolean): CarRig {
   };
 
   const setHeadlights = (on: boolean) => {
-    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 2.2 : 1.05;
+    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.4 : 1.05;
   };
 
   return {

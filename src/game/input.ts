@@ -32,6 +32,9 @@ export class Input {
   autoThrottle = false;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
   private lastPadUse = 0;
+  touchMode = false;
+  private queued = { pause: false, camera: false, respawn: false };
+  private brakeLatchUntil = 0;
   private edgePrev = {
     respawn: false,
     restart: false,
@@ -52,6 +55,10 @@ export class Input {
       if (GAME_CODES.has(e.code)) {
         e.preventDefault();
         this.keys.add(e.code);
+        if (e.repeat) return;
+        if (e.code === "Escape" || e.code === "KeyP") this.queued.pause = true;
+        if (e.code === "KeyC") this.queued.camera = true;
+        if (e.code === "KeyR") this.queued.respawn = true;
       }
     };
     this.onKeyUp = (e) => {
@@ -167,8 +174,14 @@ export class Input {
     steer += this.touchSteer;
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
-    if (brake > 0.05) throttle = 0;
-    else if (this.autoThrottle && throttle < 0.05) throttle = 1;
+    const now = performance.now();
+    if (brake > 0.05) this.brakeLatchUntil = now + 240;
+    if (now < this.brakeLatchUntil) {
+      brake = Math.max(brake, 1);
+      throttle = 0;
+    } else if (this.autoThrottle && throttle < 0.05) {
+      throttle = this.touchMode ? 0.66 : 1;
+    }
 
     steer = Math.max(-1, Math.min(1, steer));
 
@@ -184,10 +197,13 @@ export class Input {
     const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
     const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view);
 
-    const respawn = respawnNow && !this.edgePrev.respawn;
+    const respawn = this.queued.respawn || (respawnNow && !this.edgePrev.respawn);
     const restart = restartNow && !this.edgePrev.restart;
-    const pause = pauseNow && !this.edgePrev.pause;
-    const camera = cameraNow && !this.edgePrev.camera;
+    const pause = this.queued.pause || (pauseNow && !this.edgePrev.pause);
+    const camera = this.queued.camera || (cameraNow && !this.edgePrev.camera);
+    this.queued.pause = false;
+    this.queued.camera = false;
+    this.queued.respawn = false;
     const confirm = confirmNow && !this.edgePrev.confirm;
     const back = backNow && !this.edgePrev.back;
     this.edgePrev = {

@@ -106,6 +106,27 @@ function HoldButton({
   onHold: (v: 0 | 1) => void;
   accent?: boolean;
 }) {
+  const holdRef = useRef(false);
+  const pidRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const end = (e: PointerEvent) => {
+      if (pidRef.current == null || e.pointerId !== pidRef.current) return;
+      holdRef.current = false;
+      pidRef.current = null;
+      onHold(0);
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      if (holdRef.current) onHold(0);
+      holdRef.current = false;
+      pidRef.current = null;
+    };
+  }, [onHold]);
+
   return (
     <button
       type="button"
@@ -119,15 +140,23 @@ function HoldButton({
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
+        pidRef.current = e.pointerId;
+        holdRef.current = true;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture is optional; window pointerup still ends the hold */
+        }
         onHold(1);
       }}
-      onPointerUp={(e) => {
-        e.preventDefault();
-        onHold(0);
+      onLostPointerCapture={(e) => {
+        if (!holdRef.current || pidRef.current !== e.pointerId) return;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* keep hold until window pointerup */
+        }
       }}
-      onPointerCancel={() => onHold(0)}
-      onLostPointerCapture={() => onHold(0)}
     >
       {label}
     </button>

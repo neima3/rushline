@@ -129,6 +129,10 @@ export class CarSim {
     this.airBlend = 0;
     this.recoverLock = 0.85;
     this.place(track);
+    if (this.uy < 0.62) {
+      this.s = pickSafeRespawnS(track, -1);
+      this.place(track);
+    }
   }
 
   private place(track: BuiltTrack) {
@@ -196,13 +200,13 @@ export class CarSim {
     const dist = Math.hypot(dx, dy, dz);
     const height = dx * near.ux + dy * near.uy + dz * near.uz;
     const lat = dx * near.rx + dy * near.ry + dz * near.rz;
-    if (dist > 22) return true;
+    if (dist > 16) return true;
     if (this.airborne && this.airTime > 1.65) return true;
     if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
     if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
     if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
     if (!this.airborne && height < -1.1 && (Math.abs(lat) > near.width * 0.3 || dist > 6)) return true;
-    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 14) return true;
+    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 18) return true;
     return false;
   }
 
@@ -277,12 +281,14 @@ export class CarSim {
     if (this.n > half) {
       this.n = half - 0.06;
       this.heading = clamp(this.heading + 0.2, 0.08, maxYaw);
-      this.speed *= 0.82;
+      this.speed = Math.min(this.speed * 0.78, 18);
+      this.boost = 0;
       this.wallHit = 0.16;
     } else if (this.n < -half) {
       this.n = -half + 0.06;
       this.heading = clamp(this.heading - 0.2, -maxYaw, -0.08);
-      this.speed *= 0.82;
+      this.speed = Math.min(this.speed * 0.78, 18);
+      this.boost = 0;
       this.wallHit = 0.16;
     }
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
@@ -589,12 +595,20 @@ function shouldLeaveTrack(speed: number, uy: number) {
   return uy < -0.42 && speed < STICK_SPEED;
 }
 
+function sampleNearInvert(samples: BuiltTrack["samples"], i: number) {
+  for (let k = -8; k <= 8; k++) {
+    const nb = samples[(i + k + samples.length) % samples.length]!;
+    if (nb.uy < 0.15) return true;
+  }
+  return false;
+}
+
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
   const origin = Math.max(2, (cp ?? 6) + 2);
   const samples = track.samples;
   const L = track.length || 1;
-  let bestS = 6;
+  let bestS = origin;
   let bestScore = -1;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
@@ -602,6 +616,7 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
     const prev = samples[(i - 1 + samples.length) % samples.length]!;
     const next = samples[(i + 1) % samples.length]!;
     if (prev.uy < 0.68 || next.uy < 0.68) continue;
+    if (sampleNearInvert(samples, i)) continue;
     let ds = sm.s - origin;
     if (track.def.closed) {
       ds = ((ds % L) + L) % L;
@@ -614,7 +629,18 @@ export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
       bestS = sm.s;
     }
   }
-  return bestScore < 0 ? 6 : bestS;
+  if (bestScore >= 0) return bestS;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.78 || sm.y < -3 || sampleNearInvert(samples, i)) continue;
+    let ds = sm.s - origin;
+    if (track.def.closed) {
+      ds = ((ds % L) + L) % L;
+      if (ds > L * 0.5) ds -= L;
+    }
+    if (ds >= 0 && ds < 80) return sm.s;
+  }
+  return 6;
 }
 
 export const FIXED_DT = FIXED;

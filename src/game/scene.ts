@@ -46,13 +46,13 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x0b1220,
+    fog: 0x101828,
     ground: 0x12161f,
-    hemiSky: 0x1a2a48,
-    hemiGround: 0x08090d,
-    sun: 0xa8c4ff,
+    hemiSky: 0x243656,
+    hemiGround: 0x0c1018,
+    sun: 0xb4ccff,
     sunPos: [20, 80, -40],
-    exposure: 0.88,
+    exposure: 1.02,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -195,7 +195,7 @@ export class World {
 
   snapCamera(snap: CarSnap, mode: CameraMode) {
     this.trauma = 0;
-    this.camHold = 0.45;
+    this.camHold = 0.55;
     _fwd.set(snap.fx, 0, snap.fz);
     if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -208,8 +208,8 @@ export class World {
     this.camUp.crossVectors(this.camFwd, _right).normalize();
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
-    const lift = portrait ? 3.15 : 2.45;
-    const dist = (mode === "hood" ? 3.4 : 7.4) + (portrait ? 1.1 : 0);
+    const lift = portrait ? 3.7 : 2.55;
+    const dist = (mode === "hood" ? 3.1 : 6.8) + (portrait ? 0.35 : 0);
     this.camPos.set(
       snap.px - this.camFwd.x * dist + this.camUp.x * lift,
       Math.max(snap.py + 1.8, snap.py - this.camFwd.y * dist + this.camUp.y * lift),
@@ -382,7 +382,12 @@ export class World {
     _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
     else _fwd.normalize();
-    if (snap.uy > 0.55) {
+    if (mode !== "hood") {
+      _fwd.y *= 0.12;
+      if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
+      if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
+      else _fwd.normalize();
+    } else if (snap.uy > 0.55) {
       _fwd.y = 0;
       if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
       if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -393,7 +398,7 @@ export class World {
     else _up.normalize();
 
     const upDot = THREE.MathUtils.clamp(_up.dot(_worldUp), -1, 1);
-    const rollAmt = snap.airborne ? 0.06 : snap.uy > 0.55 ? 0.12 : THREE.MathUtils.clamp(0.28 + upDot * 0.32, 0.08, 0.48);
+    const rollAmt = mode === "hood" ? (snap.airborne ? 0.06 : 0.1) : snap.airborne ? 0.04 : snap.uy > 0.55 ? 0.08 : THREE.MathUtils.clamp(0.12 + upDot * 0.1, 0.04, 0.18);
     _camUpTarget.set(
       _worldUp.x + (_up.x - _worldUp.x) * rollAmt,
       _worldUp.y + (_up.y - _worldUp.y) * rollAmt,

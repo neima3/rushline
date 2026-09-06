@@ -115,6 +115,7 @@ export class Game {
   }
 
   setTouch(v: boolean) {
+    this.input.touchMode = v;
     useGame.getState().setTouch(v);
     if (v && !useGame.getState().autoThrottle) {
       this.setAutoThrottle(true);
@@ -225,6 +226,14 @@ export class Game {
 
     const actions = this.input.sample();
     if (this.injectSteer != null) actions.steer = this.injectSteer;
+    if (
+      this.input.touchMode &&
+      this.input.autoThrottle &&
+      this.input.touchThrottle < 0.05 &&
+      actions.brake < 0.05
+    ) {
+      actions.throttle = Math.min(actions.throttle, this.car.speed > 22 ? 0.4 : 0.66);
+    }
 
     this.padAcc += dt;
     if (this.padAcc > 0.2) {
