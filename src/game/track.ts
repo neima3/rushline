@@ -171,7 +171,7 @@ function nodeAt(nodes: TrackNode[], i: number, closed: boolean) {
   return nodes[Math.max(0, Math.min(n - 1, i))]!;
 }
 
-export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
+export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = false): Sample[] {
   const pts: { x: number; y: number; z: number; width: number; bank: number; boost: boolean; checkpoint: boolean }[] =
     [];
   const n = nodes.length;
@@ -323,6 +323,48 @@ export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
     uy = rz * tx - rx * tz;
     uz = rx * ty - ry * tx;
 
+    if (stabilizeUp) {
+      let wx = -tx * ty;
+      let wy = 1 - ty * ty;
+      let wz = -tz * ty;
+      const wl = Math.hypot(wx, wy, wz);
+      if (wl < 0.12) {
+        if (uy < 0) {
+          ux = -ux;
+          uy = -uy;
+          uz = -uz;
+        }
+      } else {
+        ux = wx / wl;
+        uy = wy / wl;
+        uz = wz / wl;
+        if (p.bank) {
+          const sB = Math.sin(p.bank);
+          const cB = Math.cos(p.bank);
+          const one = 1 - cB;
+          const ax = tx;
+          const ay = ty;
+          const az = tz;
+          const nux = ux * (cB + ax * ax * one) + uy * (ax * ay * one - az * sB) + uz * (ax * az * one + ay * sB);
+          const nuy = ux * (ay * ax * one + az * sB) + uy * (cB + ay * ay * one) + uz * (ay * az * one - ax * sB);
+          const nuz = ux * (az * ax * one - ay * sB) + uy * (az * ay * one + ax * sB) + uz * (cB + az * az * one);
+          ux = nux;
+          uy = nuy;
+          uz = nuz;
+        }
+      }
+      rx = ty * uz - tz * uy;
+      ry = tz * ux - tx * uz;
+      rz = tx * uy - ty * ux;
+      const rl2 = Math.hypot(rx, ry, rz) || 1;
+      rx /= rl2;
+      ry /= rl2;
+      rz /= rl2;
+      ux = ry * tz - rz * ty;
+      uy = rz * tx - rx * tz;
+      uz = rx * ty - ry * tx;
+    }
+
     if (i > 0) {
       const prev = pts[i - 1]!;
       arc += Math.hypot(p.x - prev.x, p.y - prev.y, p.z - prev.z);
@@ -352,7 +394,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean): Sample[] {
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {
-  const samples = rasterize(def.nodes, def.closed);
+  const samples = rasterize(def.nodes, def.closed, def.id !== "helix");
   const length = samples[samples.length - 1]?.s ?? 1;
   const checkpoints: number[] = [];
   const boosts: number[] = [];
@@ -388,19 +430,53 @@ export function sampleAt(track: BuiltTrack, s: number): Sample {
   const b = samples[i1]!;
   const span = b.s - a.s || 1;
   const t = Math.max(0, Math.min(1, (ss - a.s) / span));
+  let tx = lerp(a.tx, b.tx, t);
+  let ty = lerp(a.ty, b.ty, t);
+  let tz = lerp(a.tz, b.tz, t);
+  let tl = Math.hypot(tx, ty, tz) || 1;
+  tx /= tl;
+  ty /= tl;
+  tz /= tl;
+  let ux = lerp(a.ux, b.ux, t);
+  let uy = lerp(a.uy, b.uy, t);
+  let uz = lerp(a.uz, b.uz, t);
+  const ud = ux * tx + uy * ty + uz * tz;
+  ux -= tx * ud;
+  uy -= ty * ud;
+  uz -= tz * ud;
+  let ul = Math.hypot(ux, uy, uz);
+  if (ul < 0.2) {
+    ux = 0;
+    uy = 1;
+    uz = 0;
+    ul = 1;
+  }
+  ux /= ul;
+  uy /= ul;
+  uz /= ul;
+  let rx = ty * uz - tz * uy;
+  let ry = tz * ux - tx * uz;
+  let rz = tx * uy - ty * ux;
+  const rl = Math.hypot(rx, ry, rz) || 1;
+  rx /= rl;
+  ry /= rl;
+  rz /= rl;
+  ux = ry * tz - rz * ty;
+  uy = rz * tx - rx * tz;
+  uz = rx * ty - ry * tx;
   return {
     x: lerp(a.x, b.x, t),
     y: lerp(a.y, b.y, t),
     z: lerp(a.z, b.z, t),
-    tx: lerp(a.tx, b.tx, t),
-    ty: lerp(a.ty, b.ty, t),
-    tz: lerp(a.tz, b.tz, t),
-    ux: lerp(a.ux, b.ux, t),
-    uy: lerp(a.uy, b.uy, t),
-    uz: lerp(a.uz, b.uz, t),
-    rx: lerp(a.rx, b.rx, t),
-    ry: lerp(a.ry, b.ry, t),
-    rz: lerp(a.rz, b.rz, t),
+    tx,
+    ty,
+    tz,
+    ux,
+    uy,
+    uz,
+    rx,
+    ry,
+    rz,
     width: lerp(a.width, b.width, t),
     s: ss,
     boost: a.boost || b.boost,
@@ -446,7 +522,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
   stadium: { r: 0.22, g: 0.24, b: 0.27 },
   canyon: { r: 0.28, g: 0.24, b: 0.22 },
-  night: { r: 0.1, g: 0.13, b: 0.2 },
+  night: { r: 0.26, g: 0.32, b: 0.44 },
 };
 
 export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
@@ -736,6 +812,9 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     vertexColors: true,
     roughness: theme === "night" ? 0.28 : 0.62,
     metalness: theme === "night" ? 0.22 : 0.06,
+    emissive: theme === "night" ? 0x1c334c : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.48 : 0,
+    side: THREE.DoubleSide,
   });
   const curbMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.05 });
   const wallMat = new THREE.MeshStandardMaterial({
@@ -945,6 +1024,12 @@ export function getTrack(id: TrackId): BuiltTrack {
     builtCache.set(id, t);
   }
   return t;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    builtCache.clear();
+  });
 }
 
 export function allTrackDefs(): TrackDef[] {

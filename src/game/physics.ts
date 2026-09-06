@@ -2,20 +2,25 @@ import * as THREE from "three";
 import type { Actions, BuiltTrack, CarSnap } from "./types";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 
-const ACCEL = 27;
-const BRAKE = 38;
+const ACCEL = 28;
+const BRAKE = 40;
 const REVERSE = 16;
 const MAX_SPEED = 40;
 const MAX_BOOST = 56;
 const MAX_REV = 14;
-const DRAG = 0.28;
-const COAST = 0.85;
-const TURN = 2.2;
-const AIR_TURN = 1.35;
+const DRAG = 0.26;
+const COAST = 0.74;
+const TURN = 2.68;
+const DRIFT_TURN = 3.05;
+const AIR_TURN = 1.6;
 const RIDE = 0.38;
-const STICK = 17;
-const GRAVITY = 26;
+const GRAVITY = 30;
 const FIXED = 1 / 60;
+const LAND_LOCK = 0.14;
+const STICK_SPEED = 16;
+const TURBO_MINI = 0.32;
+const TURBO_MID = 0.58;
+const TURBO_FULL = 0.92;
 
 const _fwd = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -63,7 +68,12 @@ export class CarSim {
   justTurbo = false;
   justLand = false;
   skipInterp = true;
+  justRespawn = false;
   private wasSlide = false;
+  private airTime = 0;
+  private landLock = 0;
+  private airBlend = 0;
+  private recoverLock = 0;
 
   reset(track: BuiltTrack) {
     this.s = 6;
@@ -86,26 +96,83 @@ export class CarSim {
     this.justFinish = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = false;
     this.skipInterp = true;
     this.wasSlide = false;
+    this.airTime = 0;
+    this.landLock = 0;
+    this.airBlend = 0;
+    this.recoverLock = 0;
     this.place(track);
   }
 
   respawn(track: BuiltTrack) {
-    const cp = this.lastCp >= 0 ? track.checkpoints[this.lastCp] : 6;
-    this.s = Math.max(2, (cp ?? 6) + 1.5);
+    this.s = pickSafeRespawnS(track, this.lastCp);
     this.n = 0;
     this.heading = 0;
     this.speed = 9;
     this.airborne = false;
     this.vx = this.vy = this.vz = 0;
     this.boost = 0;
+    this.slideAmt = 0;
     this.driftCharge = 0;
+    this.wrongWay = 0;
+    this.wallHit = 0;
+    this.justBoost = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = true;
     this.wasSlide = false;
     this.skipInterp = true;
+    this.airTime = 0;
+    this.landLock = 0;
+    this.airBlend = 0;
+    this.recoverLock = 0.85;
+    this.landLock = 0.2;
     this.place(track);
+    this.flattenRespawn(track);
+    if (this.uy < 0.78 || this.airborne) {
+      this.s = pickSafeRespawnS(track, -1);
+      this.airborne = false;
+      this.place(track);
+      this.flattenRespawn(track);
+    }
+  }
+
+  private flattenRespawn(track: BuiltTrack) {
+    this.heading = 0;
+    this.n = 0;
+    this.airborne = false;
+    this.vx = this.vy = this.vz = 0;
+    this.airTime = 0;
+    this.airBlend = 0;
+    this.speed = Math.min(Math.max(this.speed, 6), 10);
+    this.landLock = Math.max(this.landLock, 0.45);
+    const sm = sampleAt(track, this.s);
+    let tx = sm.tx;
+    let tz = sm.tz;
+    const tl = Math.hypot(tx, tz);
+    if (tl < 1e-5) {
+      tx = 0;
+      tz = -1;
+    } else {
+      tx /= tl;
+      tz /= tl;
+    }
+    // Helix parallel-transport can leave a sticky twist. Sit on the ribbon when
+    // the sample is upright; otherwise stand above the sample in world-up so we
+    // never ride an inverted normal under the mesh.
+    const onRibbon = sm.uy >= 0.55;
+    if (onRibbon) {
+      this.px = sm.x + sm.ux * RIDE;
+      this.py = sm.y + sm.uy * RIDE;
+      this.pz = sm.z + sm.uz * RIDE;
+    } else {
+      this.px = sm.x;
+      this.py = sm.y + RIDE;
+      this.pz = sm.z;
+    }
+    this.setFrame(tx, 0, tz, 0, 1, 0, -tz, 0, tx);
   }
 
   private place(track: BuiltTrack) {
@@ -151,14 +218,48 @@ export class CarSim {
     this.justFinish = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.justRespawn = false;
     this.wallHit = Math.max(0, this.wallHit - dt);
+    this.landLock = Math.max(0, this.landLock - dt);
+    this.recoverLock = Math.max(0, this.recoverLock - dt);
     const prevS = this.s;
 
     if (this.airborne) this.stepAir(track, actions, dt);
     else this.stepGround(track, actions, dt);
 
     this.detectGates(track, prevS);
-    if (this.py < -40) this.respawn(track);
+    if (this.recoverLock <= 0 && this.needsRecover(track)) this.respawn(track);
+  }
+
+  private needsRecover(track: BuiltTrack) {
+    if (this.py < -12) return true;
+    const near = nearestSample(track, this.px, this.py, this.pz, this.s);
+    const dx = this.px - near.x;
+    const dy = this.py - near.y;
+    const dz = this.pz - near.z;
+    const dist = Math.hypot(dx, dy, dz);
+    const height = dx * near.ux + dy * near.uy + dz * near.uz;
+    const lat = dx * near.rx + dy * near.ry + dz * near.rz;
+    if (dist > 16) return true;
+    if (this.airborne && this.airTime > 1.65) return true;
+    if (this.airborne && height < -2.4 && this.airTime > 0.22) return true;
+    if (this.airborne && Math.abs(lat) > near.width * 0.5 + 10 && this.airTime > 0.55) return true;
+    if (!this.airborne && Math.abs(this.n) > near.width * 0.5 + 1.25) return true;
+    if (!this.airborne && height < -1.1 && (Math.abs(lat) > near.width * 0.3 || dist > 6)) return true;
+    if (!this.airborne && this.uy < 0.12 && near.uy > 0.55 && Math.abs(this.speed) < 18) return true;
+    return false;
+  }
+
+  private releaseTurbo() {
+    const boost = turboFromCharge(this.driftCharge);
+    if (boost <= 0) {
+      this.driftCharge = 0;
+      return;
+    }
+    this.boost = Math.max(this.boost, boost);
+    this.speed = Math.min(this.speed + 2.4 + this.driftCharge * 5.2, MAX_BOOST);
+    this.justTurbo = true;
+    this.driftCharge = 0;
   }
 
   private stepGround(track: BuiltTrack, actions: Actions, dt: number) {
@@ -168,38 +269,42 @@ export class CarSim {
       else this.speed -= REVERSE * actions.brake * dt;
     }
     const max = this.boost > 0 ? MAX_BOOST : MAX_SPEED;
-    if (this.speed > max) this.speed += (max - this.speed) * Math.min(1, 6 * dt);
+    if (this.speed > max) this.speed += (max - this.speed) * Math.min(1, 7.5 * dt);
     if (this.speed < -MAX_REV) this.speed = -MAX_REV;
 
     const drag = actions.throttle > 0.1 ? DRAG : COAST;
     this.speed *= 1 - drag * dt;
     if (Math.abs(this.speed) < 0.12 && actions.throttle < 0.05 && actions.brake < 0.05) this.speed = 0;
 
-    const spdF = THREE.MathUtils.smoothstep(Math.abs(this.speed), 0.7, 9);
-    const high = 1 - 0.5 * Math.min(1, Math.abs(this.speed) / MAX_SPEED);
+    const speedAbs = Math.abs(this.speed);
+    const speedNorm = Math.min(1, speedAbs / MAX_SPEED);
+    const spdF = THREE.MathUtils.smoothstep(speedAbs, 0.35, 5.5);
+    const speedSteer = 1 - 0.18 * speedNorm;
     const reverse = this.speed >= 0 ? 1 : -1;
+    const steer = steerCurve(actions.steer);
+    const steerAbs = Math.abs(steer);
     const slideHeld = actions.slide >= 0.2;
-    const drifting = slideHeld && Math.abs(actions.steer) > 0.2 && Math.abs(this.speed) > 10;
+    const drifting = slideHeld && steerAbs > 0.18 && speedAbs > 8;
 
-    if (this.wasSlide && !slideHeld && this.driftCharge > 0.42) {
-      this.boost = Math.max(this.boost, 0.55 + this.driftCharge * 0.85);
-      this.justTurbo = true;
-      this.driftCharge = 0;
-    }
+    if (this.wasSlide && !slideHeld) this.releaseTurbo();
     if (drifting) {
-      this.driftCharge = Math.min(1, this.driftCharge + dt * (0.55 + Math.abs(actions.steer) * 0.7));
-    } else {
-      this.driftCharge *= Math.max(0, 1 - 1.8 * dt);
+      this.driftCharge = Math.min(1, this.driftCharge + dt * (0.78 + steerAbs * 0.82));
+    } else if (!slideHeld) {
+      this.driftCharge *= Math.max(0, 1 - 2.4 * dt);
     }
     this.wasSlide = slideHeld;
 
-    this.slideAmt += ((slideHeld ? 1 : 0) - this.slideAmt) * Math.min(1, 10 * dt);
-    let turn = TURN * (drifting ? 1.32 : 1);
-    if (actions.brake > 0.3 && this.speed > 8) turn *= 1.18;
-    this.heading += actions.steer * turn * spdF * high * reverse * dt;
-    const align = drifting ? 0.22 : 1.55;
-    this.heading *= 1 - align * dt * (1 - Math.min(1, Math.abs(actions.steer) * 0.55));
-    this.heading = Math.max(-0.95, Math.min(0.95, this.heading));
+    this.slideAmt += ((slideHeld ? 1 : 0) - this.slideAmt) * Math.min(1, 12 * dt);
+    let turn = (drifting ? DRIFT_TURN : TURN) * spdF * speedSteer;
+    if (slideHeld && !drifting) turn *= 1.08;
+    if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
+    this.heading += steer * turn * reverse * dt;
+    if (this.s < 72 && steerAbs < 0.22 && !drifting) this.heading *= 1 - 2.2 * dt;
+
+    const align = drifting ? 0.26 : steerAbs < 0.1 ? 5.4 : 0.07;
+    this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
+    const maxYaw = drifting ? 0.76 : slideHeld ? 0.48 : 0.33;
+    this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     this.s += this.speed * Math.cos(this.heading) * dt;
     this.n += -this.speed * Math.sin(this.heading) * dt;
@@ -215,24 +320,29 @@ export class CarSim {
     const sm = sampleAt(track, this.s);
     const half = sm.width * 0.5 - 0.72;
     if (this.n > half) {
-      this.n = half;
-      this.heading += 0.18;
-      this.speed *= 0.84;
-      this.wallHit = 0.2;
+      this.n = half - 0.06;
+      this.heading = clamp(this.heading + 0.2, 0.08, maxYaw);
+      this.speed = Math.min(this.speed * 0.78, 18);
+      this.boost = 0;
+      this.wallHit = 0.16;
     } else if (this.n < -half) {
-      this.n = -half;
-      this.heading -= 0.18;
-      this.speed *= 0.84;
-      this.wallHit = 0.2;
+      this.n = -half + 0.06;
+      this.heading = clamp(this.heading - 0.2, -maxYaw, -0.08);
+      this.speed = Math.min(this.speed * 0.78, 18);
+      this.boost = 0;
+      this.wallHit = 0.16;
     }
-    this.heading = Math.max(-0.95, Math.min(0.95, this.heading));
+    this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
-    if (sm.boost && this.speed > 4) {
-      if (this.boost <= 0.05) this.justBoost = true;
-      this.boost = Math.max(this.boost, 1.25);
+    if (sm.boost && this.speed > 3) {
+      if (this.boost <= 0.08) {
+        this.justBoost = true;
+        this.speed = Math.min(this.speed + 5, MAX_BOOST);
+      }
+      this.boost = Math.max(this.boost, 1.0);
     }
     if (this.boost > 0) {
-      this.speed = Math.min(this.speed + 34 * dt, MAX_BOOST);
+      this.speed = Math.min(this.speed + 36 * dt, MAX_BOOST);
       this.boost -= dt;
     }
 
@@ -248,19 +358,44 @@ export class CarSim {
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (sm.uy < -0.12 && this.speed < STICK) {
+    if (this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy) && (this.recoverLock <= 0 || sm.uy < 0.15)) {
       this.airborne = true;
-      this.vy -= 2;
+      this.airTime = 0;
+      this.airBlend = 0;
+      this.boost = 0;
+      this.speed = Math.min(this.speed, 22);
+      this.px += sm.ux * 0.1;
+      this.py += sm.uy * 0.1;
+      this.pz += sm.uz * 0.1;
+      if (sm.uy < 0) this.vy -= 1.6;
     }
   }
 
   private stepAir(track: BuiltTrack, actions: Actions, dt: number) {
-    this.heading += actions.steer * AIR_TURN * dt;
-    this.heading = Math.max(-0.8, Math.min(0.8, this.heading));
+    this.airTime += dt;
+    const steer = steerCurve(actions.steer);
+    this.heading += steer * AIR_TURN * dt;
+    this.heading = clamp(this.heading, -0.7, 0.7);
+
+    const yaw = steer * AIR_TURN * 0.55 * dt;
+    if (Math.abs(yaw) > 1e-5) {
+      const c = Math.cos(yaw);
+      const s = Math.sin(yaw);
+      const vx = this.vx * c - this.vz * s;
+      const vz = this.vx * s + this.vz * c;
+      this.vx = vx;
+      this.vz = vz;
+    }
+
     this.vy -= GRAVITY * dt;
     if (actions.throttle > 0) {
-      this.vx += this.fx * 4 * dt;
-      this.vz += this.fz * 4 * dt;
+      this.vx += this.fx * 5 * dt;
+      this.vz += this.fz * 5 * dt;
+    }
+    if (this.boost > 0) {
+      this.vx += this.fx * 16 * dt;
+      this.vz += this.fz * 16 * dt;
+      this.boost -= dt;
     }
     this.px += this.vx * dt;
     this.py += this.vy * dt;
@@ -273,39 +408,95 @@ export class CarSim {
     const height = relx * near.ux + rely * near.uy + relz * near.uz;
     const lat = relx * near.rx + rely * near.ry + relz * near.rz;
     const into = this.vx * near.ux + this.vy * near.uy + this.vz * near.uz;
-    const half = near.width * 0.5 + 1.6;
+    const half = near.width * 0.5 + 1.35;
+    const along = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
+    this.s += along * dt;
+    if (track.def.closed) {
+      const L = track.length;
+      if (this.s >= L) this.s -= L;
+      if (this.s < 0) this.s += L;
+    }
 
-    if (height < 1.5 && height > -1.4 && Math.abs(lat) < half && into < 8) {
+    const upright = near.uy > 0.35;
+    const vertical = near.uy < 0.2;
+    const onFace = height < 1.15 && height > -0.35;
+    const canLand =
+      this.airTime > 0.055 &&
+      onFace &&
+      Math.abs(lat) < near.width * 0.5 + 0.85 &&
+      into < 4.2 &&
+      (!vertical || this.airTime < 0.55);
+
+    if (Math.abs(lat) > near.width * 0.5 + 1.2 || height < -0.25) {
+      this.boost = 0;
+      const spd = Math.hypot(this.vx, this.vy, this.vz);
+      if (spd > 16) {
+        const k = 16 / spd;
+        this.vx *= k;
+        this.vy *= k;
+        this.vz *= k;
+      }
+    }
+
+    if (!canLand && upright && height < 2.1 && height > -0.8 && Math.abs(lat) < half + 5.5 && this.airTime > 0.08) {
       this.airborne = false;
-      if (this.vy < -7) this.justLand = true;
+      this.justLand = false;
+      this.landLock = LAND_LOCK;
+      this.airTime = 0;
+      this.airBlend = 0;
+      this.boost = 0;
       this.s = near.s;
-      this.n = Math.max(-near.width * 0.5 + 0.7, Math.min(near.width * 0.5 - 0.7, lat));
+      this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
       const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
-      const vr = this.vx * near.rx + this.vy * near.ry + this.vz * near.rz;
-      this.speed = Math.hypot(vt, vr) * Math.sign(vt || 1) * 0.97;
-      this.heading = Math.atan2(-vr, Math.max(0.01, vt));
+      this.speed = clamp(vt * 0.72, -MAX_REV, MAX_SPEED);
+      this.heading = clamp(this.heading * 0.45, -0.4, 0.4);
       this.skipInterp = true;
       this.place(track);
       return;
     }
 
-    if (this.wasSlide && actions.slide < 0.2 && this.driftCharge > 0.42) {
-      this.boost = Math.max(this.boost, 0.55 + this.driftCharge * 0.85);
-      this.justTurbo = true;
-      this.driftCharge = 0;
-    } else {
-      this.driftCharge *= Math.max(0, 1 - 1.8 * dt);
+    if (canLand) {
+      const impact = Math.max(0, -into);
+      this.airborne = false;
+      this.justLand = impact > 9;
+      this.landLock = LAND_LOCK;
+      this.airTime = 0;
+      this.airBlend = 0;
+      this.s = near.s;
+      this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
+      const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
+      const vr = this.vx * near.rx + this.vy * near.ry + this.vz * near.rz;
+      const keep = 0.988 - Math.min(0.1, impact * 0.007);
+      this.speed = Math.hypot(vt, vr) * Math.sign(vt || 1) * keep;
+      this.heading = Math.atan2(-vr, Math.max(0.18, Math.abs(vt)) * Math.sign(vt || 1));
+      this.heading = clamp(this.heading, -0.62, 0.62);
+      this.skipInterp = impact > 14;
+      this.place(track);
+      return;
     }
+
+    if (this.wasSlide && actions.slide < 0.2) this.releaseTurbo();
+    else if (actions.slide < 0.2) this.driftCharge *= Math.max(0, 1 - 2.4 * dt);
     this.wasSlide = actions.slide >= 0.2;
 
     _fwd.set(this.vx, this.vy, this.vz);
     if (_fwd.lengthSq() < 0.4) _fwd.set(this.fx, this.fy, this.fz);
     else _fwd.normalize();
-    this.fx = _fwd.x;
-    this.fy = _fwd.y;
-    this.fz = _fwd.z;
+    this.airBlend = Math.min(1, this.airBlend + dt * 2.6);
+    const k = this.airBlend * this.airBlend;
+    this.fx += (_fwd.x - this.fx) * k;
+    this.fy += (_fwd.y - this.fy) * k;
+    this.fz += (_fwd.z - this.fz) * k;
+    const fl = Math.hypot(this.fx, this.fy, this.fz) || 1;
+    this.fx /= fl;
+    this.fy /= fl;
+    this.fz /= fl;
     this.yaw = Math.atan2(-this.fx, -this.fz);
-    _up.copy(_y);
+
+    _fwd.set(this.fx, this.fy, this.fz);
+    _up.set(this.ux * (1 - k), this.uy * (1 - k) + k, this.uz * (1 - k));
+    if (_up.lengthSq() < 1e-6) _up.copy(_y);
+    _up.normalize();
     _right.crossVectors(_up, _fwd);
     if (_right.lengthSq() < 1e-8) _right.set(1, 0, 0);
     _right.normalize();
@@ -316,10 +507,9 @@ export class CarSim {
     this.qy = _quat.y;
     this.qz = _quat.z;
     this.qw = _quat.w;
-    this.ux = 0;
-    this.uy = 1;
-    this.uz = 0;
-    this.s = near.s;
+    this.ux = _up.x;
+    this.uy = _up.y;
+    this.uz = _up.z;
   }
 
   private detectGates(track: BuiltTrack, prevS: number) {
@@ -334,7 +524,7 @@ export class CarSim {
     }
     const finishS = 2.5;
     const ready = this.lastCp >= track.checkpoints.length - 1 && track.checkpoints.length > 0;
-    if (ready && crossedGate(prevS, this.s, finishS, track.length, track.def.closed) && prevS > track.length * 0.5) {
+    if (ready && crossedGate(prevS, this.s, finishS, track.length, track.def.closed)) {
       if (this.lap >= track.def.laps) {
         this.finished = true;
         this.justFinish = true;
@@ -377,35 +567,46 @@ export class CarSim {
 }
 
 export function lerpSnap(a: CarSnap, b: CarSnap, t: number): CarSnap {
-  if (b.airborne !== a.airborne) return b;
+  const u = clamp(t, 0, 1);
+  const jump =
+    (b.px - a.px) ** 2 + (b.py - a.py) ** 2 + (b.pz - a.pz) ** 2;
+  if (b.airborne !== a.airborne && jump > 6) return b;
   _quat.set(a.qx, a.qy, a.qz, a.qw);
   _qb.set(b.qx, b.qy, b.qz, b.qw);
-  _quat.slerp(_qb, t);
+  _quat.slerp(_qb, u);
+  const fx = lerp(a.fx, b.fx, u);
+  const fy = lerp(a.fy, b.fy, u);
+  const fz = lerp(a.fz, b.fz, u);
+  const fl = Math.hypot(fx, fy, fz) || 1;
+  const ux = lerp(a.ux, b.ux, u);
+  const uy = lerp(a.uy, b.uy, u);
+  const uz = lerp(a.uz, b.uz, u);
+  const ul = Math.hypot(ux, uy, uz) || 1;
   return {
-    s: lerp(a.s, b.s, t),
-    n: lerp(a.n, b.n, t),
-    heading: lerp(a.heading, b.heading, t),
-    speed: lerp(a.speed, b.speed, t),
+    s: lerp(a.s, b.s, u),
+    n: lerp(a.n, b.n, u),
+    heading: lerp(a.heading, b.heading, u),
+    speed: lerp(a.speed, b.speed, u),
     airborne: b.airborne,
-    px: lerp(a.px, b.px, t),
-    py: lerp(a.py, b.py, t),
-    pz: lerp(a.pz, b.pz, t),
+    px: lerp(a.px, b.px, u),
+    py: lerp(a.py, b.py, u),
+    pz: lerp(a.pz, b.pz, u),
     qx: _quat.x,
     qy: _quat.y,
     qz: _quat.z,
     qw: _quat.w,
-    yaw: lerp(a.yaw, b.yaw, t),
-    boost: lerp(a.boost, b.boost, t),
-    slide: lerp(a.slide, b.slide, t),
-    driftCharge: lerp(a.driftCharge, b.driftCharge, t),
+    yaw: lerp(a.yaw, b.yaw, u),
+    boost: lerp(a.boost, b.boost, u),
+    slide: lerp(a.slide, b.slide, u),
+    driftCharge: lerp(a.driftCharge, b.driftCharge, u),
     justTurbo: b.justTurbo,
     justLand: b.justLand,
-    fx: lerp(a.fx, b.fx, t),
-    fy: lerp(a.fy, b.fy, t),
-    fz: lerp(a.fz, b.fz, t),
-    ux: lerp(a.ux, b.ux, t),
-    uy: lerp(a.uy, b.uy, t),
-    uz: lerp(a.uz, b.uz, t),
+    fx: fx / fl,
+    fy: fy / fl,
+    fz: fz / fl,
+    ux: ux / ul,
+    uy: uy / ul,
+    uz: uz / ul,
   };
 }
 
@@ -413,4 +614,143 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function steerCurve(x: number) {
+  const s = Math.sign(x);
+  const a = Math.abs(x);
+  if (a < 0.04) return 0;
+  return s * (a * a * 0.32 + a * 0.68);
+}
+
+export function turboFromCharge(charge: number) {
+  if (charge >= TURBO_FULL) return 1.02;
+  if (charge >= TURBO_MID) return 0.7;
+  if (charge >= TURBO_MINI) return 0.4;
+  return 0;
+}
+
+function shouldLeaveTrack(speed: number, uy: number) {
+  return uy < -0.42 && speed < STICK_SPEED;
+}
+
+function sampleNearInvert(samples: BuiltTrack["samples"], i: number) {
+  for (let k = -8; k <= 8; k++) {
+    const nb = samples[(i + k + samples.length) % samples.length]!;
+    if (nb.uy < 0.15) return true;
+  }
+  return false;
+}
+
+function wrappedDeltaS(s: number, origin: number, length: number, closed: boolean) {
+  let ds = s - origin;
+  if (closed) {
+    ds = ((ds % length) + length) % length;
+    if (ds > length * 0.5) ds -= length;
+  }
+  return ds;
+}
+
+function stableRunway(track: BuiltTrack, s: number, dir: 1 | -1, limit: number) {
+  const L = track.length || 1;
+  let travelled = 0;
+  let prev = s;
+  const step = 1.2;
+  while (travelled < limit) {
+    const next = prev + dir * step;
+    const sm = sampleAt(track, next);
+    if (sm.uy < 0.55 || Math.abs(sm.ty) > 0.55 || sm.y < -3) break;
+    travelled += step;
+    prev = next;
+    if (!track.def.closed && (prev <= 0 || prev >= L)) break;
+  }
+  return travelled;
+}
+
+function pickHelixRespawnS(track: BuiltTrack, origin: number) {
+  const samples = track.samples;
+  const L = track.length || 1;
+  const originSm = sampleAt(track, origin);
+  const ox = originSm.tx;
+  const oz = originSm.tz;
+  let bestS = origin;
+  let bestScore = -1;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.78 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
+    const prev = samples[(i - 1 + samples.length) % samples.length]!;
+    const next = samples[(i + 1) % samples.length]!;
+    if (prev.uy < 0.55 || next.uy < 0.55) continue;
+    if (sampleNearInvert(samples, i)) continue;
+    if (sm.tx * ox + sm.tz * oz < -0.15) continue;
+    const ds = wrappedDeltaS(sm.s, origin, L, true);
+    if (ds < -52 || ds > 22) continue;
+    const fwd = stableRunway(track, sm.s, 1, 28);
+    const back = stableRunway(track, sm.s, -1, 28);
+    if (fwd < 12) continue;
+    if (back < 8 && ds < 0) continue;
+    const score = sm.uy * 4 + fwd * 0.04 - Math.abs(ds) * 0.35 + (sm.y > -0.5 ? 0.3 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestS = sm.s;
+    }
+  }
+  if (bestScore >= 0) return bestS;
+
+  for (const dir of [-1, 1] as const) {
+    for (let d = 0; d <= 70; d += 1.4) {
+      const s = origin + dir * d;
+      const sm = sampleAt(track, s);
+      if (sm.uy < 0.7 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
+      if (stableRunway(track, sm.s, 1, 20) < 10) continue;
+      return sm.s;
+    }
+  }
+  return origin;
+}
+
+export function pickSafeRespawnS(track: BuiltTrack, lastCp: number) {
+  const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
+  if (track.def.id === "helix") {
+    const origin = Math.max(2, cp ?? 6);
+    return pickHelixRespawnS(track, origin);
+  }
+  const origin = Math.max(2, (cp ?? 6) + 2);
+  const samples = track.samples;
+  const L = track.length || 1;
+  const originSm = sampleAt(track, origin);
+  const ox = originSm.tx;
+  const oz = originSm.tz;
+  let bestS = origin;
+  let bestScore = -1;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.88 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
+    const prev = samples[(i - 1 + samples.length) % samples.length]!;
+    const next = samples[(i + 1) % samples.length]!;
+    if (prev.uy < 0.7 || next.uy < 0.7) continue;
+    if (sampleNearInvert(samples, i)) continue;
+    if (sm.tx * ox + sm.tz * oz < 0.12) continue;
+    const ds = wrappedDeltaS(sm.s, origin, L, track.def.closed);
+    if (ds < -2 || ds > 40) continue;
+    const score = sm.uy * 5 - Math.abs(ds) * 0.1 + (sm.y > -0.5 ? 0.4 : 0) - Math.abs(sm.ty) * 2.4;
+    if (score > bestScore) {
+      bestScore = score;
+      bestS = sm.s;
+    }
+  }
+  if (bestScore >= 0) return bestS;
+  for (let i = 0; i < samples.length; i++) {
+    const sm = samples[i]!;
+    if (sm.uy < 0.82 || sm.y < -3 || sampleNearInvert(samples, i) || Math.abs(sm.ty) > 0.5) continue;
+    if (sm.tx * ox + sm.tz * oz < 0) continue;
+    const ds = wrappedDeltaS(sm.s, origin, L, track.def.closed);
+    if (ds >= 0 && ds < 120) return sm.s;
+  }
+  return 6;
+}
+
 export const FIXED_DT = FIXED;
+export const MAX_PHYS_STEPS = 8;
