@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { ThemeId } from "./types";
 
 export type CarRig = {
   group: THREE.Group;
@@ -11,7 +12,76 @@ export type CarRig = {
   setBrakeLights: (on: boolean) => void;
   setBoostVisual: (amount: number) => void;
   setHeadlights: (on: boolean) => void;
+  setThemeLivery: (theme: ThemeId) => void;
   applyPose: (steer: number, speed: number, slide: number, airborne: boolean, dt: number) => void;
+};
+
+type LiveryPack = {
+  body: number;
+  bodyRough: number;
+  bodyMetal: number;
+  carbon: number;
+  accentA: number;
+  accentAEmissive: number;
+  accentAEmit: number;
+  accentB: number;
+  accentBEmissive: number;
+  accentBEmit: number;
+  rim: number;
+  rimEmissive: number;
+  rimEmit: number;
+  glow: number;
+};
+
+const LIVERIES: Record<ThemeId, LiveryPack> = {
+  stadium: {
+    body: 0xe8e9ed,
+    bodyRough: 0.36,
+    bodyMetal: 0.22,
+    carbon: 0x141418,
+    accentA: 0xc4a574,
+    accentAEmissive: 0x3a2a14,
+    accentAEmit: 0.28,
+    accentB: 0xc4a574,
+    accentBEmissive: 0x3a2a14,
+    accentBEmit: 0.2,
+    rim: 0x9aa3ae,
+    rimEmissive: 0x000000,
+    rimEmit: 0,
+    glow: 0xdde4ee,
+  },
+  canyon: {
+    body: 0xd47848,
+    bodyRough: 0.34,
+    bodyMetal: 0.38,
+    carbon: 0x2a1c14,
+    accentA: 0xe8dcc4,
+    accentAEmissive: 0x4a3820,
+    accentAEmit: 0.08,
+    accentB: 0x8b5a32,
+    accentBEmissive: 0x2a180c,
+    accentBEmit: 0.1,
+    rim: 0x7a5a40,
+    rimEmissive: 0x000000,
+    rimEmit: 0,
+    glow: 0xffc090,
+  },
+  night: {
+    body: 0x1a2030,
+    bodyRough: 0.42,
+    bodyMetal: 0.28,
+    carbon: 0x12161f,
+    accentA: 0x3ec8ff,
+    accentAEmissive: 0x3ec8ff,
+    accentAEmit: 0.75,
+    accentB: 0xff3aa0,
+    accentBEmissive: 0xff3aa0,
+    accentBEmit: 0.65,
+    rim: 0x8aa4b8,
+    rimEmissive: 0x3ec8ff,
+    rimEmit: 0.22,
+    glow: 0x5a80b0,
+  },
 };
 
 type MatOpts = {
@@ -62,7 +132,8 @@ export function makeCar(ghost: boolean): CarRig {
     opacity: ghost ? 0.2 : 0.62,
     physical: true,
   });
-  const gold = mat({ color: 0xc4a574, roughness: 0.35, metalness: 0.65, emissive: 0x3a2a14, emissiveIntensity: 0.2 });
+  const accentA = mat({ color: 0xc4a574, roughness: 0.35, metalness: 0.65, emissive: 0x3a2a14, emissiveIntensity: 0.2 });
+  const accentB = mat({ color: 0xc4a574, roughness: 0.35, metalness: 0.65, emissive: 0x3a2a14, emissiveIntensity: 0.2 });
   const rubber = mat({ color: 0x111113, roughness: 0.88, metalness: 0.08 });
   const rim = mat({ color: 0x9aa3ae, roughness: 0.28, metalness: 0.82 });
   const headMat = mat({ color: 0xf2f0e4, roughness: 0.15, metalness: 0.4, emissive: 0xf2f0e4, emissiveIntensity: ghost ? 0.1 : 1.15 });
@@ -90,14 +161,14 @@ export function makeCar(ghost: boolean): CarRig {
   add(mesh(new THREE.BoxGeometry(1.02, 0.18, 0.52), bodyMat)).position.set(0, 0.3, -0.88);
   add(mesh(new THREE.BoxGeometry(0.9, 0.24, 0.78), glass)).position.set(0, 0.52, -0.08);
   add(mesh(new THREE.BoxGeometry(0.82, 0.08, 0.42), glass)).position.set(0, 0.58, 0.28);
-  add(mesh(new THREE.BoxGeometry(0.16, 0.035, 1.85), gold)).position.set(0, 0.44, 0.04);
+  add(mesh(new THREE.BoxGeometry(0.16, 0.035, 1.85), accentA)).position.set(0, 0.44, 0.04);
   add(mesh(new THREE.BoxGeometry(1.14, 0.05, 0.28), carbon)).position.set(0, 0.22, 1.12);
   add(mesh(new THREE.BoxGeometry(1.16, 0.06, 0.32), carbon)).position.set(0, 0.22, -1.08);
   for (const x of [-0.28, -0.1, 0.1, 0.28]) {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
   }
-  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), carbon));
+  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), bodyMat));
   wing.position.set(0, 0.62, -1.05);
   for (const x of [-0.58, 0.58]) {
     const plate = add(mesh(new THREE.BoxGeometry(0.04, 0.16, 0.24), carbon));
@@ -107,16 +178,16 @@ export function makeCar(ghost: boolean): CarRig {
     const stay = add(mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), carbon));
     stay.position.set(x, 0.5, -1.0);
   }
-  add(mesh(new THREE.BoxGeometry(0.16, 0.03, 0.2), gold)).position.set(0, 0.65, -1.05);
+  add(mesh(new THREE.BoxGeometry(0.16, 0.03, 0.2), accentB)).position.set(0, 0.65, -1.05);
   for (const x of [-0.58, 0.58]) {
     const mirror = add(mesh(new THREE.BoxGeometry(0.16, 0.07, 0.1), carbon));
     mirror.position.set(x, 0.5, 0.18);
   }
   add(mesh(new THREE.BoxGeometry(1.12, 0.08, 1.4), carbon)).position.set(0, 0.2, 0);
-  const numL = add(mesh(new THREE.CircleGeometry(0.1, 12), gold));
+  const numL = add(mesh(new THREE.CircleGeometry(0.1, 12), accentB));
   numL.position.set(-0.55, 0.38, 0.05);
   numL.rotation.y = -Math.PI / 2;
-  const numR = add(mesh(new THREE.CircleGeometry(0.1, 12), gold));
+  const numR = add(mesh(new THREE.CircleGeometry(0.1, 12), accentB));
   numR.position.set(0.55, 0.38, 0.05);
   numR.rotation.y = Math.PI / 2;
 
@@ -136,6 +207,7 @@ export function makeCar(ghost: boolean): CarRig {
     pipe.position.set(x, 0.2, -1.18);
   }
 
+  let cabinGlow: THREE.PointLight | null = null;
   if (!ghost) {
     const flameGeo = new THREE.ConeGeometry(0.06, 0.32, 6);
     flameGeo.rotateX(-Math.PI / 2);
@@ -147,9 +219,9 @@ export function makeCar(ghost: boolean): CarRig {
       body.add(f);
       flames.push(f);
     }
-    const glow = new THREE.PointLight(0xdde4ee, 0.45, 7, 2);
-    glow.position.set(0, 0.45, 0.2);
-    body.add(glow);
+    cabinGlow = new THREE.PointLight(0xdde4ee, 0.45, 7, 2);
+    cabinGlow.position.set(0, 0.45, 0.2);
+    body.add(cabinGlow);
   }
 
   group.add(body);
@@ -219,6 +291,26 @@ export function makeCar(ghost: boolean): CarRig {
     (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 2.2 : 1.05;
   };
 
+  const paint = (m: THREE.Material, color: number, roughness: number, metalness: number, emissive: number, emit: number) => {
+    const sm = m as THREE.MeshStandardMaterial;
+    sm.color.set(color);
+    sm.roughness = roughness;
+    sm.metalness = metalness;
+    sm.emissive.set(emissive);
+    sm.emissiveIntensity = emit;
+  };
+
+  const setThemeLivery = (theme: ThemeId) => {
+    if (ghost) return;
+    const pack = LIVERIES[theme];
+    paint(bodyMat, pack.body, pack.bodyRough, pack.bodyMetal, 0x000000, 0);
+    paint(carbon, pack.carbon, 0.42, 0.7, 0x000000, 0);
+    paint(accentA, pack.accentA, 0.35, 0.65, pack.accentAEmissive, pack.accentAEmit);
+    paint(accentB, pack.accentB, 0.35, 0.65, pack.accentBEmissive, pack.accentBEmit);
+    paint(rim, pack.rim, 0.28, 0.82, pack.rimEmissive, pack.rimEmit);
+    if (cabinGlow) cabinGlow.color.set(pack.glow);
+  };
+
   return {
     group,
     wheels,
@@ -230,6 +322,7 @@ export function makeCar(ghost: boolean): CarRig {
     setBrakeLights,
     setBoostVisual,
     setHeadlights,
+    setThemeLivery,
     applyPose,
   };
 }

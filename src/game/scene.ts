@@ -19,38 +19,54 @@ type ThemePack = {
   sun: number;
   sunPos: [number, number, number];
   exposure: number;
+  hemiIntensity: number;
+  sunIntensity: number;
+  fogNear: number;
+  fogFar: number;
   sky: string;
 };
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0x9ec4e6,
+    fog: 0xa8c4de,
     ground: 0x6ea05a,
-    hemiSky: 0xcfe8ff,
-    hemiGround: 0x8a9a6a,
-    sun: 0xfff4e0,
-    sunPos: [80, 120, 40],
-    exposure: 1.1,
+    hemiSky: 0x8ec4ff,
+    hemiGround: 0x8a9688,
+    sun: 0xffeed4,
+    sunPos: [80, 130, 36],
+    exposure: 1.06,
+    hemiIntensity: 0.78,
+    sunIntensity: 1.22,
+    fogNear: 100,
+    fogFar: 500,
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
-    fog: 0xc9966e,
+    fog: 0xd4a070,
     ground: 0x8a5a38,
-    hemiSky: 0xffc9a0,
-    hemiGround: 0x6a4028,
-    sun: 0xffd0a0,
-    sunPos: [-60, 40, 80],
-    exposure: 1.02,
+    hemiSky: 0xffb878,
+    hemiGround: 0x8a4a28,
+    sun: 0xffb060,
+    sunPos: [-70, 28, 90],
+    exposure: 1.06,
+    hemiIntensity: 0.74,
+    sunIntensity: 1.38,
+    fogNear: 80,
+    fogFar: 420,
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x0b1220,
-    ground: 0x12161f,
-    hemiSky: 0x1a2a48,
-    hemiGround: 0x08090d,
-    sun: 0xa8c4ff,
-    sunPos: [20, 80, -40],
-    exposure: 0.88,
+    fog: 0x1c2238,
+    ground: 0x161820,
+    hemiSky: 0x3a4a78,
+    hemiGround: 0x2c3a52,
+    sun: 0x7ab8d8,
+    sunPos: [-40, 70, 20],
+    exposure: 1.0,
+    hemiIntensity: 0.78,
+    sunIntensity: 0.52,
+    fogNear: 85,
+    fogFar: 460,
     sky: "/textures/sky-night.jpg",
   },
 };
@@ -77,6 +93,7 @@ export class World {
   private loader = new THREE.TextureLoader();
   private nightLights: THREE.Object3D[] = [];
   private theme: ThemeId = "stadium";
+  private loadedKey: string | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -138,6 +155,14 @@ export class World {
   }
 
   loadTrack(track: BuiltTrack, theme: ThemeId) {
+    const key = `${track.def.id}:${theme}`;
+    if (this.loadedKey === key && this.trackRoot.children.length > 0) {
+      this.theme = theme;
+      this.car.setThemeLivery(theme);
+      this.car.setHeadlights(theme === "night");
+      return;
+    }
+    this.loadedKey = key;
     this.theme = theme;
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
@@ -148,14 +173,15 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    (this.scene.fog as THREE.Fog).near = theme === "night" ? 50 : 80;
-    (this.scene.fog as THREE.Fog).far = theme === "night" ? 320 : 440;
+    (this.scene.fog as THREE.Fog).near = pack.fogNear;
+    (this.scene.fog as THREE.Fog).far = pack.fogFar;
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
+    this.hemi.intensity = pack.hemiIntensity;
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 0.55 : 1.45;
+    this.sun.intensity = pack.sunIntensity;
     this.renderer.toneMappingExposure = pack.exposure;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
@@ -174,6 +200,7 @@ export class World {
     this.disposables.push(...env.geos, ...env.mats);
     this.textures.push(...env.textures);
     this.nightLights = env.lights;
+    this.car.setThemeLivery(theme);
     this.car.setHeadlights(theme === "night");
     this.loadSky(pack.sky, pack.fog);
 
@@ -182,13 +209,24 @@ export class World {
     this.camera.position.copy(this.camPos);
   }
 
+  private skyUrl: string | null = null;
+
   private loadSky(url: string, fog: number) {
+    if (this.skyMesh && this.skyUrl === url) {
+      const mat = this.skyMesh.material as THREE.MeshBasicMaterial;
+      if (!mat.map) mat.color.set(fog);
+      return;
+    }
     if (this.skyMesh) {
       this.scene.remove(this.skyMesh);
       this.skyMesh.geometry.dispose();
-      (this.skyMesh.material as THREE.Material).dispose();
+      const old = this.skyMesh.material as THREE.MeshBasicMaterial;
+      if (old.map) old.map.dispose();
+      old.dispose();
+      if (this.skyUrl) THREE.Cache.remove(this.skyUrl);
       this.skyMesh = null;
     }
+    this.skyUrl = url;
     const geo = new THREE.SphereGeometry(420, 32, 20);
     const mat = new THREE.MeshBasicMaterial({
       color: fog,
@@ -201,6 +239,10 @@ export class World {
     this.loader.load(
       url,
       (tex) => {
+        if (this.skyUrl !== url) {
+          tex.dispose();
+          return;
+        }
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = 4;
         mat.map = tex;
