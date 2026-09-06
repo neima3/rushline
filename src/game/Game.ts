@@ -255,7 +255,10 @@ export class Game {
 
     const actions = this.input.sample();
     if (this.injectSteer != null) actions.steer = this.injectSteer;
-    if (this.input.autoThrottle && this.input.manualThrottle < 0.05 && actions.brake < 0.05) {
+    if (this.input.touchBrake > 0.05) {
+      actions.brake = 1;
+      actions.throttle = 0;
+    } else if (this.input.autoThrottle && this.input.manualThrottle < 0.05 && actions.brake < 0.05) {
       const cap = autoThrottleCap({
         trackId: this.trackId,
         s: this.car.s,
