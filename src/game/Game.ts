@@ -1,6 +1,6 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
 import { getTrack, medalFor } from "./track";
-import { autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
+import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
@@ -255,20 +255,23 @@ export class Game {
 
     const actions = this.input.sample();
     if (this.injectSteer != null) actions.steer = this.injectSteer;
-    if (this.input.touchBrake > 0.05) {
-      actions.brake = 1;
-      actions.throttle = 0;
-    } else if (this.input.autoThrottle && this.input.manualThrottle < 0.05 && actions.brake < 0.05) {
-      const cap = autoThrottleCap({
+    const drive = applyTouchDrive({
+      throttle: actions.throttle,
+      brake: actions.brake,
+      touchBrake: this.input.touchBrake,
+      autoThrottle: this.input.autoThrottle,
+      manualThrottle: this.input.manualThrottle,
+      cap: autoThrottleCap({
         trackId: this.trackId,
         s: this.car.s,
         speed: this.car.speed,
         firstCp: this.track.checkpoints[0] ?? 80,
         touchMode: this.input.touchMode,
         countdown: this.phase === "countdown",
-      });
-      actions.throttle = Math.min(actions.throttle, cap);
-    }
+      }),
+    });
+    actions.throttle = drive.throttle;
+    actions.brake = drive.brake;
 
     this.padAcc += dt;
     if (this.padAcc > 0.2) {
