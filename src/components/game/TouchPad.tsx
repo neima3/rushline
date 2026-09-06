@@ -66,7 +66,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
       <div
         ref={steerRef}
-        className="pointer-events-auto h-28 w-[46%] max-w-56 rounded-xl border border-border bg-surface/80"
+        className="pointer-events-auto h-28 w-[46%] max-w-56 touch-none rounded-xl border border-border bg-surface/80"
         aria-label="Steer"
       >
         <div className="flex h-full items-center justify-between px-5 text-sm font-medium text-muted">
@@ -79,7 +79,12 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         <button
           type="button"
           aria-label="Respawn"
-          onPointerDown={onRespawn}
+          data-play-control="1"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRespawn();
+          }}
           className="flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
         >
           <RotateCcw className="size-5" strokeWidth={1.75} />
@@ -101,21 +106,57 @@ function HoldButton({
   onHold: (v: 0 | 1) => void;
   accent?: boolean;
 }) {
+  const holdRef = useRef(false);
+  const pidRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const end = (e: PointerEvent) => {
+      if (pidRef.current == null || e.pointerId !== pidRef.current) return;
+      holdRef.current = false;
+      pidRef.current = null;
+      onHold(0);
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      if (holdRef.current) onHold(0);
+      holdRef.current = false;
+      pidRef.current = null;
+    };
+  }, [onHold]);
+
   return (
     <button
       type="button"
-      className={`h-14 min-h-14 w-24 rounded-lg border text-sm font-medium ${
+      data-play-control="1"
+      className={`h-14 min-h-14 w-24 touch-none rounded-lg border text-sm font-medium ${
         accent
           ? "border-accent bg-accent text-accent-fg"
           : "border-border bg-surface/90 text-fg"
       }`}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        e.stopPropagation();
+        pidRef.current = e.pointerId;
+        holdRef.current = true;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture is optional; window pointerup still ends the hold */
+        }
         onHold(1);
       }}
-      onPointerUp={() => onHold(0)}
-      onPointerCancel={() => onHold(0)}
+      onLostPointerCapture={(e) => {
+        if (!holdRef.current || pidRef.current !== e.pointerId) return;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* keep hold until window pointerup */
+        }
+      }}
     >
       {label}
     </button>

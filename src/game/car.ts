@@ -193,8 +193,8 @@ export function makeCar(ghost: boolean): CarRig {
       spins[i]!.rotation.x -= spin;
       if (i < 2) hubs[i]!.rotation.y = steer * 0.38;
     }
-    const roll = -steer * 0.12;
-    const pitch = airborne ? 0.08 : -slide * 0.05;
+    const roll = -steer * (0.1 + slide * 0.08);
+    const pitch = airborne ? 0.06 : -slide * 0.07;
     const k = 1 - Math.exp(-10 * dt);
     body.rotation.z += (roll - body.rotation.z) * k;
     body.rotation.x += (pitch - body.rotation.x) * k;
@@ -216,7 +216,7 @@ export function makeCar(ghost: boolean): CarRig {
   };
 
   const setHeadlights = (on: boolean) => {
-    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 2.2 : 1.05;
+    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.4 : 1.05;
   };
 
   return {

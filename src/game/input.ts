@@ -32,6 +32,11 @@ export class Input {
   autoThrottle = false;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
   private lastPadUse = 0;
+  touchMode = false;
+  onPauseHotkey: (() => void) | null = null;
+  onCameraHotkey: (() => void) | null = null;
+  private queued = { pause: false, camera: false, respawn: false };
+  private brakeLatchUntil = 0;
   private edgePrev = {
     respawn: false,
     restart: false,
@@ -40,15 +45,41 @@ export class Input {
     confirm: false,
     back: false,
   };
+  private surface: HTMLElement | null = null;
+  private lastKeyStamp = -1;
   private onKeyDown: (e: KeyboardEvent) => void;
   private onKeyUp: (e: KeyboardEvent) => void;
   private onBlur: () => void;
   private onPad: () => void;
+  private onPointer: (e: PointerEvent) => void;
 
   constructor() {
     this.onKeyDown = (e) => {
-      if (GAME_CODES.has(e.code)) e.preventDefault();
-      this.keys.add(e.code);
+      if (e.timeStamp && e.timeStamp === this.lastKeyStamp) return;
+      this.lastKeyStamp = e.timeStamp || this.lastKeyStamp;
+      const esc = e.code === "Escape" || e.key === "Escape";
+      if (GAME_CODES.has(e.code) || esc) {
+        e.preventDefault();
+        this.keys.add(e.code);
+        if (e.repeat) return;
+        if (esc || e.code === "KeyP") {
+          if (this.onPauseHotkey) {
+            this.onPauseHotkey();
+            this.edgePrev.pause = true;
+          } else {
+            this.queued.pause = true;
+          }
+        }
+        if (e.code === "KeyC") {
+          if (this.onCameraHotkey) {
+            this.onCameraHotkey();
+            this.edgePrev.camera = true;
+          } else {
+            this.queued.camera = true;
+          }
+        }
+        if (e.code === "KeyR") this.queued.respawn = true;
+      }
     };
     this.onKeyUp = (e) => {
       this.keys.delete(e.code);
@@ -57,26 +88,47 @@ export class Input {
     this.onPad = () => {
       void navigator.getGamepads?.();
     };
+    this.onPointer = (e: PointerEvent) => {
+      const t = e.target;
+      if (t === this.surface) this.focusSurface();
+      this.onPad();
+    };
   }
 
-  attach() {
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
+  attach(surface?: HTMLElement) {
+    const opts = { capture: true };
+    this.surface = surface ?? null;
+    // One window listener only — canvas + document copies of the same handler
+    // toggle pause/camera twice when the play surface is focused.
+    window.addEventListener("keydown", this.onKeyDown, opts);
+    window.addEventListener("keyup", this.onKeyUp, opts);
     window.addEventListener("blur", this.onBlur);
-    document.addEventListener("visibilitychange", this.onBlur);
     window.addEventListener("gamepadconnected", this.onPad);
     window.addEventListener("gamepaddisconnected", this.onPad);
     window.addEventListener("pointerdown", this.onPad);
+    surface?.addEventListener("pointerdown", this.onPointer);
   }
 
   detach() {
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
+    const opts = { capture: true };
+    window.removeEventListener("keydown", this.onKeyDown, opts);
+    window.removeEventListener("keyup", this.onKeyUp, opts);
     window.removeEventListener("blur", this.onBlur);
-    document.removeEventListener("visibilitychange", this.onBlur);
     window.removeEventListener("gamepadconnected", this.onPad);
     window.removeEventListener("gamepaddisconnected", this.onPad);
     window.removeEventListener("pointerdown", this.onPad);
+    this.surface?.removeEventListener("pointerdown", this.onPointer);
+    this.surface = null;
+  }
+
+  focusSurface() {
+    const el = this.surface;
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      el.focus();
+    }
   }
 
   setKeys(codes: string[]) {
@@ -142,8 +194,14 @@ export class Input {
     steer += this.touchSteer;
     throttle = Math.max(throttle, this.touchThrottle);
     brake = Math.max(brake, this.touchBrake);
-
-    if (this.autoThrottle && throttle < 0.05 && brake < 0.05) throttle = 1;
+    const now = performance.now();
+    if (brake > 0.05) this.brakeLatchUntil = now + 340;
+    if (now < this.brakeLatchUntil) {
+      brake = Math.max(brake, 1);
+      throttle = 0;
+    } else if (this.autoThrottle && throttle < 0.05) {
+      throttle = this.touchMode ? 0.5 : 1;
+    }
 
     steer = Math.max(-1, Math.min(1, steer));
 
@@ -159,10 +217,13 @@ export class Input {
     const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
     const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view);
 
-    const respawn = respawnNow && !this.edgePrev.respawn;
+    const respawn = this.queued.respawn || (respawnNow && !this.edgePrev.respawn);
     const restart = restartNow && !this.edgePrev.restart;
-    const pause = pauseNow && !this.edgePrev.pause;
-    const camera = cameraNow && !this.edgePrev.camera;
+    const pause = this.queued.pause || (pauseNow && !this.edgePrev.pause);
+    const camera = this.queued.camera || (cameraNow && !this.edgePrev.camera);
+    this.queued.pause = false;
+    this.queued.camera = false;
+    this.queued.respawn = false;
     const confirm = confirmNow && !this.edgePrev.confirm;
     const back = backNow && !this.edgePrev.back;
     this.edgePrev = {
