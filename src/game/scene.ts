@@ -184,11 +184,11 @@ export class World {
     const start = sampleAt(track, 6);
     this.camFwd.set(start.tx, start.ty, start.tz).normalize();
     if (this.camFwd.lengthSq() < 1e-6) this.camFwd.set(0, 0, -1);
-    this.camUp.set(start.ux, start.uy, start.uz).normalize();
+    this.camUp.copy(_worldUp);
     this.camPos.set(start.x - start.tx * 10 + start.ux * 4, start.y + 4, start.z - start.tz * 10 + start.uz * 4);
     this.lookPos.set(start.x, start.y + 1, start.z);
     this.camera.position.copy(this.camPos);
-    this.camera.up.copy(this.camUp);
+    this.camera.up.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
   }
 
@@ -378,7 +378,9 @@ export class World {
       const k = 1 - Math.exp(-1.4 * dt);
       this.camPos.lerp(_desired, k);
       this.lookPos.lerp(_look, k);
+      this.camUp.copy(_worldUp);
       this.camera.position.copy(this.camPos);
+      this.camera.up.copy(_worldUp);
       this.camera.lookAt(this.lookPos);
       this.camera.fov += (56 - this.camera.fov) * (1 - Math.exp(-3 * dt));
       this.camera.updateProjectionMatrix();
