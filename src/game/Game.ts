@@ -1,5 +1,6 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
 import { getTrack, medalFor } from "./track";
+import { autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { CarSim, FIXED_DT, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
@@ -56,6 +57,8 @@ export class Game {
     this.car.reset(this.track);
     this.curr = this.car.snap();
     this.prev = this.car.snap();
+    this.canvas.tabIndex = 0;
+    this.canvas.style.outline = "none";
     this.input.attach();
     this.audio.attach();
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -108,9 +111,23 @@ export class Game {
   }
 
   setTouch(v: boolean) {
+    this.input.touchMode = v;
     useGame.getState().setTouch(v);
     if (v && !useGame.getState().autoThrottle) {
       this.setAutoThrottle(true);
+    }
+  }
+
+  capturePlayFocus() {
+    // Focusing the canvas on iOS Safari cancels the active pointer
+    // (pointercancel / touchcancel) and drops TouchPad Accel / Brake.
+    if (this.input.touchMode) return;
+    const el = this.canvas;
+    if (!el) return;
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      el.focus();
     }
   }
 
@@ -157,6 +174,8 @@ export class Game {
     });
     this.audio.unlock();
     this.audio.countdown(3);
+    this.capturePlayFocus();
+    requestAnimationFrame(() => this.capturePlayFocus());
   }
 
   pause() {
@@ -196,6 +215,17 @@ export class Game {
 
     const actions = this.input.sample();
     if (this.injectSteer != null) actions.steer = this.injectSteer;
+    if (this.input.autoThrottle && this.input.manualThrottle < 0.05 && actions.brake < 0.05) {
+      const cap = autoThrottleCap({
+        trackId: this.trackId,
+        s: this.car.s,
+        speed: this.car.speed,
+        firstCp: this.track.checkpoints[0] ?? 80,
+        touchMode: this.input.touchMode,
+        countdown: this.phase === "countdown",
+      });
+      actions.throttle = Math.min(actions.throttle, cap);
+    }
 
     this.padAcc += dt;
     if (this.padAcc > 0.2) {
@@ -242,6 +272,7 @@ export class Game {
       while (this.acc >= FIXED_DT && steps < 5) {
         this.prev = this.car.snap();
         this.car.step(this.track, actions, FIXED_DT);
+        this.car.speed = clampTouchSpeed(this.car.speed, this.input.touchMode);
         if (this.car.justBoost) {
           this.audio.boost();
           this.world.addTrauma(0.28);
