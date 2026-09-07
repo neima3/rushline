@@ -85,7 +85,7 @@ export function Overlay({ gameRef }: Props) {
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
             type="button"
-            className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+            className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-bg/80 text-fg"
             onMouseDown={keepPlayFocus}
             onClick={() => g()?.pause()}
             aria-label="Pause"
@@ -101,7 +101,7 @@ export function Overlay({ gameRef }: Props) {
             />
             <button
               type="button"
-              className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-surface/90"
+              className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-bg/80"
               onMouseDown={keepPlayFocus}
               onClick={() => g()?.setMuted(!muted)}
               aria-label={muted ? "Unmute" : "Mute"}
@@ -177,7 +177,7 @@ export function Overlay({ gameRef }: Props) {
 
 function PadChip({ xbox }: { xbox: boolean }) {
   return (
-    <span className="inline-flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted">
+    <span className="inline-flex h-11 items-center gap-2 rounded-md border border-border bg-bg/80 px-3 text-xs font-medium uppercase tracking-widest text-muted">
       <Gamepad2 className="size-4 text-fg" />
       {xbox ? "Xbox" : "Pad"}
     </span>
@@ -338,16 +338,16 @@ function Hud({
     <>
       {showMinimap ? <MiniMap trackId={trackId} s={s} n={n} /> : null}
       <div className="absolute top-[max(3.25rem,calc(env(safe-area-inset-top)+2.55rem))] left-1/2 flex -translate-x-1/2 flex-col items-center px-16">
-        <p className="font-display text-[2rem] tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl">
-          {formatTime(time)}
-        </p>
-        {showSpeed ? (
-          <p className="mt-0.5 font-display text-xl tabular-nums leading-none md:hidden">
-            {formatSpeed(speed)}
-            <span className="ml-1 text-[10px] font-sans uppercase tracking-widest text-muted">km/h</span>
-          </p>
-        ) : null}
-        <div className="mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
+        <div className="hud-plate flex flex-col items-center">
+          <p className="hud-timer text-[2rem] leading-none sm:text-5xl md:text-6xl">{formatTime(time)}</p>
+          {showSpeed ? (
+            <p className="hud-speed mt-0.5 text-xl leading-none md:hidden">
+              {formatSpeed(speed)}
+              <span className="ml-1 font-sans text-[10px] font-medium uppercase tracking-widest text-muted">km/h</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="hud-meta mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
             <Flag className="size-3" />
             {lap}/{laps}
@@ -365,8 +365,8 @@ function Hud({
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
         {showSpeed ? (
           <>
-            <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
+            <p className="hud-speed text-4xl leading-none">{formatSpeed(speed)}</p>
+            <p className="hud-meta text-[10px] uppercase tracking-widest text-muted">km/h</p>
           </>
         ) : null}
         <Meter label="Boost" value={Math.min(1, boost / 1.0)} tone="ok" show={boost > 0.05} />
@@ -553,7 +553,7 @@ function GhostChip({
       data-camera={camera}
       onMouseDown={keepPlayFocus}
       onClick={onClick}
-      className="play-control h-11 rounded-md border border-border bg-surface/90 px-3 text-xs font-medium uppercase tracking-widest text-muted"
+      className="play-control h-11 rounded-md border border-border bg-bg/80 px-3 text-xs font-medium uppercase tracking-widest text-muted"
     >
       {label}
     </button>

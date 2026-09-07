@@ -24,6 +24,8 @@ type MatOpts = {
   transparent?: boolean;
   opacity?: number;
   physical?: boolean;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
 };
 
 export function makeCar(ghost: boolean): CarRig {
@@ -47,27 +49,52 @@ export function makeCar(ghost: boolean): CarRig {
       transparent: Boolean(ghost || opts.transparent),
       opacity: ghost ? op : (opts.opacity ?? 1),
     };
-    const m = opts.physical
-      ? new THREE.MeshPhysicalMaterial({ ...base, transmission: ghost ? 0 : 0.15, thickness: 0.2 })
-      : new THREE.MeshStandardMaterial(base);
+    const m =
+      opts.physical || opts.clearcoat
+        ? new THREE.MeshPhysicalMaterial({
+            ...base,
+            transmission: opts.physical && !ghost ? 0.12 : 0,
+            thickness: opts.physical ? 0.18 : 0,
+            clearcoat: ghost ? 0 : (opts.clearcoat ?? 0),
+            clearcoatRoughness: opts.clearcoatRoughness ?? 0.22,
+          })
+        : new THREE.MeshStandardMaterial(base);
     mats.push(m);
     baseOpacity.push(m.opacity);
     return m;
   };
 
-  const bodyMat = mat({ color: 0xe8e9ed, roughness: 0.28, metalness: 0.55 });
-  const carbon = mat({ color: 0x141418, roughness: 0.42, metalness: 0.7 });
-  const glass = mat({
-    color: 0x1a2430,
-    roughness: 0.08,
-    metalness: 0.85,
-    transparent: true,
-    opacity: ghost ? 0.2 : 0.62,
-    physical: true,
+  const bodyMat = mat({
+    color: 0xf3f1ea,
+    roughness: 0.22,
+    metalness: 0.42,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.16,
   });
-  const gold = mat({ color: 0xc4a574, roughness: 0.35, metalness: 0.65, emissive: 0x3a2a14, emissiveIntensity: 0.2 });
-  const rubber = mat({ color: 0x111113, roughness: 0.88, metalness: 0.08 });
-  const rim = mat({ color: 0x9aa3ae, roughness: 0.28, metalness: 0.82 });
+  const navy = mat({ color: 0x1a2436, roughness: 0.38, metalness: 0.48, clearcoat: 0.28, clearcoatRoughness: 0.3 });
+  const carbon = mat({ color: 0x101014, roughness: 0.4, metalness: 0.74 });
+  const glass = mat({
+    color: 0x0c1218,
+    roughness: 0.06,
+    metalness: 0.88,
+    transparent: true,
+    opacity: ghost ? 0.18 : 0.58,
+    physical: true,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.08,
+  });
+  const gold = mat({
+    color: 0xd2ae62,
+    roughness: 0.28,
+    metalness: 0.72,
+    emissive: 0x3a2a14,
+    emissiveIntensity: 0.22,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.2,
+  });
+  const teal = mat({ color: 0x4ea8a4, roughness: 0.32, metalness: 0.55, emissive: 0x163836, emissiveIntensity: 0.18 });
+  const rubber = mat({ color: 0x0c0c0e, roughness: 0.92, metalness: 0.04 });
+  const rim = mat({ color: 0xd0d4dc, roughness: 0.22, metalness: 0.88, clearcoat: 0.4, clearcoatRoughness: 0.18 });
   const headMat = mat({ color: 0xf2f0e4, roughness: 0.15, metalness: 0.4, emissive: 0xf2f0e4, emissiveIntensity: ghost ? 0.1 : 1.15 });
   const tailMat = mat({ color: 0xff2a22, roughness: 0.3, metalness: 0.2, emissive: 0xff2a22, emissiveIntensity: ghost ? 0.1 : 0.65 });
   const flameMat = mat({
@@ -87,15 +114,22 @@ export function makeCar(ghost: boolean): CarRig {
     return mesh;
   };
 
-  add(mesh(new THREE.BoxGeometry(1.08, 0.22, 1.72), bodyMat)).position.set(0, 0.32, 0.02);
-  add(mesh(new THREE.BoxGeometry(0.96, 0.16, 0.55), bodyMat)).position.set(0, 0.3, 0.92);
-  add(mesh(new THREE.BoxGeometry(0.72, 0.12, 0.32), bodyMat)).position.set(0, 0.28, 1.12);
-  add(mesh(new THREE.BoxGeometry(1.02, 0.18, 0.52), bodyMat)).position.set(0, 0.3, -0.88);
-  add(mesh(new THREE.BoxGeometry(0.9, 0.24, 0.78), glass)).position.set(0, 0.52, -0.08);
-  add(mesh(new THREE.BoxGeometry(0.82, 0.08, 0.42), glass)).position.set(0, 0.58, 0.28);
-  add(mesh(new THREE.BoxGeometry(0.16, 0.035, 1.85), gold)).position.set(0, 0.44, 0.04);
-  add(mesh(new THREE.BoxGeometry(1.14, 0.05, 0.28), carbon)).position.set(0, 0.22, 1.12);
-  add(mesh(new THREE.BoxGeometry(1.16, 0.06, 0.32), carbon)).position.set(0, 0.22, -1.08);
+  add(mesh(new THREE.BoxGeometry(1.08, 0.22, 1.72), bodyMat)).position.set(0, 0.34, 0.02);
+  add(mesh(new THREE.BoxGeometry(0.96, 0.16, 0.55), bodyMat)).position.set(0, 0.32, 0.92);
+  add(mesh(new THREE.BoxGeometry(0.72, 0.12, 0.32), bodyMat)).position.set(0, 0.3, 1.12);
+  add(mesh(new THREE.BoxGeometry(1.02, 0.18, 0.52), bodyMat)).position.set(0, 0.32, -0.88);
+  add(mesh(new THREE.BoxGeometry(0.94, 0.26, 0.82), glass)).position.set(0, 0.54, -0.06);
+  add(mesh(new THREE.BoxGeometry(0.84, 0.08, 0.44), glass)).position.set(0, 0.61, 0.3);
+  add(mesh(new THREE.BoxGeometry(0.2, 0.04, 1.88), gold)).position.set(0, 0.46, 0.04);
+  add(mesh(new THREE.BoxGeometry(0.045, 0.03, 1.7), teal)).position.set(0.16, 0.47, 0.02);
+  add(mesh(new THREE.BoxGeometry(0.045, 0.03, 1.7), teal)).position.set(-0.16, 0.47, 0.02);
+  for (const x of [-0.55, 0.55]) {
+    const flank = add(mesh(new THREE.BoxGeometry(0.05, 0.16, 1.15), navy));
+    flank.position.set(x, 0.34, -0.02);
+  }
+  add(mesh(new THREE.BoxGeometry(1.14, 0.08, 1.48), carbon)).position.set(0, 0.2, 0);
+  add(mesh(new THREE.BoxGeometry(1.16, 0.055, 0.3), carbon)).position.set(0, 0.23, 1.14);
+  add(mesh(new THREE.BoxGeometry(1.18, 0.065, 0.34), carbon)).position.set(0, 0.23, -1.1);
   for (const x of [-0.28, -0.1, 0.1, 0.28]) {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
@@ -115,13 +149,14 @@ export function makeCar(ghost: boolean): CarRig {
     const mirror = add(mesh(new THREE.BoxGeometry(0.16, 0.07, 0.1), carbon));
     mirror.position.set(x, 0.5, 0.18);
   }
-  add(mesh(new THREE.BoxGeometry(1.12, 0.08, 1.4), carbon)).position.set(0, 0.2, 0);
-  const numL = add(mesh(new THREE.CircleGeometry(0.1, 12), gold));
-  numL.position.set(-0.55, 0.38, 0.05);
-  numL.rotation.y = -Math.PI / 2;
-  const numR = add(mesh(new THREE.CircleGeometry(0.1, 12), gold));
-  numR.position.set(0.55, 0.38, 0.05);
-  numR.rotation.y = Math.PI / 2;
+  for (const x of [-0.56, 0.56]) {
+    const disc = add(mesh(new THREE.CircleGeometry(0.13, 14), gold));
+    disc.position.set(x, 0.4, 0.06);
+    disc.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+    const ring = add(mesh(new THREE.RingGeometry(0.13, 0.155, 14), carbon));
+    ring.position.set(x + (x < 0 ? -0.002 : 0.002), 0.4, 0.06);
+    ring.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+  }
 
   for (const x of [-0.38, 0.38]) {
     const h = add(mesh(new THREE.BoxGeometry(0.22, 0.08, 0.08), headMat));
@@ -221,11 +256,11 @@ export function makeCar(ghost: boolean): CarRig {
   };
 
   const setHeadlights = (on: boolean) => {
-    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.4 : 1.05;
-    if (cabinGlow) cabinGlow.intensity = on ? 0.95 : 0.45;
+    (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.2 : 1.15;
+    if (cabinGlow) cabinGlow.intensity = on ? 0.85 : 0.4;
     if (!ghost) {
-      (bodyMat as THREE.MeshStandardMaterial).emissive.setHex(on ? 0x243044 : 0x000000);
-      (bodyMat as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.16 : 0;
+      (bodyMat as THREE.MeshStandardMaterial).emissive.setHex(on ? 0x1c2838 : 0x000000);
+      (bodyMat as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.1 : 0;
     }
   };
 

@@ -667,9 +667,15 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     strip(roadPos, roadNrm, roadCol, roadUv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
 
     const stripe = Math.floor(a.s / 2.0) % 2 === 0;
-    const curbA = stripe ? { r: 0.92, g: 0.18, b: 0.16 } : { r: 0.96, g: 0.96, b: 0.94 };
-    const cw = 0.55;
-    const ch = 0.11;
+    const curbA = stripe
+      ? theme === "stadium"
+        ? { r: 0.98, g: 0.1, b: 0.08 }
+        : { r: 0.94, g: 0.16, b: 0.14 }
+      : theme === "stadium"
+        ? { r: 1, g: 1, b: 0.97 }
+        : { r: 0.97, g: 0.97, b: 0.94 };
+    const cw = theme === "stadium" ? 0.62 : 0.55;
+    const ch = theme === "stadium" ? 0.14 : 0.12;
     const lift = 0.02;
     for (const side of [-1, 1] as const) {
       const aox = side < 0 ? alx : arx;
@@ -846,10 +852,10 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   });
   const curbMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.38,
+    roughness: theme === "stadium" ? 0.32 : 0.38,
     metalness: 0.05,
-    emissive: theme === "night" ? 0x1a2434 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.2 : 0,
+    emissive: theme === "night" ? 0x1a2434 : theme === "stadium" ? 0x1a0808 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.22 : theme === "stadium" ? 0.06 : 0,
   });
   const wallMat = new THREE.MeshStandardMaterial({
     vertexColors: true,

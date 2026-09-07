@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./types";
 import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
@@ -6,6 +7,7 @@ import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
 import { qualityProfile, type Settings } from "./settings";
+import { isOnCurb, resolveQuality, type QualityProfile, type QualityTier } from "./quality";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -160,8 +162,8 @@ const THEMES: Record<ThemeId, ThemePack> = {
   night: {
     fog: 0x243850,
     ground: 0x222836,
-    hemiSky: 0x6a88b0,
-    hemiGround: 0x3a5068,
+    hemiSky: 0x7292b6,
+    hemiGround: 0x425868,
     sun: 0xd0e4ff,
     sunPos: [20, 80, -40],
     exposure: 1.24,
@@ -180,10 +182,16 @@ export class World {
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
   private fill: THREE.DirectionalLight;
+  private fill2: THREE.DirectionalLight;
   private skyMesh: THREE.Mesh | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
   private post: PostFx;
+  private quality: QualityProfile = resolveQuality();
+  private pmrem: THREE.PMREMGenerator | null = null;
+  private envMap: THREE.Texture | null = null;
+  private viewW = 800;
+  private viewH = 600;
   private disposables: { dispose: () => void }[] = [];
   private textures: THREE.Texture[] = [];
   private camPos = new THREE.Vector3(0, 8, 16);
@@ -214,12 +222,14 @@ export class World {
       powerPreference: "high-performance",
       alpha: false,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setSize(canvas.clientWidth || 800, canvas.clientHeight || 600, false);
+    this.viewW = canvas.clientWidth || 800;
+    this.viewH = canvas.clientHeight || 600;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.pixelRatioCap));
+    this.renderer.setSize(this.viewW, this.viewH, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = this.quality.shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene.background = new THREE.Color(0x8eb8dc);
@@ -231,8 +241,11 @@ export class World {
     this.fill = new THREE.DirectionalLight(0x8ab4d8, 0);
     this.fill.position.set(12, -42, 18);
     this.fill.castShadow = false;
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1536, 1536);
+    this.fill2 = new THREE.DirectionalLight(0xb8c8dc, 0);
+    this.fill2.position.set(-22, 36, -14);
+    this.fill2.castShadow = false;
+    this.sun.castShadow = this.quality.shadows;
+    this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     this.sun.shadow.camera.near = 10;
     this.sun.shadow.camera.far = 280;
     this.sun.shadow.camera.left = -70;
@@ -240,7 +253,7 @@ export class World {
     this.sun.shadow.camera.top = 70;
     this.sun.shadow.camera.bottom = -70;
     this.sun.shadow.bias = -0.0003;
-    this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target, this.fill2, this.fill2.target);
 
     const groundGeo = new THREE.PlaneGeometry(900, 900);
     groundGeo.rotateX(-Math.PI / 2);
@@ -259,9 +272,26 @@ export class World {
     this.scene.add(this.car.group, this.ghost.group, this.vfx.root);
     this.post = new PostFx(this.renderer, this.scene, this.camera);
     this.disposables.push(groundGeo, this.ground.material as THREE.Material);
+    this.vfx.setQuality(this.quality);
+    this.applyEnvironmentMap();
+  }
+
+  /** Settings PR: persist the tier and apply it through the Options store. */
+  setQuality(tier: QualityTier) {
+    this.quality = resolveQuality(tier);
+    this.vfx.setQuality(this.quality);
+    this.renderer.shadowMap.enabled = this.quality.shadows;
+    this.sun.castShadow = this.quality.shadows;
+    this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
+    this.applyEnvironmentMap();
+    this.post.configure(this.quality.bloom, false);
+    this.resize(this.viewW, this.viewH);
+    if (this.builtTrack) this.applyThemeLights(this.theme);
   }
 
   applySettings(s: Settings) {
+    this.quality = resolveQuality(s.quality);
+    this.vfx.setQuality(this.quality);
     const q = qualityProfile(s.quality);
     this.camDistance = s.chaseDistance;
     this.camFov = s.fov;
@@ -286,6 +316,8 @@ export class World {
     }
     if (fogChanged) this.applyFog();
     this.post.configure(s.bloom, s.motionBlur);
+    this.applyEnvironmentMap();
+    if (this.builtTrack) this.applyThemeLights(this.theme);
     if (dprChanged || fogChanged) {
       const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
       const r = parent.getBoundingClientRect();
@@ -295,11 +327,13 @@ export class World {
 
   resize(w: number, h: number) {
     if (w < 1 || h < 1) return;
+    this.viewW = w;
+    this.viewH = h;
     const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.far = this.cameraFar;
+    this.camera.far = this.theme === "night" ? 900 : this.cameraFar;
     this.camera.updateProjectionMatrix();
     this.post.setSize(w, h, dpr);
   }
@@ -307,9 +341,15 @@ export class World {
   private applyFog() {
     const fog = this.scene.fog as THREE.Fog | null;
     if (!fog) return;
-    fog.near = this.fogBase.near * this.fogNearMul;
-    fog.far = this.fogBase.far * this.fogFarMul;
-    this.camera.far = this.cameraFar;
+    // Helix Night stays 88/460 even when Low/Med fog multipliers apply.
+    if (this.theme === "night") {
+      fog.near = 88;
+      fog.far = 460;
+    } else {
+      fog.near = this.fogBase.near * this.fogNearMul;
+      fog.far = this.fogBase.far * this.fogFarMul;
+    }
+    this.camera.far = this.theme === "night" ? 900 : this.cameraFar;
     this.camera.updateProjectionMatrix();
   }
 
@@ -328,18 +368,9 @@ export class World {
     this.fogBase.near = theme === "night" ? 88 : 80;
     this.fogBase.far = theme === "night" ? 460 : 440;
     this.applyFog();
-    this.hemi.color.set(pack.hemiSky);
-    this.hemi.groundColor.set(pack.hemiGround);
-    this.sun.color.set(pack.sun);
-    this.sun.position.set(...pack.sunPos);
-    this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 1.02 : 1.45;
-    this.hemi.intensity = theme === "night" ? 1.32 : 0.75;
-    this.fill.color.set(0x8ab4d8);
-    this.fill.intensity = theme === "night" ? 0.4 : 0;
-    this.fill.position.set(12, -42, 18);
-    this.fill.target.position.set(0, 0, 0);
+    this.applyThemeLights(theme);
     this.renderer.toneMappingExposure = pack.exposure;
+    this.scene.environmentIntensity = theme === "night" ? 0.32 : this.quality.environment ? 0.62 : 0;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
     applyGroundMaterial(this.ground, theme, this.textures);
@@ -357,7 +388,9 @@ export class World {
     this.disposables.push(...env.geos, ...env.mats);
     this.textures.push(...env.textures);
     this.nightLights = env.lights;
+    this.applyThemeLights(theme);
     this.car.setHeadlights(theme === "night");
+    this.vfx.setTheme(theme === "night");
     this.loadSky(pack.sky, pack.fog);
 
     const start = sampleAt(track, 6);
@@ -490,9 +523,14 @@ export class World {
     this.car.applyPose(steer, snap.speed, snap.slide, snap.airborne, dt);
     this.car.setBrakeLights(brake > 0.2);
     this.car.setBoostVisual(Math.max(snap.boost > 0.05 ? 0.6 + snap.boost * 0.4 : 0, snap.driftCharge * 0.35));
+    const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s).width : 12;
+    const curb = isOnCurb(snap.n, width, snap.airborne);
+    if (snap.boost > 0.05) this.vfx.emitTrail(snap, 6);
     if (snap.boost > 0.05 || snap.slide > 0.4 || snap.airborne) {
       this.vfx.emitSparks(snap, snap.boost > 0.05 ? 7 : snap.slide > 0.5 ? 4 : 2, snap.boost > 0.05);
     }
+    if (curb && Math.abs(snap.speed) > 6) this.vfx.emitCurbSparks(snap);
+    if (snap.slide > 0.32 && Math.abs(snap.speed) > 8 && !snap.airborne) this.vfx.emitSmoke(snap, 3);
     this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
@@ -682,6 +720,10 @@ export class World {
       this.fill.target.position.set(snap.px, snap.py, snap.pz);
       this.fill.position.set(snap.px + 10, snap.py - 36, snap.pz + 16);
     }
+    if (this.fill2.intensity > 0) {
+      this.fill2.target.position.set(snap.px, snap.py, snap.pz);
+      this.fill2.position.set(snap.px - 20, snap.py + 32, snap.pz - 12);
+    }
   }
 
   addTrauma(v: number) {
@@ -695,6 +737,44 @@ export class World {
   render() {
     if (this.skyMesh) this.skyMesh.position.copy(this.camera.position);
     this.post.render();
+  }
+
+  private applyThemeLights(theme: ThemeId) {
+    const pack = THEMES[theme];
+    this.hemi.color.set(pack.hemiSky);
+    this.hemi.groundColor.set(pack.hemiGround);
+    this.sun.color.set(pack.sun);
+    this.sun.position.set(...pack.sunPos);
+    this.sun.target.position.set(0, 0, 0);
+    this.sun.intensity = theme === "night" ? 1.02 : 1.45;
+    this.hemi.intensity = theme === "night" ? 1.32 : 0.75;
+    const nightFill = theme === "night" && this.quality.nightFills;
+    this.fill.color.set(0x8ab4d8);
+    this.fill.intensity = nightFill ? 0.46 : 0;
+    this.fill.position.set(12, -42, 18);
+    this.fill.target.position.set(0, 0, 0);
+    this.fill2.color.set(0xb8c8dc);
+    this.fill2.intensity = nightFill ? 0.2 : 0;
+    this.fill2.position.set(-22, 36, -14);
+    this.fill2.target.position.set(0, 0, 0);
+    for (const o of this.nightLights) {
+      const pl = o as THREE.PointLight;
+      if (pl.isPointLight) pl.visible = this.quality.nightFills || theme !== "night";
+    }
+  }
+
+  private applyEnvironmentMap() {
+    if (!this.quality.environment) {
+      this.scene.environment = null;
+      return;
+    }
+    if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    if (!this.envMap) {
+      const room = new RoomEnvironment();
+      this.envMap = this.pmrem.fromScene(room, 0.04).texture;
+      room.dispose();
+    }
+    this.scene.environment = this.envMap;
   }
 
   private clearGroup(g: THREE.Group) {
@@ -716,6 +796,8 @@ export class World {
     this.clearGroup(this.envRoot);
     this.vfx.dispose();
     this.post.dispose();
+    this.envMap?.dispose();
+    this.pmrem?.dispose();
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures) t.dispose();

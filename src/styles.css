@@ -92,6 +92,49 @@ body {
   user-select: none;
 }
 
+.hud-plate {
+  padding: 0.28rem 0.8rem 0.38rem;
+  border-radius: 8px;
+  background: rgba(9, 9, 11, 0.42);
+  border: 1px solid rgba(244, 244, 242, 0.1);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.hud-timer {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.72),
+    0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+.hud-speed {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.75),
+    0 0 16px rgba(0, 0, 0, 0.4);
+}
+
+.hud-meta {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+@media (max-width: 768px) {
+  .hud-plate {
+    background: rgba(9, 9, 11, 0.78);
+    border-color: rgba(244, 244, 242, 0.14);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .play-control {
+    background: rgba(9, 9, 11, 0.82);
+  }
+}
+
 [data-allow-scroll] {
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;

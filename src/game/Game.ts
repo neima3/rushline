@@ -7,6 +7,7 @@ import { Input } from "./input";
 import { GameAudio } from "./audio";
 import { readSave, TRACK_ORDER, useGame, writeSave } from "./store";
 import type { Settings } from "./settings";
+import type { QualityTier } from "./quality";
 
 type Probe = {
   getYaw: () => number;
@@ -147,6 +148,11 @@ export class Game {
   setMuted(m: boolean) {
     this.audio.setMuted(m);
     useGame.getState().setMuted(m);
+  }
+
+  /** Settings PR: persist the tier and call this after the user changes quality. */
+  setQuality(tier: QualityTier) {
+    this.world.setQuality(tier);
   }
 
   setAutoThrottle(v: boolean) {
