@@ -40,6 +40,21 @@ describe("quality presets", () => {
     assert.ok(dayLow.far < 440);
   });
 
+  it("matches Settings #17 Low/Med/High cost table", () => {
+    assert.equal(QUALITY_PRESETS.low.shadows, false);
+    assert.equal(QUALITY_PRESETS.low.bloom, false);
+    assert.equal(QUALITY_PRESETS.low.pixelRatioCap, 1);
+    assert.equal(QUALITY_PRESETS.low.sparkScale, SETTINGS_TIER_COST.low.particleDensity);
+    assert.equal(QUALITY_PRESETS.medium.shadows, true);
+    assert.equal(QUALITY_PRESETS.medium.bloom, false);
+    assert.equal(QUALITY_PRESETS.medium.pixelRatioCap, 1.5);
+    assert.equal(QUALITY_PRESETS.medium.sparkScale, SETTINGS_TIER_COST.medium.particleDensity);
+    assert.equal(QUALITY_PRESETS.high.shadows, true);
+    assert.equal(QUALITY_PRESETS.high.bloom, true);
+    assert.equal(QUALITY_PRESETS.high.pixelRatioCap, 2);
+    assert.equal(QUALITY_PRESETS.high.sparkScale, SETTINGS_TIER_COST.high.particleDensity);
+  });
+
   it("maps Settings store fields onto scene knobs", () => {
     const low = SETTINGS_TIER_COST.low;
     const profile = applyGraphicsKnobs(QUALITY_PRESETS.high, {

@@ -61,10 +61,11 @@ export const SETTINGS_TIER_COST: Record<
   high: { particleDensity: 1, dprCap: 2, fogNearMul: 1, fogFarMul: 1, shadowMap: 1536, cameraFar: 900 },
 };
 
+/** Mirrors Settings #17 `qualityProfile` for shadows / bloom / particles / DPR. */
 export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
   low: {
     tier: "low",
-    sparkScale: 0.32,
+    sparkScale: 0.22,
     smokeScale: 0.22,
     shadowMap: 512,
     shadows: false,
@@ -78,11 +79,11 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
   },
   medium: {
     tier: "medium",
-    sparkScale: 0.62,
+    sparkScale: 0.55,
     smokeScale: 0.55,
     shadowMap: 1024,
     shadows: true,
-    bloom: true,
+    bloom: false,
     bloomStrength: 0.12,
     bloomRadius: 0.28,
     bloomThreshold: 0.9,
