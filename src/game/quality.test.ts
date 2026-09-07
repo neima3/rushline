@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isOnCurb, QUALITY_PRESETS, resolveQuality } from "./quality.ts";
+import { cycleQuality, isOnCurb, QUALITY_PRESETS, resolveQuality } from "./quality.ts";
 
 describe("quality presets", () => {
   it("caps bloom and shadows on Low", () => {
@@ -14,6 +14,12 @@ describe("quality presets", () => {
   it("resolveQuality honors an explicit tier", () => {
     assert.equal(resolveQuality("low").tier, "low");
     assert.equal(resolveQuality("high").bloom, true);
+  });
+
+  it("cycles Low → Med → High → Low", () => {
+    assert.equal(cycleQuality("low"), "medium");
+    assert.equal(cycleQuality("medium"), "high");
+    assert.equal(cycleQuality("high"), "low");
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {

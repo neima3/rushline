@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { ThemeId } from "./types";
+import { makeLiveryTexture } from "./textures";
 
 export type CarRig = {
   group: THREE.Group;
@@ -12,6 +14,7 @@ export type CarRig = {
   setBoostVisual: (amount: number) => void;
   setHeadlights: (on: boolean) => void;
   setOpacity: (opacity: number) => void;
+  setTheme: (theme: ThemeId) => void;
   applyPose: (steer: number, speed: number, slide: number, airborne: boolean, dt: number) => void;
 };
 
@@ -64,14 +67,20 @@ export function makeCar(ghost: boolean): CarRig {
     return m;
   };
 
+  const dayLivery = ghost ? null : makeLiveryTexture(false);
+  const nightLivery = ghost ? null : makeLiveryTexture(true);
   const bodyMat = mat({
-    color: 0xe6e2d8,
-    roughness: 0.22,
-    metalness: 0.42,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.16,
+    color: 0xffffff,
+    roughness: 0.24,
+    metalness: 0.38,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.18,
   });
-  const navy = mat({ color: 0x1a2436, roughness: 0.38, metalness: 0.48, clearcoat: 0.28, clearcoatRoughness: 0.3 });
+  if (dayLivery) {
+    (bodyMat as THREE.MeshStandardMaterial).map = dayLivery;
+    (bodyMat as THREE.MeshStandardMaterial).needsUpdate = true;
+  }
+  const navy = mat({ color: 0x1a1a1e, roughness: 0.4, metalness: 0.45, clearcoat: 0.22, clearcoatRoughness: 0.32 });
   const carbon = mat({ color: 0x101014, roughness: 0.4, metalness: 0.74 });
   const glass = mat({
     color: 0x0c1218,
@@ -92,7 +101,13 @@ export function makeCar(ghost: boolean): CarRig {
     clearcoat: 0.35,
     clearcoatRoughness: 0.2,
   });
-  const teal = mat({ color: 0x4ea8a4, roughness: 0.32, metalness: 0.55, emissive: 0x163836, emissiveIntensity: 0.18 });
+  const accent = mat({
+    color: 0xef5a24,
+    roughness: 0.3,
+    metalness: 0.5,
+    emissive: 0x4a1808,
+    emissiveIntensity: 0.2,
+  });
   const rubber = mat({ color: 0x0c0c0e, roughness: 0.92, metalness: 0.04 });
   const rim = mat({ color: 0xd0d4dc, roughness: 0.22, metalness: 0.88, clearcoat: 0.4, clearcoatRoughness: 0.18 });
   const headMat = mat({ color: 0xf2f0e4, roughness: 0.15, metalness: 0.4, emissive: 0xf2f0e4, emissiveIntensity: ghost ? 0.1 : 1.15 });
@@ -121,8 +136,8 @@ export function makeCar(ghost: boolean): CarRig {
   add(mesh(new THREE.BoxGeometry(0.94, 0.26, 0.82), glass)).position.set(0, 0.54, -0.06);
   add(mesh(new THREE.BoxGeometry(0.84, 0.08, 0.44), glass)).position.set(0, 0.61, 0.3);
   add(mesh(new THREE.BoxGeometry(0.2, 0.04, 1.88), gold)).position.set(0, 0.46, 0.04);
-  add(mesh(new THREE.BoxGeometry(0.045, 0.03, 1.7), teal)).position.set(0.16, 0.47, 0.02);
-  add(mesh(new THREE.BoxGeometry(0.045, 0.03, 1.7), teal)).position.set(-0.16, 0.47, 0.02);
+  add(mesh(new THREE.BoxGeometry(0.05, 0.035, 1.7), accent)).position.set(0.18, 0.47, 0.02);
+  add(mesh(new THREE.BoxGeometry(0.05, 0.035, 1.7), accent)).position.set(-0.18, 0.47, 0.02);
   for (const x of [-0.55, 0.55]) {
     const flank = add(mesh(new THREE.BoxGeometry(0.05, 0.16, 1.15), navy));
     flank.position.set(x, 0.34, -0.02);
@@ -258,10 +273,24 @@ export function makeCar(ghost: boolean): CarRig {
   const setHeadlights = (on: boolean) => {
     (headMat as THREE.MeshStandardMaterial).emissiveIntensity = ghost ? 0.1 : on ? 3.2 : 1.15;
     if (cabinGlow) cabinGlow.intensity = on ? 0.85 : 0.4;
-    if (!ghost) {
-      (bodyMat as THREE.MeshStandardMaterial).emissive.setHex(on ? 0x1c2838 : 0x000000);
-      (bodyMat as THREE.MeshStandardMaterial).emissiveIntensity = on ? 0.1 : 0;
+  };
+
+  const setTheme = (theme: ThemeId) => {
+    if (ghost) return;
+    const night = theme === "night";
+    const bm = bodyMat as THREE.MeshStandardMaterial;
+    const tex = night ? nightLivery : dayLivery;
+    if (tex) {
+      bm.map = tex;
+      bm.needsUpdate = true;
     }
+    bm.emissive.setHex(night ? 0x1a2848 : 0x000000);
+    bm.emissiveIntensity = night ? 0.22 : 0;
+    (navy as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
+    (accent as THREE.MeshStandardMaterial).color.setHex(night ? 0x3de8ff : 0xef5a24);
+    (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? 0x146880 : 0x4a1808);
+    (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;
+    (rim as THREE.MeshStandardMaterial).color.setHex(night ? 0x8a78c0 : 0xd0d4dc);
   };
 
   return {
@@ -284,6 +313,7 @@ export function makeCar(ghost: boolean): CarRig {
         m.needsUpdate = true;
       });
     },
+    setTheme,
     applyPose,
   };
 }

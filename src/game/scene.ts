@@ -140,31 +140,31 @@ export function clearChaseCamera(
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0x9ec4e6,
+    fog: 0xb8d4ea,
     ground: 0x6ea05a,
-    hemiSky: 0xcfe8ff,
+    hemiSky: 0xe8f4ff,
     hemiGround: 0x8a9a6a,
-    sun: 0xfff4e0,
-    sunPos: [80, 120, 40],
-    exposure: 1.05,
+    sun: 0xfff6e8,
+    sunPos: [90, 110, 28],
+    exposure: 1.06,
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
-    fog: 0xc9966e,
-    ground: 0x8a5a38,
-    hemiSky: 0xffc9a0,
-    hemiGround: 0x6a4028,
-    sun: 0xffd0a0,
-    sunPos: [-60, 40, 80],
-    exposure: 1.02,
+    fog: 0xd49268,
+    ground: 0x8a4e2e,
+    hemiSky: 0xffc090,
+    hemiGround: 0x4a2818,
+    sun: 0xffb070,
+    sunPos: [-90, 22, 48],
+    exposure: 1.06,
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x243850,
-    ground: 0x222836,
-    hemiSky: 0x7292b6,
-    hemiGround: 0x425868,
-    sun: 0xd0e4ff,
+    fog: 0x2c2848,
+    ground: 0x1c1828,
+    hemiSky: 0x7a6ab0,
+    hemiGround: 0x4a3860,
+    sun: 0xc8b8ff,
     sunPos: [20, 80, -40],
     exposure: 1.24,
     sky: "/textures/sky-night.jpg",
@@ -392,8 +392,10 @@ export class World {
     this.textures.push(...env.textures);
     this.nightLights = env.lights;
     this.applyThemeLights(theme);
+    this.car.setTheme(theme);
+    this.ghost.setTheme(theme);
     this.car.setHeadlights(theme === "night");
-    this.vfx.setTheme(theme === "night");
+    this.vfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog);
 
     const start = sampleAt(track, 6);
@@ -749,15 +751,15 @@ export class World {
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 1.02 : 1.45;
-    this.hemi.intensity = theme === "night" ? 1.32 : 0.75;
+    this.sun.intensity = theme === "night" ? 0.95 : theme === "canyon" ? 1.55 : 1.52;
+    this.hemi.intensity = theme === "night" ? 1.32 : theme === "canyon" ? 0.82 : 0.88;
     const nightFill = theme === "night" && this.quality.nightFills;
-    this.fill.color.set(0x8ab4d8);
-    this.fill.intensity = nightFill ? 0.46 : 0;
+    this.fill.color.set(theme === "night" ? 0xb878d8 : 0x8ab4d8);
+    this.fill.intensity = nightFill ? 0.5 : 0;
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
-    this.fill2.color.set(0xb8c8dc);
-    this.fill2.intensity = nightFill ? 0.24 : 0;
+    this.fill2.color.set(theme === "night" ? 0xe890c8 : 0xb8c8dc);
+    this.fill2.intensity = nightFill ? 0.28 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {

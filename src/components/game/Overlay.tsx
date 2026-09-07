@@ -4,7 +4,7 @@ import type { Game } from "@/game/Game";
 import { allTrackDefs, getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { Medal, TrackId } from "@/game/types";
-import { cn, formatSpeed, formatTime } from "@/lib/utils";
+import { cn, formatSpeed, formatTime, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
 
@@ -85,7 +85,7 @@ export function Overlay({ gameRef }: Props) {
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
             type="button"
-            className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-bg/80 text-fg"
+            className="play-control hud-chip flex size-11 items-center justify-center rounded-md text-fg"
             onMouseDown={keepPlayFocus}
             onClick={() => g()?.pause()}
             aria-label="Pause"
@@ -98,10 +98,11 @@ export function Overlay({ gameRef }: Props) {
               label={camera === "hood" ? "Hood" : "Chase"}
               camera={camera}
               onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
+              className="hud-chip"
             />
             <button
               type="button"
-              className="play-control flex size-11 items-center justify-center rounded-md border border-border bg-bg/80"
+              className="play-control hud-chip flex size-11 items-center justify-center rounded-md"
               onMouseDown={keepPlayFocus}
               onClick={() => g()?.setMuted(!muted)}
               aria-label={muted ? "Unmute" : "Mute"}
@@ -115,11 +116,12 @@ export function Overlay({ gameRef }: Props) {
       {phase === "paused" && !settingsOpen ? (
         <Modal
           title="Paused"
+          chrome
           actions={[
             { label: "Resume", primary: true, onClick: () => g()?.resume() },
             { label: "Options", onClick: () => setSettingsOpen(true) },
             { label: "Restart", onClick: () => g()?.startRace() },
-            { label: "Menu", onClick: () => g()?.menu() },
+            { label: "Quit", onClick: () => g()?.menu() },
           ]}
         />
       ) : null}
@@ -177,7 +179,7 @@ export function Overlay({ gameRef }: Props) {
 
 function PadChip({ xbox }: { xbox: boolean }) {
   return (
-    <span className="inline-flex h-11 items-center gap-2 rounded-md border border-border bg-bg/80 px-3 text-xs font-medium uppercase tracking-widest text-muted">
+    <span className="hud-chip inline-flex h-11 items-center gap-2 rounded-md px-3 text-xs font-medium uppercase tracking-widest text-muted">
       <Gamepad2 className="size-4 text-fg" />
       {xbox ? "Xbox" : "Pad"}
     </span>
@@ -334,18 +336,21 @@ function Hud({
   showSpeed: boolean;
   showMinimap: boolean;
 }) {
+  const clock = formatTimeParts(time);
   return (
     <>
       {showMinimap ? <MiniMap trackId={trackId} s={s} n={n} /> : null}
       <div className="absolute top-[max(3.25rem,calc(env(safe-area-inset-top)+2.55rem))] left-1/2 flex -translate-x-1/2 flex-col items-center px-16">
-        <div className="hud-plate flex flex-col items-center">
-          <p className="hud-timer text-[2rem] leading-none sm:text-5xl md:text-6xl">{formatTime(time)}</p>
-          {showSpeed ? (
-            <p className="hud-speed mt-0.5 text-xl leading-none md:hidden">
-              {formatSpeed(speed)}
-              <span className="ml-1 font-sans text-[10px] font-medium uppercase tracking-widest text-muted">km/h</span>
-            </p>
-          ) : null}
+        <div className="hud-chrome hud-timer-plate flex flex-col items-center">
+          <p className="hud-timer text-[2rem] leading-none sm:text-5xl md:text-6xl">{clock.main}</p>
+          <p className="hud-timer-frac">{clock.frac}</p>
+        </div>
+        {showSpeed ? (
+          <div className="hud-chrome hud-speed-pill mt-2 inline-flex md:hidden">
+            <span className="hud-speed text-[1.65rem] leading-none">{formatSpeed(speed)}</span>
+            <span className="hud-speed-unit">KM/H</span>
+          </div>
+        ) : null}
         </div>
         <div className="hud-meta mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
@@ -364,10 +369,10 @@ function Hud({
       </div>
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
         {showSpeed ? (
-          <>
-            <p className="hud-speed text-4xl leading-none">{formatSpeed(speed)}</p>
-            <p className="hud-meta text-[10px] uppercase tracking-widest text-muted">km/h</p>
-          </>
+          <div className="hud-chrome hud-speed-pill ml-auto">
+            <span className="hud-speed text-4xl leading-none">{formatSpeed(speed)}</span>
+            <span className="hud-speed-unit">KM/H</span>
+          </div>
         ) : null}
         <Meter label="Boost" value={Math.min(1, boost / 1.0)} tone="ok" show={boost > 0.05} />
         <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} ticks />
@@ -426,23 +431,24 @@ function Meter({
 }
 
 function MedalRow({ medal, compact }: { medal: Medal | null; compact?: boolean }) {
-  const items: { id: Medal; cls: string; label: string }[] = [
-    { id: "bronze", cls: "bg-medal-bronze", label: "B" },
-    { id: "silver", cls: "bg-medal-silver", label: "S" },
-    { id: "gold", cls: "bg-medal-gold", label: "G" },
-    { id: "author", cls: "bg-fg", label: "A" },
+  const items: { id: Medal; ring: string; fill: string; label: string }[] = [
+    { id: "bronze", ring: "border-medal-bronze", fill: "bg-medal-bronze", label: "B" },
+    { id: "silver", ring: "border-medal-silver", fill: "bg-medal-silver", label: "S" },
+    { id: "gold", ring: "border-medal-gold", fill: "bg-medal-gold", label: "G" },
+    { id: "author", ring: "border-fg", fill: "bg-fg", label: "A" },
   ];
   const order: Medal[] = ["bronze", "silver", "gold", "author"];
   const reached = medal ? order.indexOf(medal) : -1;
   return (
-    <span className={cn("flex items-center gap-1", compact ? "" : "justify-center")}>
+    <span className={cn("flex items-center gap-1.5", compact ? "" : "justify-center")}>
       {items.map((m, i) => (
         <span
           key={m.id}
           className={cn(
-            "inline-flex size-2 rounded-full",
-            i <= reached ? m.cls : "bg-border",
-            !compact && "size-2.5",
+            "hud-medal inline-flex items-center justify-center rounded-full border",
+            m.ring,
+            i <= reached ? m.fill : "bg-transparent opacity-45",
+            compact ? "size-3" : "size-4",
           )}
           title={m.label}
         />
@@ -456,17 +462,28 @@ function Modal({
   subtitle,
   extra,
   actions,
+  chrome,
 }: {
   title: string;
   subtitle?: string;
   extra?: ReactNode;
+  chrome?: boolean;
   actions: { label: string; onClick: () => void; primary?: boolean }[];
 }) {
   return (
     <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/70 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <div
+        className={cn(
+          "w-full max-w-sm p-6",
+          chrome
+            ? "hud-chrome hud-pause-card"
+            : "rounded-xl border border-border bg-surface shadow-[0_24px_80px_rgba(0,0,0,0.45)]",
+        )}
+      >
         {subtitle ? <p className="text-xs uppercase tracking-[0.18em] text-muted">{subtitle}</p> : null}
-        <h2 className="font-display text-4xl leading-none tracking-tight">{title}</h2>
+        <h2 className={cn("font-display leading-none tracking-tight", chrome ? "text-3xl uppercase" : "text-4xl")}>
+          {title}
+        </h2>
         {extra}
         <div className="mt-6 flex flex-col gap-2">
           {actions.map((a) => (
@@ -542,10 +559,12 @@ function GhostChip({
   label,
   camera,
   onClick,
+  className,
 }: {
   label: string;
   camera: "chase" | "hood";
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
@@ -553,7 +572,10 @@ function GhostChip({
       data-camera={camera}
       onMouseDown={keepPlayFocus}
       onClick={onClick}
-      className="play-control h-11 rounded-md border border-border bg-bg/80 px-3 text-xs font-medium uppercase tracking-widest text-muted"
+      className={cn(
+        "play-control h-11 rounded-md px-3 text-xs font-medium uppercase tracking-widest text-muted",
+        className ?? "border border-border bg-bg/80",
+      )}
     >
       {label}
     </button>

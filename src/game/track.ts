@@ -548,9 +548,9 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 }
 
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
-  stadium: { r: 0.22, g: 0.24, b: 0.27 },
-  canyon: { r: 0.28, g: 0.24, b: 0.22 },
-  night: { r: 0.38, g: 0.44, b: 0.56 },
+  stadium: { r: 0.82, g: 0.83, b: 0.85 },
+  canyon: { r: 0.18, g: 0.16, b: 0.15 },
+  night: { r: 0.36, g: 0.38, b: 0.5 },
 };
 
 export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
@@ -667,15 +667,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     strip(roadPos, roadNrm, roadCol, roadUv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
 
     const stripe = Math.floor(a.s / 2.0) % 2 === 0;
-    const curbA = stripe
-      ? theme === "stadium"
-        ? { r: 0.98, g: 0.1, b: 0.08 }
-        : { r: 0.94, g: 0.16, b: 0.14 }
-      : theme === "stadium"
-        ? { r: 1, g: 1, b: 0.97 }
-        : { r: 0.97, g: 0.97, b: 0.94 };
-    const cw = theme === "stadium" ? 0.62 : 0.55;
-    const ch = theme === "stadium" ? 0.14 : 0.12;
+    const cw = theme === "stadium" ? 0.64 : 0.55;
+    const ch = theme === "stadium" ? 0.15 : 0.12;
     const lift = 0.02;
     for (const side of [-1, 1] as const) {
       const aox = side < 0 ? alx : arx;
@@ -684,6 +677,18 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
       const box = side < 0 ? blx : brx;
       const boy = side < 0 ? bly : bry;
       const boz = side < 0 ? blz : brz;
+      const curbA =
+        theme === "night"
+          ? side < 0
+            ? { r: 0.22, g: 0.9, b: 1 }
+            : { r: 1, g: 0.28, b: 0.72 }
+          : stripe
+            ? theme === "stadium"
+              ? { r: 0.98, g: 0.08, b: 0.06 }
+              : { r: 0.94, g: 0.16, b: 0.14 }
+            : theme === "stadium"
+              ? { r: 1, g: 1, b: 0.98 }
+              : { r: 0.97, g: 0.97, b: 0.94 };
       const aex = aox + a.rx * side * cw + a.ux * ch;
       const aey = aoy + a.ry * side * cw + a.uy * ch;
       const aez = aoz + a.rz * side * cw + a.uz * ch;
@@ -725,10 +730,12 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
       const rd = 0.62;
       const wallColV =
         theme === "stadium"
-          ? { r: 0.72, g: 0.74, b: 0.7 }
+          ? { r: 0.78, g: 0.8, b: 0.76 }
           : theme === "canyon"
             ? { r: 0.55, g: 0.38, b: 0.28 }
-            : { r: 0.22, g: 0.28, b: 0.36 };
+            : side < 0
+              ? { r: 0.2, g: 0.72, b: 0.95 }
+              : { r: 0.9, g: 0.22, b: 0.62 };
       const a0x = aox + a.rx * side * rd + a.ux * railH0;
       const a0y = aoy + a.ry * side * rd + a.uy * railH0;
       const a0z = aoz + a.rz * side * rd + a.uz * railH0;
@@ -786,9 +793,14 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
       strip(markPos, markNrm, markCol, markUv, ly0x, ly0y, ly0z, ly1x, ly1y, ly1z, ly2x, ly2y, ly2z, ly3x, ly3y, ly3z, a.ux, a.uy, a.uz, white, u0, u1);
     }
 
-    const edgeW = 0.08;
-    const inset = 0.28;
-    const edgeCol = theme === "stadium" ? { r: 0.95, g: 0.86, b: 0.32 } : { r: 0.93, g: 0.93, b: 0.9 };
+    const edgeW = theme === "canyon" ? 0.16 : 0.09;
+    const inset = theme === "canyon" ? 0.18 : 0.28;
+    const edgeCol =
+      theme === "stadium"
+        ? { r: 0.98, g: 0.98, b: 0.96 }
+        : theme === "night"
+          ? { r: 0.55, g: 0.92, b: 1 }
+          : { r: 0.96, g: 0.96, b: 0.94 };
     for (const side of [-1, 1] as const) {
       const e0x = a.x + a.rx * side * (ha - inset) + a.ux * 0.025;
       const e0y = a.y + a.ry * side * (ha - inset) + a.uy * 0.025;
@@ -844,18 +856,18 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   const roadMat = new THREE.MeshStandardMaterial({
     map: asphalt,
     vertexColors: true,
-    roughness: theme === "night" ? 0.28 : 0.62,
-    metalness: theme === "night" ? 0.22 : 0.06,
-    emissive: theme === "night" ? 0x2a4a68 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.62 : 0,
+    roughness: theme === "night" ? 0.3 : theme === "stadium" ? 0.46 : 0.78,
+    metalness: theme === "night" ? 0.2 : theme === "stadium" ? 0.1 : 0.04,
+    emissive: theme === "night" ? 0x24304c : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.48 : 0,
     side: THREE.DoubleSide,
   });
   const curbMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: theme === "stadium" ? 0.32 : 0.38,
-    metalness: 0.05,
-    emissive: theme === "night" ? 0x1a2434 : theme === "stadium" ? 0x1a0808 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.22 : theme === "stadium" ? 0.06 : 0,
+    roughness: theme === "stadium" ? 0.3 : 0.38,
+    metalness: theme === "night" ? 0.25 : 0.05,
+    emissive: theme === "night" ? 0x3a2060 : theme === "stadium" ? 0x1a0808 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.55 : theme === "stadium" ? 0.05 : 0,
   });
   const wallMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -869,8 +881,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     vertexColors: true,
     roughness: 0.35,
     metalness: theme === "night" ? 0.55 : 0.4,
-    emissive: theme === "night" ? 0x1a3048 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.42 : 0,
+    emissive: theme === "night" ? 0x3a60a0 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.85 : 0,
   });
   const postGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.85, 5);
   const postMat = new THREE.MeshStandardMaterial({

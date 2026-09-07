@@ -174,8 +174,8 @@ function buildCanyon(
 ) {
   const ring = trackOutRadius(track) + 36;
   const rockGeo = new THREE.BoxGeometry(1, 1, 1);
-  const rockDark = new THREE.MeshStandardMaterial({ color: 0x5c3826, roughness: 0.97 });
-  const rockLite = new THREE.MeshStandardMaterial({ color: 0xc08a54, roughness: 0.9 });
+  const rockDark = new THREE.MeshStandardMaterial({ color: 0x3a2438, roughness: 0.97 });
+  const rockLite = new THREE.MeshStandardMaterial({ color: 0xd07840, roughness: 0.88 });
   const darkPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; rz: number }[] = [];
   const litePlaced: typeof darkPlaced = [];
   for (let i = 0; i < 56; i++) {
@@ -215,7 +215,7 @@ function buildCanyon(
   mats.push(rockDark, rockLite);
 
   const mesaGeo = new THREE.CylinderGeometry(1, 1.4, 1, 6);
-  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xb07a4e, roughness: 0.92 });
+  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xc86a38, roughness: 0.9 });
   const mesaPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number }[] = [];
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + 0.4;
@@ -268,7 +268,7 @@ function buildCanyon(
   geos.push(cactusGeo);
   mats.push(cactusMat);
 
-  addTrackRocks(track, group, geos, mats, 0x4a3024, 0xb07a48);
+  addTrackRocks(track, group, geos, mats, 0x2e1c28, 0xe08848);
   addRidgeFoliage(track, group, geos, mats);
 }
 
@@ -281,10 +281,10 @@ function buildNight(
 ) {
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    color: 0x243044,
-    roughness: 0.6,
-    metalness: 0.16,
-    emissive: 0x1a283c,
+    color: 0x1c1830,
+    roughness: 0.58,
+    metalness: 0.18,
+    emissive: 0x2a1848,
     emissiveIntensity: 0.55,
   });
   const ring = trackOutRadius(track) + 40;
@@ -334,8 +334,16 @@ function buildNight(
     emissive: 0x3aa0ff,
     emissiveIntensity: 2.2,
   });
+  const neonMag = new THREE.MeshStandardMaterial({
+    color: 0xff5aa8,
+    emissive: 0xff2a88,
+    emissiveIntensity: 2.1,
+  });
   const neonN = 48;
   const neons = new THREE.InstancedMesh(neonGeo, neonMat, neonN);
+  const neonsM = new THREE.InstancedMesh(neonGeo, neonMag, neonN);
+  let ci = 0;
+  let mi = 0;
   for (let i = 0; i < neonN; i++) {
     const sm = track.samples[Math.floor((i / neonN) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
@@ -346,11 +354,14 @@ function buildNight(
     _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
     _dummy.scale.set(2.8, 1, 1);
     _dummy.updateMatrix();
-    neons.setMatrixAt(i, _dummy.matrix);
+    if (side < 0) neonsM.setMatrixAt(mi++, _dummy.matrix);
+    else neons.setMatrixAt(ci++, _dummy.matrix);
   }
-  group.add(neons);
+  neons.count = ci;
+  neonsM.count = mi;
+  group.add(neons, neonsM);
   geos.push(neonGeo);
-  mats.push(neonMat);
+  mats.push(neonMat, neonMag);
 }
 
 function decorateTrackside(

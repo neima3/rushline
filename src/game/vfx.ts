@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { CarSnap } from "./types";
+import type { CarSnap, ThemeId } from "./types";
 import type { QualityProfile } from "./quality";
 
 const MAX_SPARKS = 280;
@@ -56,9 +56,9 @@ export class Vfx {
     });
     this.trail = this.makeCloud(MAX_TRAIL, {
       color: 0xffb45a,
-      size: 0.16,
-      map: sparkSprite(),
-      opacity: 0.85,
+      size: 0.22,
+      map: trailSprite(),
+      opacity: 0.88,
       additive: true,
     });
     this.textures.push(
@@ -96,9 +96,14 @@ export class Vfx {
     this.skidCap = Math.max(40, Math.floor(MAX_SKIDS * (0.4 + profile.sparkScale * 0.6)));
   }
 
-  setTheme(night: boolean) {
-    this.trailColor.setHex(night ? 0x7ec8ff : 0xffb45a);
+  setTheme(theme: ThemeId | boolean) {
+    const night = theme === true || theme === "night";
+    const canyon = theme === "canyon";
+    this.trailColor.setHex(night ? 0x4ef0ff : 0xff8a3a);
     (this.trail.points.material as THREE.PointsMaterial).color.copy(this.trailColor);
+    (this.smoke.points.material as THREE.PointsMaterial).color.setHex(canyon ? 0xc4a078 : night ? 0xb8a0d0 : 0xc8c4bc);
+    (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : 0xffc878);
+    (this.sparks.points.material as THREE.PointsMaterial).size = night ? 0.16 : 0.14;
   }
 
   emitSparks(snap: CarSnap, count: number, boost: boolean) {
@@ -261,14 +266,47 @@ function pickSlot(life: Float32Array, cap: number) {
 
 function sparkSprite() {
   const c = document.createElement("canvas");
-  c.width = c.height = 32;
+  c.width = c.height = 48;
   const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  const cx = 24;
+  const cy = 24;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 22);
   g.addColorStop(0, "rgba(255,255,240,1)");
-  g.addColorStop(0.35, "rgba(255,200,110,0.85)");
-  g.addColorStop(1, "rgba(255,140,40,0)");
+  g.addColorStop(0.28, "rgba(255,200,90,0.9)");
+  g.addColorStop(1, "rgba(255,80,20,0)");
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 32, 32);
+  ctx.fillRect(0, 0, 48, 48);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = "rgba(255,240,200,0.85)";
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20);
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function trailSprite() {
+  const c = document.createElement("canvas");
+  c.width = 24;
+  c.height = 48;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createLinearGradient(12, 0, 12, 48);
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(0.35, "rgba(180,255,255,0.85)");
+  g.addColorStop(1, "rgba(255,80,180,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(12, 2);
+  ctx.lineTo(20, 44);
+  ctx.lineTo(4, 44);
+  ctx.closePath();
+  ctx.fill();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

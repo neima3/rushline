@@ -1,9 +1,9 @@
 /** Graphics quality preset.
  *
- * Settings PR: persist a user tier and call `Game.setQuality(tier)` /
- * `World.setQuality(tier)`. Until that lands, `QUALITY_OVERRIDE` is the
- * single hook — leave `null` for auto (High on desktop, Medium on
- * coarse/narrow, Low when the UA asks to save data).
+ * Menu / pause GFX cycles Low → Med → High and persists to
+ * `localStorage` (`rushline-quality`). `QUALITY_OVERRIDE` still forces a
+ * tier. Auto (no save): High on desktop, Medium on coarse/narrow, Low
+ * when the UA asks to save data.
  */
 export type QualityTier = "low" | "medium" | "high";
 
@@ -72,8 +72,36 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
 /** Settings PR: set to `"low" | "medium" | "high"` to force a tier. */
 export const QUALITY_OVERRIDE: QualityTier | null = null;
 
+const QUALITY_KEY = "rushline-quality";
+
+export function readSavedQuality(): QualityTier | null {
+  if (QUALITY_OVERRIDE) return QUALITY_OVERRIDE;
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    if (v === "low" || v === "medium" || v === "high") return v;
+  } catch {
+    /* quota */
+  }
+  return null;
+}
+
+export function writeSavedQuality(tier: QualityTier) {
+  try {
+    localStorage.setItem(QUALITY_KEY, tier);
+  } catch {
+    /* quota */
+  }
+}
+
+export function cycleQuality(tier: QualityTier): QualityTier {
+  return tier === "low" ? "medium" : tier === "medium" ? "high" : "low";
+}
+
 export function detectQuality(): QualityTier {
   if (QUALITY_OVERRIDE) return QUALITY_OVERRIDE;
+  const saved = readSavedQuality();
+  if (saved) return saved;
   if (typeof window === "undefined" || typeof navigator === "undefined") return "high";
   const saveData = "connection" in navigator && (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
   if (saveData) return "low";

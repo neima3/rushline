@@ -150,8 +150,8 @@ export class Game {
     useGame.getState().setMuted(m);
   }
 
-  /** Settings PR: persist the tier and call this after the user changes quality. */
   setQuality(tier: QualityTier) {
+    useGame.getState().setQuality(tier);
     this.world.setQuality(tier);
   }
 
