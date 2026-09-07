@@ -17,8 +17,6 @@ uniform float hasMap;
 varying vec3 vDir;
 
 #include <common>
-#include <tonemapping_pars_fragment>
-#include <colorspace_pars_fragment>
 
 vec2 dirToEquirect(vec3 dir) {
   float u = atan(dir.z, dir.x) * RECIPROCAL_PI2 + 0.5;
@@ -26,11 +24,19 @@ vec2 dirToEquirect(vec3 dir) {
   return vec2(u, v);
 }
 
+vec3 decodeSRGB(vec3 c) {
+  return mix(
+    pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)),
+    c * 0.0773993808,
+    vec3(lessThanEqual(c, vec3(0.04045)))
+  );
+}
+
 void main() {
   vec3 dir = normalize(vDir);
   vec3 sky = fogColor;
   if (hasMap > 0.5) {
-    sky = sRGBTransferEOTF(texture2D(map, dirToEquirect(dir))).rgb;
+    sky = decodeSRGB(texture2D(map, dirToEquirect(dir)).rgb);
   }
   float w = smoothstep(-0.1, 0.28, dir.y);
   gl_FragColor = vec4(mix(fogColor, sky * tint, w), 1.0);

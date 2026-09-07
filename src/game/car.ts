@@ -359,8 +359,15 @@ export function makeCar(ghost: boolean): CarRig {
     bm.emissiveIntensity = night ? 0.18 : 0;
     const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
     bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : 0xffe6cc);
-    bodyPhys.envMapIntensity = night ? 1.28 : theme === "canyon" ? 1.18 : 1.05;
+    // Circuit High scene env stays 0.08 so asphalt does not wash. The car
+    // multiplies that back up so clearcoat can still read the sky.
+    const env = night ? 1.3 : theme === "canyon" ? 1.22 : 3.45;
+    bodyPhys.envMapIntensity = env;
     bodyPhys.clearcoat = night ? 0.78 : 0.86;
+    (glass as THREE.MeshPhysicalMaterial).envMapIntensity = env * 1.1;
+    (gold as THREE.MeshPhysicalMaterial).envMapIntensity = env;
+    (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
+    (rim as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.85;
     (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
     (accent as THREE.MeshStandardMaterial).color.setHex(night ? 0x3de8ff : 0xef5a24);
     (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? 0x146880 : 0x4a1808);
