@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getTrack, sampleAt } from "./track.ts";
+import { getTrack, medalPace, sampleAt } from "./track.ts";
 import { CarSim, helixNearGate, pickSafeRespawnS } from "./physics.ts";
 
 const idle = {
@@ -75,11 +75,42 @@ describe("mobile feel sims", () => {
     assert.ok(Math.abs(off.n) > Math.abs(med.n), `off ${off.n} should stay wider than medium ${med.n}`);
   });
 
+  it("Off assist still bleeds residual yaw after a steer pulse", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.trackAssist = "off";
+    car.reset(circuit);
+    car.s = 80;
+    car.n = 0;
+    car.speed = 18;
+    for (let i = 0; i < 36; i++) car.step(circuit, { ...cruise, steer: 1 }, 1 / 60);
+    const yawed = Math.abs(car.heading);
+    assert.ok(yawed > 0.12, `heading after steer ${car.heading}`);
+    for (let i = 0; i < 55; i++) car.step(circuit, { ...cruise, steer: 0 }, 1 / 60);
+    assert.ok(Math.abs(car.heading) < yawed * 0.5, `residual ${car.heading} vs peak ${yawed}`);
+  });
+
   it("does not change Helix post-CP1 R parking", () => {
     const helix = getTrack("helix");
     const cp1 = helix.checkpoints[0]!;
     const s = pickSafeRespawnS(helix, 0, cp1 + 8);
     assert.ok(s >= 128 && s <= 140, `post-CP1 island s ${s}`);
     assert.equal(helixNearGate(helix, s), false);
+  });
+
+  it("medal pace drops Author then Gold without rewriting finish medals", () => {
+    const early = medalPace("circuit", 1_000);
+    assert.equal(early.holding, "author");
+    assert.ok(early.remain != null && early.remain > 40_000);
+    assert.equal(early.lost.length, 0);
+
+    const gold = medalPace("circuit", 51_000);
+    assert.equal(gold.holding, "gold");
+    assert.deepEqual(gold.lost, ["author"]);
+
+    const miss = medalPace("circuit", 90_000);
+    assert.equal(miss.holding, null);
+    assert.equal(miss.remain, null);
+    assert.equal(miss.lost.length, 4);
   });
 });

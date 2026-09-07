@@ -25,3 +25,12 @@ export function formatTimeParts(ms: number) {
 export function formatSpeed(mps: number) {
   return Math.max(0, Math.round(Math.abs(mps) * 3.6)).toString();
 }
+
+/** Race split vs ghost. Negative = ahead. */
+export function formatDelta(ms: number) {
+  if (!Number.isFinite(ms)) return "—";
+  const abs = Math.abs(ms) / 1000;
+  if (abs < 0.008) return "0.00";
+  const sign = ms > 0 ? "+" : "−";
+  return `${sign}${abs.toFixed(2)}`;
+}

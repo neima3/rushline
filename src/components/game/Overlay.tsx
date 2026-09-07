@@ -1,10 +1,10 @@
 import type { ReactNode, RefObject } from "react";
 import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
-import { allTrackDefs, getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
+import { allTrackDefs, getTrack, medalFor, medalPace, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { Medal, TrackId } from "@/game/types";
-import { cn, formatSpeed, formatTime, formatTimeParts } from "@/lib/utils";
+import { cn, formatDelta, formatSpeed, formatTime, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
 
@@ -69,6 +69,10 @@ export function Overlay({ gameRef }: Props) {
           lap={hud.lap}
           laps={hud.laps}
           medal={hud.medal}
+          medalRemain={hud.medalRemain}
+          ghostDelta={hud.ghostDelta}
+          ghostS={hud.ghostS}
+          ghostN={hud.ghostN}
           wrongWay={hud.wrongWay}
           countdown={phase === "countdown" ? hud.countdown : null}
           boost={hud.boost}
@@ -133,7 +137,7 @@ export function Overlay({ gameRef }: Props) {
           extra={
             <div className="mt-5 space-y-3">
               <p className="font-display text-5xl tabular-nums leading-none tracking-tight">{formatTime(results.time)}</p>
-              <MedalRow medal={results.medal} />
+              <MedalBoard trackId={results.trackId} time={results.time} earned={results.medal} />
               <p className="text-sm text-muted">Best {formatTime(results.best ?? results.time)}</p>
             </div>
           }
@@ -283,7 +287,10 @@ function Menu({
                 <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
                   <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
                   <span className="mt-1 text-xs text-muted">{t.blurb}</span>
-                  <span className="mt-2 text-xs tabular-nums text-subtle">Best {formatTime(best[t.id] ?? -1)}</span>
+                  <span className="mt-2 flex items-center gap-2 text-xs tabular-nums text-subtle">
+                    <MedalRow medal={medalFor(t.id, best[t.id] ?? Number.POSITIVE_INFINITY)} />
+                    Best {formatTime(best[t.id] ?? -1)}
+                  </span>
                 </span>
               </button>
             ))}
@@ -309,6 +316,10 @@ function Hud({
   lap,
   laps,
   medal,
+  medalRemain,
+  ghostDelta,
+  ghostS,
+  ghostN,
   wrongWay,
   countdown,
   boost,
@@ -326,6 +337,10 @@ function Hud({
   lap: number;
   laps: number;
   medal: Medal | null;
+  medalRemain: number | null;
+  ghostDelta: number | null;
+  ghostS: number | null;
+  ghostN: number | null;
   wrongWay: boolean;
   countdown: number | null;
   boost: number;
@@ -339,11 +354,21 @@ function Hud({
   const clock = formatTimeParts(time);
   return (
     <>
-      {showMinimap ? <MiniMap trackId={trackId} s={s} n={n} /> : null}
+      {showMinimap ? <MiniMap trackId={trackId} s={s} n={n} ghostS={ghostS} ghostN={ghostN} /> : null}
       <div className="absolute top-[max(3.25rem,calc(env(safe-area-inset-top)+2.55rem))] left-1/2 flex -translate-x-1/2 flex-col items-center px-16">
         <div className="hud-chrome hud-timer-plate flex flex-col items-center">
           <p className="hud-timer text-[2rem] leading-none sm:text-5xl md:text-6xl">{clock.main}</p>
           <p className="hud-timer-frac">{clock.frac}</p>
+          {ghostDelta != null ? (
+            <p
+              className={cn(
+                "hud-ghost-delta mt-1 text-[11px] font-semibold tabular-nums tracking-wide",
+                ghostDelta > 20 ? "text-danger" : ghostDelta < -20 ? "text-ok" : "text-muted",
+              )}
+            >
+              {formatDelta(ghostDelta)}
+            </p>
+          ) : null}
         </div>
         {showSpeed ? (
           <div className="hud-chrome hud-speed-pill mt-2 inline-flex md:hidden">
@@ -359,7 +384,14 @@ function Hud({
           <span>
             CP {cp}/{cpTotal}
           </span>
-          <MedalRow medal={medal} compact />
+          <span className="flex items-center gap-1.5">
+            <MedalRow medal={medal} compact pace />
+            {medal && medalRemain != null ? (
+              <span className="tabular-nums tracking-wide text-fg/80">{formatTime(medalRemain)}</span>
+            ) : (
+              <span className="text-subtle">—</span>
+            )}
+          </span>
         </div>
         <div className="mt-1 flex gap-3 md:hidden">
           <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
@@ -429,7 +461,7 @@ function Meter({
   );
 }
 
-function MedalRow({ medal, compact }: { medal: Medal | null; compact?: boolean }) {
+function MedalRow({ medal, compact, pace }: { medal: Medal | null; compact?: boolean; pace?: boolean }) {
   const items: { id: Medal; ring: string; fill: string; label: string }[] = [
     { id: "bronze", ring: "border-medal-bronze", fill: "bg-medal-bronze", label: "B" },
     { id: "silver", ring: "border-medal-silver", fill: "bg-medal-silver", label: "S" },
@@ -440,19 +472,61 @@ function MedalRow({ medal, compact }: { medal: Medal | null; compact?: boolean }
   const reached = medal ? order.indexOf(medal) : -1;
   return (
     <span className={cn("flex items-center gap-1.5", compact ? "" : "justify-center")}>
-      {items.map((m, i) => (
-        <span
-          key={m.id}
-          className={cn(
-            "hud-medal inline-flex items-center justify-center rounded-full border",
-            m.ring,
-            i <= reached ? m.fill : "bg-transparent opacity-45",
-            compact ? "size-3" : "size-4",
-          )}
-          title={m.label}
-        />
-      ))}
+      {items.map((m, i) => {
+        const current = pace && i === reached;
+        const filled = pace ? i === reached : i <= reached;
+        const available = pace && i < reached;
+        return (
+          <span
+            key={m.id}
+            className={cn(
+              "hud-medal inline-flex items-center justify-center rounded-full border",
+              m.ring,
+              filled ? m.fill : available ? "bg-transparent opacity-80" : "bg-transparent opacity-35",
+              current && "hud-medal-now",
+              compact ? "size-3" : "size-4",
+            )}
+            title={m.label}
+            aria-label={m.label}
+          />
+        );
+      })}
     </span>
+  );
+}
+
+function MedalBoard({ trackId, time, earned }: { trackId: TrackId; time: number; earned: Medal | null }) {
+  const medals = TRACK_DEFS[trackId].medals;
+  const pace = medalPace(trackId, time);
+  const rows: { id: Medal; label: string; at: number }[] = [
+    { id: "author", label: "Author", at: medals.author },
+    { id: "gold", label: "Gold", at: medals.gold },
+    { id: "silver", label: "Silver", at: medals.silver },
+    { id: "bronze", label: "Bronze", at: medals.bronze },
+  ];
+  return (
+    <div className="space-y-2">
+      <MedalRow medal={earned} />
+      <ul className="space-y-1 text-sm">
+        {rows.map((row) => {
+          const got = !pace.lost.includes(row.id);
+          return (
+            <li
+              key={row.id}
+              className={cn(
+                "flex items-center justify-between gap-3 tabular-nums",
+                earned === row.id ? "text-fg" : got ? "text-muted" : "text-subtle/70",
+              )}
+            >
+              <span className="uppercase tracking-widest">{row.label}</span>
+              <span>
+                {got ? "✓" : "·"} {formatTime(row.at)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -509,7 +583,19 @@ function keepPlayFocus(e: { preventDefault: () => void }) {
   e.preventDefault();
 }
 
-function MiniMap({ trackId, s, n }: { trackId: TrackId; s: number; n: number }) {
+function MiniMap({
+  trackId,
+  s,
+  n,
+  ghostS,
+  ghostN,
+}: {
+  trackId: TrackId;
+  s: number;
+  n: number;
+  ghostS: number | null;
+  ghostN: number | null;
+}) {
   const track = getTrack(trackId);
   const step = Math.max(1, Math.floor(track.samples.length / 72));
   let minX = Infinity;
@@ -541,6 +627,13 @@ function MiniMap({ trackId, s, n }: { trackId: TrackId; s: number; n: number }) 
     .join(" ");
   const sm = sampleAt(track, s);
   const car = to(sm.x + sm.rx * n, sm.z + sm.rz * n);
+  const ghost =
+    ghostS != null && ghostN != null
+      ? (() => {
+          const g = sampleAt(track, ghostS);
+          return to(g.x + g.rx * ghostN, g.z + g.rz * ghostN);
+        })()
+      : null;
   return (
     <div
       data-minimap="1"
@@ -548,6 +641,7 @@ function MiniMap({ trackId, s, n }: { trackId: TrackId; s: number; n: number }) 
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-md border border-border/80 bg-bg/55">
         <path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" className="text-muted" />
+        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.2" fill="#5ee8ff" opacity="0.9" /> : null}
         <circle cx={car.x} cy={car.y} r="2.6" className="fill-accent" />
       </svg>
     </div>

@@ -15,7 +15,15 @@ export type CarRig = {
   setHeadlights: (on: boolean) => void;
   setOpacity: (opacity: number) => void;
   setTheme: (theme: ThemeId) => void;
-  applyPose: (steer: number, speed: number, slide: number, airborne: boolean, dt: number) => void;
+  applyPose: (
+    steer: number,
+    speed: number,
+    slide: number,
+    airborne: boolean,
+    dt: number,
+    landJuice?: number,
+    boostJuice?: number,
+  ) => void;
 };
 
 type MatOpts = {
@@ -39,16 +47,17 @@ export function makeCar(ghost: boolean): CarRig {
   const headlights: THREE.Mesh[] = [];
   const taillights: THREE.Mesh[] = [];
   const flames: THREE.Mesh[] = [];
-  const op = ghost ? 0.34 : 1;
+  const GHOST_BASE = 0.46;
+  const op = ghost ? GHOST_BASE : 1;
   const baseOpacity: number[] = [];
 
   const mat = (opts: MatOpts) => {
     const base = {
-      color: ghost ? 0x9aa7b5 : opts.color,
+      color: ghost ? 0xb8d4e8 : opts.color,
       roughness: opts.roughness ?? 0.4,
       metalness: opts.metalness ?? 0.4,
-      emissive: ghost ? 0x4a5a70 : (opts.emissive ?? 0x000000),
-      emissiveIntensity: ghost ? 0.25 : (opts.emissiveIntensity ?? 0),
+      emissive: ghost ? 0x3de8ff : (opts.emissive ?? 0x000000),
+      emissiveIntensity: ghost ? 0.42 : (opts.emissiveIntensity ?? 0),
       transparent: Boolean(ghost || opts.transparent),
       opacity: ghost ? op : (opts.opacity ?? 1),
     };
@@ -159,6 +168,18 @@ export function makeCar(ghost: boolean): CarRig {
     stay.position.set(x, 0.5, -1.0);
   }
   add(mesh(new THREE.BoxGeometry(0.16, 0.03, 0.2), gold)).position.set(0, 0.65, -1.05);
+  if (ghost) {
+    const halo = mat({
+      color: 0x5ee8ff,
+      roughness: 0.35,
+      metalness: 0.1,
+      emissive: 0x5ee8ff,
+      emissiveIntensity: 0.95,
+      transparent: true,
+      opacity: 0.55,
+    });
+    add(mesh(new THREE.BoxGeometry(1.2, 0.035, 1.86), halo)).position.set(0, 0.48, 0.02);
+  }
   for (const x of [-0.58, 0.58]) {
     const mirror = add(mesh(new THREE.BoxGeometry(0.16, 0.07, 0.1), carbon));
     mirror.position.set(x, 0.5, 0.18);
@@ -241,17 +262,30 @@ export function makeCar(ghost: boolean): CarRig {
     spins.push(spinG);
   }
 
-  const applyPose = (steer: number, speed: number, slide: number, airborne: boolean, dt: number) => {
+  const applyPose = (
+    steer: number,
+    speed: number,
+    slide: number,
+    airborne: boolean,
+    dt: number,
+    landJuice = 0,
+    boostJuice = 0,
+  ) => {
     const spin = (speed / 0.28) * dt;
     for (let i = 0; i < spins.length; i++) {
       spins[i]!.rotation.x -= spin;
       if (i < 2) hubs[i]!.rotation.y = steer * 0.38;
     }
-    const roll = -steer * (0.1 + slide * 0.08);
-    const pitch = airborne ? 0.06 : -slide * 0.07;
+    const squat = landJuice * 0.14;
+    const roll = -steer * (0.1 + slide * 0.1);
+    const pitch = airborne ? 0.07 : -slide * 0.08 + landJuice * 0.1 - boostJuice * 0.04;
     const k = 1 - Math.exp(-10 * dt);
     body.rotation.z += (roll - body.rotation.z) * k;
     body.rotation.x += (pitch - body.rotation.x) * k;
+    body.position.y += (-squat - body.position.y) * k;
+    const sy = 1 - squat * 0.55;
+    const sx = 1 + squat * 0.35 + boostJuice * 0.04;
+    body.scale.set(sx, sy, 1 + squat * 0.12);
   };
 
   const setBrakeLights = (on: boolean) => {
@@ -304,7 +338,7 @@ export function makeCar(ghost: boolean): CarRig {
     setBoostVisual,
     setHeadlights,
     setOpacity: (opacity: number) => {
-      const k = ghost ? opacity / 0.34 : 1;
+      const k = ghost ? opacity / GHOST_BASE : 1;
       mats.forEach((m, i) => {
         const next = Math.max(0, Math.min(1, (baseOpacity[i] ?? 1) * k));
         m.opacity = next;

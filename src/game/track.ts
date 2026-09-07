@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { BuiltTrack, Sample, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
+import type { BuiltTrack, Medal, Sample, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
 import { makeAsphaltTexture, makeCheckerTexture } from "./textures";
 
 const TAU = Math.PI * 2;
@@ -1095,4 +1095,29 @@ export function medalFor(id: TrackId, time: number) {
   if (time <= m.silver) return "silver" as const;
   if (time <= m.bronze) return "bronze" as const;
   return null;
+}
+
+export type MedalPace = {
+  holding: Medal | null;
+  remain: number | null;
+  lost: Medal[];
+};
+
+/** During a run: the medal you are still on pace for, and ms until it drops. */
+export function medalPace(id: TrackId, time: number): MedalPace {
+  const m = TRACK_DEFS[id].medals;
+  const ladder: { id: Medal; at: number }[] = [
+    { id: "author", at: m.author },
+    { id: "gold", at: m.gold },
+    { id: "silver", at: m.silver },
+    { id: "bronze", at: m.bronze },
+  ];
+  const lost: Medal[] = [];
+  for (const rung of ladder) {
+    if (time <= rung.at) {
+      return { holding: rung.id, remain: rung.at - time, lost };
+    }
+    lost.push(rung.id);
+  }
+  return { holding: null, remain: null, lost };
 }

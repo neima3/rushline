@@ -25,7 +25,7 @@ export function Minimap({ trackId, s, n, heading, ghostS, ghostN }: Props) {
     >
       <svg viewBox="0 0 100 100" className="size-full">
         <path d={map.d} fill="none" stroke="rgba(244,244,242,0.28)" strokeWidth="2.4" strokeLinejoin="round" />
-        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.1" fill="rgba(154,167,181,0.85)" /> : null}
+        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.4" fill="#5ee8ff" opacity="0.92" /> : null}
         <g transform={`translate(${car.x} ${car.y}) rotate(${(yaw * 180) / Math.PI})`}>
           <polygon points="0,-3.4 2.4,3.2 -2.4,3.2" fill="#f4f4f2" />
         </g>

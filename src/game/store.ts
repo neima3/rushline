@@ -38,6 +38,8 @@ const emptyHud = (): HudState => ({
   heading: 0,
   ghostS: null,
   ghostN: null,
+  ghostDelta: null,
+  medalRemain: null,
 });
 
 const emptyPad = (): PadInfo => ({

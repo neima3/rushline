@@ -1,5 +1,6 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
-import { getTrack, medalFor } from "./track";
+import { getTrack, medalFor, medalPace } from "./track";
+import { ghostSplitMs } from "./feel";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
@@ -256,6 +257,10 @@ export class Game {
       cp: 0,
       cpTotal: this.track.checkpoints.length,
       medal: null,
+      medalRemain: null,
+      ghostDelta: null,
+      ghostS: null,
+      ghostN: null,
       wrongWay: false,
     });
     this.audio.unlock();
@@ -437,7 +442,7 @@ export class Game {
     this.world.applyGhost(this.track, this.ghost, this.time);
     this.world.stepParticles(dt);
     const attract = this.phase === "menu" || this.phase === "select";
-    this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced);
+    this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
     this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide);
     this.world.render();
 
@@ -451,8 +456,12 @@ export class Game {
     this.hudAcc += dt;
     if (this.hudAcc > 0.08) {
       this.hudAcc = 0;
-      const medal = this.phase === "race" ? medalFor(this.trackId, this.time) : null;
+      const pace = this.phase === "race" ? medalPace(this.trackId, this.time) : { holding: null, remain: null };
       const ghost = ghostAt(this.ghost, this.time);
+      const ghostDelta =
+        ghost && this.phase === "race"
+          ? ghostSplitMs(ghost.s, this.car.s, vis.speed, this.track.length, this.track.def.closed)
+          : null;
       useGame.getState().setHud({
         time: this.time,
         speed: vis.speed,
@@ -461,16 +470,18 @@ export class Game {
         lap: this.car.lap,
         laps: this.track.def.laps,
         boost: vis.boost,
-        medal,
+        medal: pace.holding,
         wrongWay: this.car.wrongWay > 0.45,
         countdown: this.phase === "countdown" ? Math.max(1, Math.ceil(this.countdown)) : this.time < 450 ? 0 : null,
-        splittime: null,
+        splittime: ghostDelta,
         driftCharge: vis.driftCharge,
         s: this.car.s,
         n: this.car.n,
         heading: this.car.heading,
         ghostS: ghost?.s ?? null,
         ghostN: ghost?.n ?? null,
+        ghostDelta,
+        medalRemain: pace.remain,
       });
     }
   };

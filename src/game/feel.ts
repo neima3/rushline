@@ -74,6 +74,63 @@ export function headingAlign(steerAbs: number, drifting: boolean, assist: TrackA
   return 0.12 * k;
 }
 
+/**
+ * Always-on straighten when Track Assist is Off. Medium/High already snap
+ * via headingAlign — do not stack, so the shipped phone line stays put.
+ */
+export function residualAlign(steerAbs: number, drifting: boolean, assist: TrackAssist = "medium"): number {
+  if (trackAssistScale(assist).heading > 0) return 0;
+  if (drifting) return 0.1;
+  if (steerAbs < 0.08) return 3.4;
+  if (steerAbs < 0.22) return 0.7;
+  return 0.06;
+}
+
+export function headingReturn(steerAbs: number, drifting: boolean, assist: TrackAssist = "medium"): number {
+  return residualAlign(steerAbs, drifting, assist) + headingAlign(steerAbs, drifting, assist);
+}
+
+/** Chase yaw settle. Idle (released steer) damps residual swing; steering lags. */
+export function camFwdRate(steerAbs: number, headingAbs: number, airborne: boolean): number {
+  if (airborne) return 3.4;
+  if (steerAbs < 0.08 && headingAbs < 0.16) return 11.2;
+  if (steerAbs < 0.08) return 8.6;
+  return 6.6;
+}
+
+export function camFollowRate(airborne: boolean, hood: boolean, boost: number): number {
+  if (hood) return 14;
+  return (airborne ? 8.8 : 11.2) + (boost > 0.05 ? 1.8 : 0);
+}
+
+export function camLookAhead(speed: number, boost: number, airborne: boolean): number {
+  return 12 + speed * 0.12 + (boost > 0.05 ? 2.6 : 0) - (airborne ? 1.15 : 0);
+}
+
+export function camFovTarget(baseFov: number, speed: number, boost: number, landJuice: number): number {
+  const kick = (boost > 0 ? 4.6 : 0) + landJuice * -2.1;
+  return clamp(baseFov - 4 + speed * 0.15 + kick, baseFov - 6, baseFov + 9);
+}
+
+export function camBoostPull(boost: number): number {
+  return boost > 0.05 ? 0.48 + boost * 0.22 : 0;
+}
+
+export function camLandDrop(landJuice: number): number {
+  return landJuice * 0.58;
+}
+
+/** Ghost gap in ms. Positive = ghost ahead (you are behind). */
+export function ghostSplitMs(ghostS: number, playerS: number, speed: number, length: number, closed: boolean): number {
+  let ds = ghostS - playerS;
+  if (closed) {
+    const L = length || 1;
+    ds = ((ds % L) + L) % L;
+    if (ds > L * 0.5) ds -= L;
+  }
+  return (ds / Math.max(10, Math.abs(speed))) * 1000;
+}
+
 export function driftSteerThreshold(slideHeld: boolean): number {
   return slideHeld ? 0.26 : 1;
 }

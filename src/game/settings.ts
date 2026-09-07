@@ -104,7 +104,7 @@ export function defaultSettings(touch = false): Settings {
     invertSteer: false,
     showSpeed: true,
     showMinimap: true,
-    ghostOpacity: 0.34,
+    ghostOpacity: 0.46,
   };
 }
 
