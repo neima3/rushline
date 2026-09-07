@@ -7,7 +7,17 @@ import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
 import { qualityProfile, type Settings } from "./settings";
-import { isOnCurb, resolveQuality, type QualityProfile, type QualityTier } from "./quality";
+import {
+  applyGraphicsKnobs,
+  fogWindow,
+  isOnCurb,
+  QUALITY_PRESETS,
+  resolveQuality,
+  SETTINGS_TIER_COST,
+  type GraphicsKnobs,
+  type QualityProfile,
+  type QualityTier,
+} from "./quality";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -208,12 +218,14 @@ export class World {
   private fogBase = { near: 80, far: 440 };
   private fogNearMul = 1;
   private fogFarMul = 1;
+  private fogEnabled = true;
   private dprCap = 2;
   private camDistance = 1;
   private camFov = 58;
   private camShake = 1;
   private ghostOpacity = 0.34;
   private cameraFar = 900;
+  private knobs: GraphicsKnobs | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -276,55 +288,100 @@ export class World {
     this.applyEnvironmentMap();
   }
 
-  /** Settings PR: persist the tier and apply it through the Options store. */
-  setQuality(tier: QualityTier) {
-    this.quality = resolveQuality(tier);
-    this.vfx.setQuality(this.quality);
-    this.renderer.shadowMap.enabled = this.quality.shadows;
-    this.sun.castShadow = this.quality.shadows;
-    this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
-    this.applyEnvironmentMap();
-    this.post.configure(this.quality.bloom, false);
-    this.tuneBloom(this.theme);
-    this.resize(this.viewW, this.viewH);
-    if (this.builtTrack) this.applyThemeLights(this.theme);
-  }
-
-  applySettings(s: Settings) {
-    this.quality = resolveQuality(s.quality);
-    this.vfx.setQuality(this.quality);
-    const q = qualityProfile(s.quality);
-    this.camDistance = s.chaseDistance;
-    this.camFov = s.fov;
-    this.camShake = s.cameraShake;
-    this.vfx.density = q.particleDensity;
-    if (this.ghostOpacity !== s.ghostOpacity) {
-      this.ghostOpacity = s.ghostOpacity;
-      this.ghost.setOpacity(s.ghostOpacity);
+  applySettings(s: Settings | GraphicsKnobs) {
+    const cost = SETTINGS_TIER_COST[s.quality];
+    const full = s as Settings;
+    this.knobs = {
+      quality: s.quality,
+      shadows: s.shadows,
+      bloom: s.bloom,
+      particleDensity: s.particleDensity ?? cost.particleDensity,
+      dprCap: s.dprCap ?? cost.dprCap,
+      fogNearMul: s.fogNearMul ?? cost.fogNearMul,
+      fogFarMul: s.fogFarMul ?? cost.fogFarMul,
+      cameraFar: s.cameraFar ?? cost.cameraFar,
+      fogEnabled: s.fogEnabled !== false,
+    };
+    this.quality = applyGraphicsKnobs(QUALITY_PRESETS[s.quality], this.knobs);
+    this.fogNearMul = this.knobs.fogNearMul ?? 1;
+    this.fogFarMul = this.knobs.fogFarMul ?? 1;
+    this.fogEnabled = this.knobs.fogEnabled !== false;
+    this.dprCap = this.knobs.dprCap ?? 2;
+    this.cameraFar = this.knobs.cameraFar ?? 900;
+    if (typeof full.chaseDistance === "number") this.camDistance = full.chaseDistance;
+    if (typeof full.fov === "number") this.camFov = full.fov;
+    if (typeof full.cameraShake === "number") this.camShake = full.cameraShake;
+    if (typeof full.ghostOpacity === "number" && this.ghostOpacity !== full.ghostOpacity) {
+      this.ghostOpacity = full.ghostOpacity;
+      this.ghost.setOpacity(full.ghostOpacity);
     }
-    const dprChanged = this.dprCap !== q.dprCap;
-    const fogChanged = this.fogNearMul !== q.fogNearMul || this.fogFarMul !== q.fogFarMul || this.cameraFar !== q.cameraFar;
-    this.dprCap = q.dprCap;
-    this.fogNearMul = q.fogNearMul;
-    this.fogFarMul = q.fogFarMul;
-    this.cameraFar = q.cameraFar;
+    this.vfx.setQuality(this.quality);
+    this.vfx.density = this.knobs.particleDensity ?? this.quality.sparkScale;
     this.renderer.shadowMap.enabled = s.shadows;
     this.sun.castShadow = s.shadows;
-    if (this.sun.shadow.mapSize.x !== q.shadowMap) {
+    if (this.sun.shadow.mapSize.x !== this.quality.shadowMap) {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
-      this.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
+      this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     }
-    if (fogChanged) this.applyFog();
-    this.post.configure(s.bloom, s.motionBlur);
+    this.applyFog();
+    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false);
     this.tuneBloom(this.theme);
     this.applyEnvironmentMap();
     if (this.builtTrack) this.applyThemeLights(this.theme);
-    if (dprChanged || fogChanged) {
-      const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
-      const r = parent.getBoundingClientRect();
-      this.resize(Math.max(1, r.width), Math.max(1, r.height));
-    }
+    const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
+    const r = parent.getBoundingClientRect();
+    this.resize(Math.max(1, r.width), Math.max(1, r.height));
+  }
+
+  setQuality(tier: QualityTier) {
+    const preset = QUALITY_PRESETS[tier];
+    this.applySettings({
+      quality: tier,
+      shadows: preset.shadows,
+      bloom: preset.bloom,
+      ...SETTINGS_TIER_COST[tier],
+      fogEnabled: this.fogEnabled,
+    });
+  }
+
+  setShadows(on: boolean) {
+    this.applySettings({ quality: this.quality.tier, shadows: on, bloom: this.quality.bloom, fogEnabled: this.fogEnabled });
+  }
+
+  setBloom(on: boolean) {
+    this.applySettings({ quality: this.quality.tier, shadows: this.quality.shadows, bloom: on, fogEnabled: this.fogEnabled });
+  }
+
+  setFogEnabled(on: boolean) {
+    this.applySettings({ quality: this.quality.tier, shadows: this.quality.shadows, bloom: this.quality.bloom, fogEnabled: on });
+  }
+
+  setPixelRatioCap(cap: number) {
+    this.applySettings({
+      quality: this.quality.tier,
+      shadows: this.quality.shadows,
+      bloom: this.quality.bloom,
+      dprCap: cap,
+      fogEnabled: this.fogEnabled,
+    });
+  }
+
+  getGraphics() {
+    const fog = this.scene.fog as THREE.Fog;
+    return {
+      quality: this.quality.tier,
+      shadows: this.quality.shadows,
+      bloom: this.quality.bloom,
+      dprCap: this.dprCap,
+      pixelRatioCap: this.quality.pixelRatioCap,
+      particleDensity: this.knobs?.particleDensity ?? this.quality.sparkScale,
+      fogEnabled: this.fogEnabled,
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      fogNear: fog?.near ?? 80,
+      fogFar: fog?.far ?? 440,
+    };
   }
 
   resize(w: number, h: number) {
@@ -343,14 +400,13 @@ export class World {
   private applyFog() {
     const fog = this.scene.fog as THREE.Fog | null;
     if (!fog) return;
-    // Helix Night stays 88/460 even when Low/Med fog multipliers apply.
-    if (this.theme === "night") {
-      fog.near = 88;
-      fog.far = 460;
-    } else {
-      fog.near = this.fogBase.near * this.fogNearMul;
-      fog.far = this.fogBase.far * this.fogFarMul;
-    }
+    const win = fogWindow(this.theme, {
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      fogEnabled: this.fogEnabled,
+    });
+    fog.near = win.near;
+    fog.far = win.far;
     this.camera.far = this.theme === "night" ? 900 : this.cameraFar;
     this.camera.updateProjectionMatrix();
   }

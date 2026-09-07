@@ -1,9 +1,8 @@
-/** Graphics quality preset.
+/** Graphics quality knobs.
  *
- * Menu / pause GFX cycles Low → Med → High and persists to
- * `localStorage` (`rushline-quality`). `QUALITY_OVERRIDE` still forces a
- * tier. Auto (no save): High on desktop, Medium on coarse/narrow, Low
- * when the UA asks to save data.
+ * Options UI lives on Settings PR #17 (`rushline-settings-v1`). This
+ * module is the scene-side contract: tiers, cost levers, and Helix Night
+ * fog lock (near 88 / far 460 — never tighten).
  */
 export type QualityTier = "low" | "medium" | "high";
 
@@ -24,6 +23,33 @@ export type QualityProfile = {
   nightFills: boolean;
 };
 
+/** Duck-typed slice of Settings PR #17 `Settings` + `qualityProfile`. */
+export type GraphicsKnobs = {
+  quality: QualityTier;
+  shadows: boolean;
+  bloom: boolean;
+  particleDensity?: number;
+  dprCap?: number;
+  fogNearMul?: number;
+  fogFarMul?: number;
+  cameraFar?: number;
+  fogEnabled?: boolean;
+};
+
+export const SETTINGS_KEY = "rushline-settings-v1";
+export const NIGHT_FOG = { near: 88, far: 460 } as const;
+export const DAY_FOG = { near: 80, far: 440 } as const;
+
+/** Settings #17 tier cost — particles / DPR / day fog scale. Night fog ignores muls. */
+export const SETTINGS_TIER_COST: Record<
+  QualityTier,
+  { particleDensity: number; dprCap: number; fogNearMul: number; fogFarMul: number; shadowMap: number; cameraFar: number }
+> = {
+  low: { particleDensity: 0.22, dprCap: 1, fogNearMul: 0.52, fogFarMul: 0.5, shadowMap: 512, cameraFar: 280 },
+  medium: { particleDensity: 0.55, dprCap: 1.5, fogNearMul: 0.78, fogFarMul: 0.72, shadowMap: 1024, cameraFar: 520 },
+  high: { particleDensity: 1, dprCap: 2, fogNearMul: 1, fogFarMul: 1, shadowMap: 1536, cameraFar: 900 },
+};
+
 export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
   low: {
     tier: "low",
@@ -35,7 +61,7 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
     bloomStrength: 0,
     bloomRadius: 0.2,
     bloomThreshold: 0.95,
-    pixelRatioCap: 1.2,
+    pixelRatioCap: 1,
     environment: false,
     nightFills: false,
   },
@@ -69,26 +95,73 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
   },
 };
 
-/** Settings PR: set to `"low" | "medium" | "high"` to force a tier. */
+/** Force a tier in preview. Leave `null` for saved / auto. */
 export const QUALITY_OVERRIDE: QualityTier | null = null;
 
 const QUALITY_KEY = "rushline-quality";
 
-export function readSavedQuality(): QualityTier | null {
-  if (QUALITY_OVERRIDE) return QUALITY_OVERRIDE;
+function asTier(v: unknown): QualityTier | null {
+  return v === "low" || v === "medium" || v === "high" ? v : null;
+}
+
+/** Helix Night stays 88/460. Day themes may scale. Disable pushes day fog out, not night. */
+export function fogWindow(
+  theme: "stadium" | "canyon" | "night",
+  knobs?: Pick<GraphicsKnobs, "fogNearMul" | "fogFarMul" | "fogEnabled">,
+) {
+  if (theme === "night") return { near: NIGHT_FOG.near, far: NIGHT_FOG.far };
+  if (knobs?.fogEnabled === false) return { near: 2000, far: 4000 };
+  return {
+    near: DAY_FOG.near * (knobs?.fogNearMul ?? 1),
+    far: DAY_FOG.far * (knobs?.fogFarMul ?? 1),
+  };
+}
+
+export function readSettingsGraphics(): GraphicsKnobs | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const v = localStorage.getItem(QUALITY_KEY);
-    if (v === "low" || v === "medium" || v === "high") return v;
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    const quality = asTier(o.quality);
+    if (!quality) return null;
+    const cost = SETTINGS_TIER_COST[quality];
+    return {
+      quality,
+      shadows: typeof o.shadows === "boolean" ? o.shadows : QUALITY_PRESETS[quality].shadows,
+      bloom: typeof o.bloom === "boolean" ? o.bloom : QUALITY_PRESETS[quality].bloom,
+      particleDensity: cost.particleDensity,
+      dprCap: cost.dprCap,
+      fogNearMul: cost.fogNearMul,
+      fogFarMul: cost.fogFarMul,
+      cameraFar: cost.cameraFar,
+    };
   } catch {
-    /* quota */
+    return null;
   }
-  return null;
+}
+
+export function readSavedQuality(): QualityTier | null {
+  if (QUALITY_OVERRIDE) return QUALITY_OVERRIDE;
+  const fromSettings = readSettingsGraphics();
+  if (fromSettings) return fromSettings.quality;
+  if (typeof localStorage === "undefined") return null;
+  try {
+    return asTier(localStorage.getItem(QUALITY_KEY));
+  } catch {
+    return null;
+  }
 }
 
 export function writeSavedQuality(tier: QualityTier) {
   try {
     localStorage.setItem(QUALITY_KEY, tier);
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) {
+      const o = JSON.parse(raw) as Record<string, unknown>;
+      o.quality = tier;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(o));
+    }
   } catch {
     /* quota */
   }
@@ -113,8 +186,28 @@ export function detectQuality(): QualityTier {
   return "high";
 }
 
+export function applyGraphicsKnobs(base: QualityProfile, knobs: GraphicsKnobs): QualityProfile {
+  const density = knobs.particleDensity;
+  return {
+    ...base,
+    tier: knobs.quality,
+    shadows: knobs.shadows,
+    bloom: knobs.bloom,
+    sparkScale: density ?? base.sparkScale,
+    smokeScale: density ?? base.smokeScale,
+    pixelRatioCap: knobs.dprCap ?? base.pixelRatioCap,
+    shadowMap: SETTINGS_TIER_COST[knobs.quality].shadowMap,
+    nightFills: knobs.quality !== "low",
+    environment: knobs.quality !== "low" && knobs.bloom,
+  };
+}
+
 export function resolveQuality(tier?: QualityTier | null): QualityProfile {
-  return QUALITY_PRESETS[tier ?? detectQuality()];
+  const knobs = typeof localStorage !== "undefined" ? readSettingsGraphics() : null;
+  const t = tier ?? knobs?.quality ?? detectQuality();
+  const base = QUALITY_PRESETS[t];
+  if (knobs) return applyGraphicsKnobs(base, knobs);
+  return base;
 }
 
 /** Visual curb contact — car is clamped ~0.72m inside the ribbon edge. */

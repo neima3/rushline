@@ -7,7 +7,7 @@ import { Input } from "./input";
 import { GameAudio } from "./audio";
 import { readSave, TRACK_ORDER, useGame, writeSave } from "./store";
 import type { Settings } from "./settings";
-import type { QualityTier } from "./quality";
+import { type GraphicsKnobs, type QualityTier } from "./quality";
 
 type Probe = {
   getYaw: () => number;
@@ -148,6 +148,31 @@ export class Game {
   setMuted(m: boolean) {
     this.audio.setMuted(m);
     useGame.getState().setMuted(m);
+  }
+
+  applySettings(s: Settings | GraphicsKnobs) {
+    this.world.applySettings(s);
+    useGame.getState().setQuality(s.quality);
+  }
+
+  getGraphics() {
+    return this.world.getGraphics();
+  }
+
+  setShadows(on: boolean) {
+    this.world.setShadows(on);
+  }
+
+  setBloom(on: boolean) {
+    this.world.setBloom(on);
+  }
+
+  setFogEnabled(on: boolean) {
+    this.world.setFogEnabled(on);
+  }
+
+  setPixelRatioCap(cap: number) {
+    this.world.setPixelRatioCap(cap);
   }
 
   setQuality(tier: QualityTier) {

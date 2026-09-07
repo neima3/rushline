@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cycleQuality, isOnCurb, QUALITY_PRESETS, resolveQuality } from "./quality.ts";
+import { cycleQuality, fogWindow, isOnCurb, NIGHT_FOG, QUALITY_PRESETS, resolveQuality } from "./quality.ts";
 
 describe("quality presets", () => {
   it("caps bloom and shadows on Low", () => {
@@ -20,6 +20,14 @@ describe("quality presets", () => {
     assert.equal(cycleQuality("low"), "medium");
     assert.equal(cycleQuality("medium"), "high");
     assert.equal(cycleQuality("high"), "low");
+  });
+
+  it("never tightens Helix Night fog below 88/460", () => {
+    assert.deepEqual(fogWindow("night"), NIGHT_FOG);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5, fogEnabled: false }), NIGHT_FOG);
+    const dayLow = fogWindow("stadium", { fogNearMul: 0.52, fogFarMul: 0.5 });
+    assert.ok(dayLow.near < 80);
+    assert.ok(dayLow.far < 440);
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {
