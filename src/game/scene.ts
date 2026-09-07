@@ -151,9 +151,9 @@ export function clearChaseCamera(
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0xb8d4ea,
+    fog: 0x9ec4e6,
     ground: 0x6ea05a,
-    hemiSky: 0xd4e8f6,
+    hemiSky: 0xc4dcf0,
     hemiGround: 0x8a9a6a,
     sun: 0xfff6e8,
     sunPos: [90, 110, 28],

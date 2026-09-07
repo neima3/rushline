@@ -81,7 +81,7 @@ describe("quality presets", () => {
     assert.ok(high.hemi < med.hemi && med.hemi < low.hemi);
     assert.ok(high.exposure < med.exposure && med.exposure <= low.exposure);
     assert.ok(high.sun < 1.52 && high.hemi < 0.88 && high.exposure < 1.06);
-    assert.ok(high.bloomMul < 0.55 && high.bloomThreshold >= 0.94);
+    assert.ok(high.bloomMul < 0.35 && high.bloomThreshold >= 0.96);
 
     const ridge = themeLightLevels("canyon", QUALITY_PRESETS.high);
     assert.equal(ridge.sun, 1.55);

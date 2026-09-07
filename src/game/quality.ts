@@ -170,12 +170,12 @@ export function themeLightLevels(
   const high = quality.tier === "high";
   const med = quality.tier === "medium";
   return {
-    sun: high ? 1.26 : med ? 1.34 : 1.42,
-    hemi: high ? 0.66 : med ? 0.74 : 0.8,
-    exposure: high ? 0.94 : med ? 1 : 1.06,
-    env: quality.environment ? (high ? 0.18 : 0.26) : 0,
-    bloomMul: high ? 0.28 : 0.4,
-    bloomThreshold: Math.max(quality.bloomThreshold, high ? 0.94 : 0.92),
+    sun: high ? 1.08 : med ? 1.22 : 1.36,
+    hemi: high ? 0.52 : med ? 0.64 : 0.74,
+    exposure: high ? 0.86 : med ? 0.94 : 1.02,
+    env: quality.environment ? (high ? 0.08 : 0.12) : 0,
+    bloomMul: high ? 0.16 : 0.32,
+    bloomThreshold: Math.max(quality.bloomThreshold, high ? 0.96 : 0.93),
   };
 }
 
