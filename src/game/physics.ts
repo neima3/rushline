@@ -131,8 +131,18 @@ export class CarSim {
     this.landLock = 0.2;
     this.place(track);
     this.flattenRespawn(track);
-    if (this.uy < 0.78 || this.airborne) {
-      this.s = pickSafeRespawnS(track, -1, this.s);
+    // plantUpright always writes world-up, so test the SAMPLE — a ledge /
+    // invert / loop-overhang island still needs a second pick.
+    const planted = sampleAt(track, this.s);
+    const helixBad =
+      track.def.id === "helix" && (planted.uy < 0.9 || helixRibbonOverhead(track, planted) || helixNearGate(track, planted.s));
+    if (this.uy < 0.78 || this.airborne || helixBad) {
+      if (helixBad && this.lastCp >= 0) {
+        const cp = track.checkpoints[this.lastCp] ?? 24;
+        this.s = pickHelixRespawnS(track, Math.max(24, cp - 18));
+      } else {
+        this.s = pickSafeRespawnS(track, -1, this.s);
+      }
       this.airborne = false;
       this.place(track);
       this.flattenRespawn(track);
@@ -356,7 +366,9 @@ export class CarSim {
     this.py = sm.y + sm.ry * this.n + sm.uy * RIDE;
     this.pz = sm.z + sm.rz * this.n + sm.uz * RIDE;
     this.setFrame(sm.tx, sm.ty, sm.tz, sm.ux, sm.uy, sm.uz, sm.rx, sm.ry, sm.rz);
-    if (this.recoverLock > 0 && sm.uy < 0.75) this.plantUpright(track);
+    // Helix R recoveries stay world-up on flats / corkscrew approach so the
+    // car cannot snap to a banked ledge the same beat as respawn.
+    if (this.recoverLock > 0 && (track.def.id === "helix" || sm.uy < 0.75)) this.plantUpright(track);
     this.vx = this.fx * this.speed;
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
@@ -679,6 +691,57 @@ function stableRunway(track: BuiltTrack, s: number, dir: 1 | -1, limit: number) 
   return travelled;
 }
 
+/** True-flat Helix runway — corkscrew bank (uy ~0.93) does not count. */
+function helixFlatRunway(track: BuiltTrack, s: number, dir: 1 | -1, limit: number) {
+  const L = track.length || 1;
+  let travelled = 0;
+  let prev = s;
+  const step = 1.2;
+  while (travelled < limit) {
+    const next = prev + dir * step;
+    const sm = sampleAt(track, next);
+    if (sm.uy < 0.96 || Math.abs(sm.ty) > 0.28 || sm.y < -2) break;
+    travelled += step;
+    prev = next;
+    if (!track.def.closed && (prev <= 0 || prev >= L)) break;
+  }
+  return travelled;
+}
+
+export function helixRibbonOverhead(track: BuiltTrack, sm: { x: number; y: number; z: number }) {
+  let hits = 0;
+  for (const o of track.samples) {
+    if (o.uy > 0.35) continue;
+    const horiz = Math.hypot(o.x - sm.x, o.z - sm.z);
+    if (horiz < o.width * 0.55 + 3 && o.y > sm.y + 2) hits++;
+    if (hits >= 8) return true;
+  }
+  return false;
+}
+
+export function helixNearGate(track: BuiltTrack, s: number) {
+  const L = track.length || 1;
+  for (const cp of track.checkpoints) {
+    if (Math.abs(wrappedDeltaS(s, cp, L, true)) < 7) return true;
+  }
+  return false;
+}
+
+function helixIslandOk(track: BuiltTrack, sm: BuiltTrack["samples"][number], i: number) {
+  if (sm.uy < 0.92 || sm.y < -2 || Math.abs(sm.ty) > 0.22) return false;
+  const samples = track.samples;
+  const prev = samples[(i - 1 + samples.length) % samples.length]!;
+  const next = samples[(i + 1) % samples.length]!;
+  if (prev.uy < 0.7 || next.uy < 0.7) return false;
+  if (sampleNearInvert(samples, i)) return false;
+  if (helixNearGate(track, sm.s)) return false;
+  if (helixRibbonOverhead(track, sm)) return false;
+  const fwd = helixFlatRunway(track, sm.s, 1, 36);
+  const back = helixFlatRunway(track, sm.s, -1, 28);
+  if (fwd < 14 || back < 10) return false;
+  return true;
+}
+
 function pickHelixRespawnS(track: BuiltTrack, origin: number) {
   const samples = track.samples;
   const L = track.length || 1;
@@ -689,42 +752,40 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
   let bestScore = -1;
   for (let i = 0; i < samples.length; i++) {
     const sm = samples[i]!;
-    if (sm.uy < 0.78 || sm.y < -3 || Math.abs(sm.ty) > 0.32) continue;
-    const prev = samples[(i - 1 + samples.length) % samples.length]!;
-    const next = samples[(i + 1) % samples.length]!;
-    if (prev.uy < 0.55 || next.uy < 0.55) continue;
-    if (sampleNearInvert(samples, i)) continue;
+    if (!helixIslandOk(track, sm, i)) continue;
     if (sm.tx * ox + sm.tz * oz < -0.15) continue;
     const ds = wrappedDeltaS(sm.s, origin, L, true);
-    if (ds < -52 || ds > 22) continue;
-    const fwd = stableRunway(track, sm.s, 1, 28);
-    const back = stableRunway(track, sm.s, -1, 28);
-    if (fwd < 12) continue;
-    if (back < 8 && ds < 0) continue;
-    const score = sm.uy * 4 + fwd * 0.04 - Math.abs(ds) * 0.35 + (sm.y > -0.5 ? 0.3 : 0);
+    if (ds < -36 || ds > 16) continue;
+    const fwd = helixFlatRunway(track, sm.s, 1, 36);
+    const back = helixFlatRunway(track, sm.s, -1, 28);
+    // Prefer the middle of a true-flat island, not the CP arch / corkscrew lip.
+    const score = sm.uy * 3 + Math.min(fwd, 22) * 0.18 + Math.min(back, 20) * 0.14 - Math.abs(ds) * 0.06;
     if (score > bestScore) {
       bestScore = score;
       bestS = sm.s;
     }
   }
-  if (bestScore >= 0 && sampleAt(track, bestS).uy >= 0.85) return bestS;
+  if (bestScore >= 0 && sampleAt(track, bestS).uy >= 0.9) return bestS;
 
   for (const dir of [-1, 1] as const) {
     for (let d = 0; d <= 70; d += 1.4) {
       const s = origin + dir * d;
       const sm = sampleAt(track, s);
-      if (sm.uy < 0.85 || sm.y < -3 || Math.abs(sm.ty) > 0.4) continue;
-      if (stableRunway(track, sm.s, 1, 20) < 10) continue;
+      if (sm.uy < 0.92 || sm.y < -2 || Math.abs(sm.ty) > 0.28) continue;
+      if (helixNearGate(track, sm.s) || helixRibbonOverhead(track, sm)) continue;
+      if (helixFlatRunway(track, sm.s, 1, 24) < 14) continue;
+      if (helixFlatRunway(track, sm.s, -1, 20) < 8) continue;
       return sm.s;
     }
   }
-  return sampleAt(track, origin).uy >= 0.85 ? origin : 20;
+  return sampleAt(track, 20).uy >= 0.85 ? 20 : origin;
 }
 
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20) {
   const cp = lastCp >= 0 ? track.checkpoints[lastCp] : 6;
   if (track.def.id === "helix") {
-    const origin = lastCp < 0 ? 20 : Math.max(2, cp ?? 6);
+    // Post-CP: search the approach island (~12m before the gate), not the arch.
+    const origin = lastCp < 0 ? 20 : Math.max(24, (cp ?? 24) - 12);
     return pickHelixRespawnS(track, origin);
   }
   // Circuit / Ridge: same picker as the passing #9 path.

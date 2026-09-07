@@ -24,6 +24,115 @@ type ThemePack = {
   sky: string;
 };
 
+const _snapCam = new THREE.Vector3();
+const _snapLook = new THREE.Vector3();
+const _snapFwd = new THREE.Vector3();
+const _snapUp = new THREE.Vector3();
+const _snapRight = new THREE.Vector3();
+
+/** Chase/hood snap pose used by World.snapCamera — exported so respawn tests
+ *  can prove Helix post-CP R keeps the camera above the ribbon on portrait. */
+export function chaseSnapPlacement(
+  snap: CarSnap,
+  track: BuiltTrack | null,
+  mode: CameraMode,
+  aspect: number,
+): { cam: THREE.Vector3; look: THREE.Vector3 } {
+  const helixSnap = track?.def.id === "helix";
+  _snapFwd.set(snap.fx, 0, snap.fz);
+  if (_snapFwd.lengthSq() < 1e-6) _snapFwd.set(snap.fx, snap.fy, snap.fz);
+  if (_snapFwd.lengthSq() < 1e-8) _snapFwd.set(0, 0, -1);
+  else _snapFwd.normalize();
+  _snapUp.copy(_worldUp);
+  _snapRight.crossVectors(_snapUp, _snapFwd);
+  if (_snapRight.lengthSq() < 1e-8) _snapRight.set(1, 0, 0);
+  _snapRight.normalize();
+  _snapUp.crossVectors(_snapFwd, _snapRight).normalize();
+
+  const portrait = aspect > 0 && aspect < 0.72;
+  const hood = mode === "hood";
+  let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? (helixSnap ? 4.35 : 3.7) : helixSnap ? 3.8 : 2.55;
+  let dist = hood ? 0.52 : (helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0);
+  // Helix only: pre-CP R sits near the start. A 7m chase pull-back walks
+  // through the finish seam and reads as under-geo at night.
+  if (helixSnap && !hood && snap.s < dist + 6) {
+    dist = Math.min(dist, Math.max(2.6, snap.s * 0.4));
+    lift += 1.4;
+  }
+  _snapCam.set(
+    snap.px - _snapFwd.x * dist + _snapUp.x * lift,
+    Math.max(snap.py + (hood ? 1.05 : helixSnap ? 2.4 : 1.8), snap.py - _snapFwd.y * dist + _snapUp.y * lift),
+    snap.pz - _snapFwd.z * dist + _snapUp.z * lift,
+  );
+  _snapLook.set(snap.px + _snapFwd.x * 12, snap.py + 0.7, snap.pz + _snapFwd.z * 12);
+  return { cam: _snapCam, look: _snapLook };
+}
+
+export function clearChaseCamera(
+  camPos: THREE.Vector3,
+  snap: CarSnap,
+  track: BuiltTrack | null,
+  mode: CameraMode,
+) {
+  const helix = track?.def.id === "helix";
+  const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
+  const minAboveCar = (mode === "hood" ? 0.95 : 2.05) + steep * (helix ? 0.25 : 1.15);
+  camPos.y = Math.max(camPos.y, snap.py + minAboveCar);
+  if (!track) return;
+
+  const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
+    if (helix && uy < 0.55) {
+      camPos.y = Math.max(camPos.y, y + floor, snap.py + minAboveCar);
+      return;
+    }
+    const height = (camPos.x - x) * ux + (camPos.y - y) * uy + (camPos.z - z) * uz;
+    if (height >= floor) return;
+    const push = floor - height;
+    if (helix) {
+      camPos.x += ux * push;
+      camPos.y += uy * push;
+      camPos.z += uz * push;
+    } else {
+      camPos.x += ux * push * 0.2;
+      camPos.y += push;
+      camPos.z += uz * push * 0.2;
+    }
+  };
+
+  const road = sampleAt(track, snap.s);
+  const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
+  liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
+
+  const near = helix
+    ? nearestSample(track, camPos.x, camPos.y, camPos.z, snap.s, {
+        // Post-CP1 island sits under the loop in XZ. A wide wrap window
+        // grabs the invert and pushes chase through the ribbon.
+        noWrap: snap.s < 40 || (snap.s > 115 && snap.s < 190),
+        minUy: 0.7,
+        maxDs: 32,
+        window: 36,
+      })
+    : nearestSample(track, camPos.x, camPos.y, camPos.z, snap.s);
+  const nearFloor = mode === "hood" ? 0.9 : 1.75;
+  liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
+
+  camPos.y = Math.max(
+    camPos.y,
+    snap.py + minAboveCar,
+    road.y + (helix ? 2.6 : mode === "hood" ? 1.15 : 1.7),
+    near.y + (helix && near.uy < 0.7 ? 0 : helix ? 2.2 : mode === "hood" ? 0.95 : 1.45),
+  );
+  if (helix && near.y > snap.py + 2.2 && near.uy > 0.7) {
+    const horiz = Math.hypot(camPos.x - near.x, camPos.z - near.z);
+    if (horiz < near.width * 0.7 + 5) camPos.y = Math.max(camPos.y, near.y + 2.4);
+  }
+  // Helix Night only: world-Y floor wins over any inverted-normal push so
+  // R cannot leave the chase cam under the ribbon looking up at chevrons.
+  if (helix) {
+    camPos.y = Math.max(camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.6), road.y + 2.6);
+  }
+}
+
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
     fog: 0x9ec4e6,
@@ -222,21 +331,9 @@ export class World {
     this.camUp.crossVectors(this.camFwd, _right).normalize();
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
-    const hood = mode === "hood";
-    let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? (helixSnap ? 4.1 : 3.7) : helixSnap ? 3.8 : 2.55;
-    let dist = hood ? 0.52 : (helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0);
-    // Helix only: pre-CP R sits near the start. A 7m chase pull-back walks
-    // through the finish seam and reads as under-geo at night.
-    if (helixSnap && !hood && snap.s < dist + 6) {
-      dist = Math.min(dist, Math.max(2.6, snap.s * 0.4));
-      lift += 1.4;
-    }
-    this.camPos.set(
-      snap.px - this.camFwd.x * dist + this.camUp.x * lift,
-      Math.max(snap.py + (hood ? 1.05 : helixSnap ? 2.2 : 1.8), snap.py - this.camFwd.y * dist + this.camUp.y * lift),
-      snap.pz - this.camFwd.z * dist + this.camUp.z * lift,
-    );
-    this.lookPos.set(snap.px + this.camFwd.x * 12, snap.py + 0.7, snap.pz + this.camFwd.z * 12);
+    const pose = chaseSnapPlacement(snap, this.builtTrack, mode, this.camera.aspect);
+    this.camPos.copy(pose.cam);
+    this.lookPos.copy(pose.look);
     this.keepCameraClear(snap, this.builtTrack, mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
@@ -247,59 +344,7 @@ export class World {
   }
 
   private keepCameraClear(snap: CarSnap, track: BuiltTrack | null, mode: CameraMode) {
-    const helix = track?.def.id === "helix";
-    const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
-    const minAboveCar = (mode === "hood" ? 0.95 : 2.05) + steep * (helix ? 0.25 : 1.15);
-    this.camPos.y = Math.max(this.camPos.y, snap.py + minAboveCar);
-    if (!track) return;
-
-    const liftAlong = (ux: number, uy: number, uz: number, x: number, y: number, z: number, floor: number) => {
-      if (helix && uy < 0.55) {
-        this.camPos.y = Math.max(this.camPos.y, y + floor, snap.py + minAboveCar);
-        return;
-      }
-      const height = (this.camPos.x - x) * ux + (this.camPos.y - y) * uy + (this.camPos.z - z) * uz;
-      if (height >= floor) return;
-      const push = floor - height;
-      if (helix) {
-        this.camPos.x += ux * push;
-        this.camPos.y += uy * push;
-        this.camPos.z += uz * push;
-      } else {
-        this.camPos.x += ux * push * 0.2;
-        this.camPos.y += push;
-        this.camPos.z += uz * push * 0.2;
-      }
-    };
-
-    const road = sampleAt(track, snap.s);
-    const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
-    liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
-
-    const near = helix
-      ? nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s, {
-          noWrap: snap.s < 40,
-          minUy: 0.55,
-        })
-      : nearestSample(track, this.camPos.x, this.camPos.y, this.camPos.z, snap.s);
-    const nearFloor = mode === "hood" ? 0.9 : 1.75;
-    liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
-
-    this.camPos.y = Math.max(
-      this.camPos.y,
-      snap.py + minAboveCar,
-      road.y + (helix ? 2.6 : mode === "hood" ? 1.15 : 1.7),
-      near.y + (helix && near.uy < 0.7 ? 0 : helix ? 2.2 : mode === "hood" ? 0.95 : 1.45),
-    );
-    if (helix && near.y > snap.py + 2.2 && near.uy > 0.7) {
-      const horiz = Math.hypot(this.camPos.x - near.x, this.camPos.z - near.z);
-      if (horiz < near.width * 0.7 + 5) this.camPos.y = Math.max(this.camPos.y, near.y + 2.4);
-    }
-    // Helix Night only: world-Y floor wins over any inverted-normal push so
-    // R cannot leave the chase cam under the ribbon looking up at chevrons.
-    if (helix) {
-      this.camPos.y = Math.max(this.camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.35), road.y + 2.35);
-    }
+    clearChaseCamera(this.camPos, snap, track, mode);
   }
 
   private loadSky(url: string, fog: number) {
