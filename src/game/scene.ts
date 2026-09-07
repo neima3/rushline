@@ -146,7 +146,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
     hemiGround: 0x8a9a6a,
     sun: 0xfff4e0,
     sunPos: [80, 120, 40],
-    exposure: 1.1,
+    exposure: 1.05,
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
@@ -285,6 +285,7 @@ export class World {
     this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     this.applyEnvironmentMap();
     this.post.configure(this.quality.bloom, false);
+    this.tuneBloom(this.theme);
     this.resize(this.viewW, this.viewH);
     if (this.builtTrack) this.applyThemeLights(this.theme);
   }
@@ -316,6 +317,7 @@ export class World {
     }
     if (fogChanged) this.applyFog();
     this.post.configure(s.bloom, s.motionBlur);
+    this.tuneBloom(this.theme);
     this.applyEnvironmentMap();
     if (this.builtTrack) this.applyThemeLights(this.theme);
     if (dprChanged || fogChanged) {
@@ -370,7 +372,8 @@ export class World {
     this.applyFog();
     this.applyThemeLights(theme);
     this.renderer.toneMappingExposure = pack.exposure;
-    this.scene.environmentIntensity = theme === "night" ? 0.32 : this.quality.environment ? 0.62 : 0;
+    this.scene.environmentIntensity = theme === "night" ? 0.28 : this.quality.environment ? 0.42 : 0;
+    this.tuneBloom(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
     applyGroundMaterial(this.ground, theme, this.textures);
@@ -754,7 +757,7 @@ export class World {
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
     this.fill2.color.set(0xb8c8dc);
-    this.fill2.intensity = nightFill ? 0.2 : 0;
+    this.fill2.intensity = nightFill ? 0.24 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {
@@ -775,6 +778,15 @@ export class World {
       room.dispose();
     }
     this.scene.environment = this.envMap;
+  }
+
+  private tuneBloom(theme: ThemeId) {
+    const night = theme === "night";
+    this.post.tuneBloom(
+      this.quality.bloomStrength * (night ? 1 : 0.55),
+      this.quality.bloomRadius,
+      night ? Math.min(this.quality.bloomThreshold, 0.8) : Math.max(this.quality.bloomThreshold, 0.91),
+    );
   }
 
   private clearGroup(g: THREE.Group) {

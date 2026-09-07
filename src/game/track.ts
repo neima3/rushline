@@ -550,7 +550,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
   stadium: { r: 0.22, g: 0.24, b: 0.27 },
   canyon: { r: 0.28, g: 0.24, b: 0.22 },
-  night: { r: 0.34, g: 0.40, b: 0.52 },
+  night: { r: 0.38, g: 0.44, b: 0.56 },
 };
 
 export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {

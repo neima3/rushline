@@ -65,7 +65,7 @@ export function makeCar(ghost: boolean): CarRig {
   };
 
   const bodyMat = mat({
-    color: 0xf3f1ea,
+    color: 0xe6e2d8,
     roughness: 0.22,
     metalness: 0.42,
     clearcoat: 0.55,

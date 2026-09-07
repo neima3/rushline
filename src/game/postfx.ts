@@ -40,6 +40,13 @@ export class PostFx {
     this.bloom?.setSize(this.w, this.h);
   }
 
+  tuneBloom(strength: number, radius: number, threshold: number) {
+    if (!this.bloom) return;
+    this.bloom.strength = strength;
+    this.bloom.radius = radius;
+    this.bloom.threshold = threshold;
+  }
+
   configure(bloom: boolean, motionBlur: boolean) {
     if (this.composer && this.bloomOn === bloom && this.blurOn === motionBlur) return;
     this.bloomOn = bloom;
