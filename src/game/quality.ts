@@ -1,8 +1,19 @@
-/** Graphics quality knobs.
+/** Graphics quality knobs — scene contract for Settings PR #17.
  *
- * Options UI lives on Settings PR #17 (`rushline-settings-v1`). This
- * module is the scene-side contract: tiers, cost levers, and Helix Night
- * fog lock (near 88 / far 460 — never tighten).
+ * Options UI is Settings-only. This module does not render a panel.
+ *
+ * Store key: `rushline-settings-v1`
+ * Fields we read: `quality`, `shadows`, `bloom`
+ * Tier cost we apply: `particleDensity`, `dprCap`, `fogNearMul`, `fogFarMul`, `shadowMap`
+ *
+ * Scene API (`Game` / `World`):
+ *   applySettings(s)          full Settings-shaped slice
+ *   setQuality / setShadows / setBloom
+ *   setFogEnabled / setFogDensity(nearMul, farMul?)
+ *   setPixelRatioCap
+ *   getGraphics()             shadows, bloom, dprCap, fogEnabled, fogNearMul/Far, fogNear/Far
+ *
+ * Helix Night fog stays near 88 / far 460 — never tighten.
  */
 export type QualityTier = "low" | "medium" | "high";
 

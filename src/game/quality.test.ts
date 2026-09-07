@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cycleQuality, fogWindow, isOnCurb, NIGHT_FOG, QUALITY_PRESETS, resolveQuality } from "./quality.ts";
+import {
+  applyGraphicsKnobs,
+  cycleQuality,
+  fogWindow,
+  isOnCurb,
+  NIGHT_FOG,
+  QUALITY_PRESETS,
+  SETTINGS_KEY,
+  SETTINGS_TIER_COST,
+  resolveQuality,
+} from "./quality.ts";
 
 describe("quality presets", () => {
   it("caps bloom and shadows on Low", () => {
@@ -28,6 +38,23 @@ describe("quality presets", () => {
     const dayLow = fogWindow("stadium", { fogNearMul: 0.52, fogFarMul: 0.5 });
     assert.ok(dayLow.near < 80);
     assert.ok(dayLow.far < 440);
+  });
+
+  it("maps Settings store fields onto scene knobs", () => {
+    const low = SETTINGS_TIER_COST.low;
+    const profile = applyGraphicsKnobs(QUALITY_PRESETS.high, {
+      quality: "low",
+      shadows: false,
+      bloom: false,
+      particleDensity: low.particleDensity,
+      dprCap: low.dprCap,
+    });
+    assert.equal(profile.tier, "low");
+    assert.equal(profile.shadows, false);
+    assert.equal(profile.bloom, false);
+    assert.equal(profile.pixelRatioCap, 1);
+    assert.equal(profile.smokeScale, low.particleDensity);
+    assert.equal(SETTINGS_KEY, "rushline-settings-v1");
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {

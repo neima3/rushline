@@ -218,7 +218,7 @@ export class World {
   private fogBase = { near: 80, far: 440 };
   private fogNearMul = 1;
   private fogFarMul = 1;
-  private fogEnabled = true;
+  private fogOn = true;
   private dprCap = 2;
   private camDistance = 1;
   private camFov = 58;
@@ -288,6 +288,24 @@ export class World {
     this.applyEnvironmentMap();
   }
 
+  private currentKnobs(): GraphicsKnobs {
+    return {
+      quality: this.quality.tier,
+      shadows: this.quality.shadows,
+      bloom: this.quality.bloom,
+      particleDensity: this.knobs?.particleDensity,
+      dprCap: this.dprCap,
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      cameraFar: this.cameraFar,
+      fogEnabled: this.fogOn,
+    };
+  }
+
+  private patchKnobs(partial: Partial<GraphicsKnobs>) {
+    this.applySettings({ ...this.currentKnobs(), ...partial });
+  }
+
   applySettings(s: Settings | GraphicsKnobs) {
     const cost = SETTINGS_TIER_COST[s.quality];
     const full = s as Settings;
@@ -306,7 +324,7 @@ export class World {
     this.quality = applyGraphicsKnobs(QUALITY_PRESETS[s.quality], this.knobs);
     this.fogNearMul = this.knobs.fogNearMul ?? 1;
     this.fogFarMul = this.knobs.fogFarMul ?? 1;
-    this.fogEnabled = this.knobs.fogEnabled !== false;
+    this.fogOn = this.knobs.fogEnabled !== false;
     this.dprCap = this.knobs.dprCap ?? 2;
     this.cameraFar = this.knobs.cameraFar ?? 900;
     if (typeof full.chaseDistance === "number") this.camDistance = full.chaseDistance;
@@ -336,36 +354,58 @@ export class World {
   }
 
   setQuality(tier: QualityTier) {
-    const preset = QUALITY_PRESETS[tier];
-    this.applySettings({
+    const cost = SETTINGS_TIER_COST[tier];
+    this.patchKnobs({
       quality: tier,
-      shadows: preset.shadows,
-      bloom: preset.bloom,
-      ...SETTINGS_TIER_COST[tier],
-      fogEnabled: this.fogEnabled,
+      shadows: QUALITY_PRESETS[tier].shadows,
+      bloom: QUALITY_PRESETS[tier].bloom,
+      particleDensity: cost.particleDensity,
+      dprCap: cost.dprCap,
+      fogNearMul: cost.fogNearMul,
+      fogFarMul: cost.fogFarMul,
+      cameraFar: cost.cameraFar,
     });
   }
 
   setShadows(on: boolean) {
-    this.applySettings({ quality: this.quality.tier, shadows: on, bloom: this.quality.bloom, fogEnabled: this.fogEnabled });
+    this.patchKnobs({ shadows: on });
   }
 
   setBloom(on: boolean) {
-    this.applySettings({ quality: this.quality.tier, shadows: this.quality.shadows, bloom: on, fogEnabled: this.fogEnabled });
+    this.patchKnobs({ bloom: on });
   }
 
   setFogEnabled(on: boolean) {
-    this.applySettings({ quality: this.quality.tier, shadows: this.quality.shadows, bloom: this.quality.bloom, fogEnabled: on });
+    this.patchKnobs({ fogEnabled: on });
+  }
+
+  /** Day themes only. Helix Night stays 88/460. */
+  setFogDensity(nearMul: number, farMul = nearMul) {
+    this.patchKnobs({
+      fogEnabled: true,
+      fogNearMul: Math.max(0.2, nearMul),
+      fogFarMul: Math.max(0.2, farMul),
+    });
   }
 
   setPixelRatioCap(cap: number) {
-    this.applySettings({
-      quality: this.quality.tier,
-      shadows: this.quality.shadows,
-      bloom: this.quality.bloom,
-      dprCap: cap,
-      fogEnabled: this.fogEnabled,
-    });
+    this.patchKnobs({ dprCap: Math.max(0.75, Math.min(2.5, cap)) });
+  }
+
+  get shadows() {
+    return this.quality.shadows;
+  }
+
+  get bloom() {
+    return this.quality.bloom;
+  }
+
+  get fogEnabled() {
+    return this.fogOn;
+  }
+
+  get pixelRatioCap() {
+    return this.quality.pixelRatioCap;
   }
 
   getGraphics() {
@@ -377,7 +417,7 @@ export class World {
       dprCap: this.dprCap,
       pixelRatioCap: this.quality.pixelRatioCap,
       particleDensity: this.knobs?.particleDensity ?? this.quality.sparkScale,
-      fogEnabled: this.fogEnabled,
+      fogEnabled: this.fogOn,
       fogNearMul: this.fogNearMul,
       fogFarMul: this.fogFarMul,
       fogNear: fog?.near ?? 80,
@@ -404,7 +444,7 @@ export class World {
     const win = fogWindow(this.theme, {
       fogNearMul: this.fogNearMul,
       fogFarMul: this.fogFarMul,
-      fogEnabled: this.fogEnabled,
+      fogEnabled: this.fogOn,
     });
     fog.near = win.near;
     fog.far = win.far;

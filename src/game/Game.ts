@@ -171,6 +171,10 @@ export class Game {
     this.world.setFogEnabled(on);
   }
 
+  setFogDensity(nearMul: number, farMul?: number) {
+    this.world.setFogDensity(nearMul, farMul);
+  }
+
   setPixelRatioCap(cap: number) {
     this.world.setPixelRatioCap(cap);
   }
