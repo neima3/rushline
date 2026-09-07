@@ -6,6 +6,9 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 export class PostFx {
+  private renderer: THREE.WebGLRenderer;
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
   private after: AfterimagePass | null = null;
@@ -17,11 +20,11 @@ export class PostFx {
   private h = 1;
   private dpr = 1;
 
-  constructor(
-    private renderer: THREE.WebGLRenderer,
-    private scene: THREE.Scene,
-    private camera: THREE.PerspectiveCamera,
-  ) {}
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    this.renderer = renderer;
+    this.scene = scene;
+    this.camera = camera;
+  }
 
   get active() {
     return Boolean(this.composer && (this.bloomOn || this.blurOn));
