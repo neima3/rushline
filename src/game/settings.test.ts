@@ -15,6 +15,7 @@ describe("defaultSettings", () => {
     assert.equal(s.shadows, true);
     assert.equal(s.bloom, true);
     assert.equal(s.autoThrottle, false);
+    assert.equal(s.trackAssist, "off");
     assert.equal(s.motionBlur, false);
   });
 
@@ -24,6 +25,7 @@ describe("defaultSettings", () => {
     assert.equal(s.shadows, true);
     assert.equal(s.bloom, false);
     assert.equal(s.autoThrottle, true);
+    assert.equal(s.trackAssist, "medium");
     assert.ok(qualityProfile("medium").dprCap <= 1.5);
     assert.ok(qualityProfile("medium").particleDensity < 1);
   });
@@ -88,6 +90,7 @@ describe("parseSettings", () => {
       fov: 12,
       cameraShake: 4,
       touchSteerSensitivity: 0.1,
+      trackAssist: "high",
       autoThrottle: false,
       invertSteer: true,
       showSpeed: false,
@@ -103,10 +106,20 @@ describe("parseSettings", () => {
     assert.equal(s.fov, 50);
     assert.equal(s.cameraShake, 1.5);
     assert.equal(s.touchSteerSensitivity, 0.45);
+    assert.equal(s.trackAssist, "high");
     assert.equal(s.invertSteer, true);
     assert.equal(s.autoThrottle, false);
     assert.equal(s.showSpeed, false);
     assert.equal(s.ghostOpacity, 1);
+  });
+});
+
+describe("parseSettings trackAssist", () => {
+  it("falls back to the platform default for missing or garbage values", () => {
+    assert.equal(parseSettings({}, false).trackAssist, "off");
+    assert.equal(parseSettings({}, true).trackAssist, "medium");
+    assert.equal(parseSettings({ trackAssist: "turbo" }, true).trackAssist, "medium");
+    assert.equal(parseSettings({ trackAssist: "low" }, false).trackAssist, "low");
   });
 });
 

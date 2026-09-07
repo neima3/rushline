@@ -118,6 +118,7 @@ export class Game {
     this.input.touchSteerSensitivity = s.touchSteerSensitivity;
     this.input.invertSteer = s.invertSteer;
     this.input.autoThrottle = s.autoThrottle;
+    this.car.trackAssist = s.trackAssist;
   }
 
   private fit() {
