@@ -16,7 +16,6 @@ import type {
   SaveData,
   TrackId,
 } from "./types";
-
 const SAVE_KEY = "rushline-v1";
 
 export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix"];

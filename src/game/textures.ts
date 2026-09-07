@@ -31,33 +31,58 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
   const d = img.data;
   const base =
     theme === "stadium"
-      ? [38, 42, 48]
+      ? [198, 200, 204]
       : theme === "canyon"
-        ? [46, 40, 38]
-        : [36, 42, 56];
+        ? [36, 32, 30]
+        : [28, 30, 42];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
       const n =
-        hash(x * 13 + y * 7) * 18 +
-        hash(x * 0.25 + y * 3) * 10 +
+        hash(x * 13 + y * 7) * (theme === "stadium" ? 14 : 16) +
+        hash(x * 0.25 + y * 3) * 8 +
         ((x ^ y) & 3) * 2;
-      const oil = Math.sin((x + y) * 0.08) * 4;
-      d[i] = Math.max(0, Math.min(255, base[0] + n + oil));
-      d[i + 1] = Math.max(0, Math.min(255, base[1] + n * 0.9));
-      d[i + 2] = Math.max(0, Math.min(255, base[2] + n * 0.8 - oil));
+      const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 6 : 3);
+      const seam = theme === "night" && (x % 64 < 2 || y % 64 < 2) ? 18 : 0;
+      const edgeGrime = theme === "stadium" ? Math.max(0, (Math.abs(x - 128) / 128) * 18) : 0;
+      d[i] = Math.max(0, Math.min(255, base[0] + n + oil - edgeGrime + seam));
+      d[i + 1] = Math.max(0, Math.min(255, base[1] + n * 0.9 - edgeGrime + seam * 0.6));
+      d[i + 2] = Math.max(0, Math.min(255, base[2] + n * 0.8 - oil - edgeGrime + seam));
       d[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = theme === "night" ? "#6aa0ff" : "#ffffff";
-  for (let i = 0; i < 40; i++) {
-    ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, 8 + hash(i) * 18, 1);
+  ctx.globalAlpha = theme === "stadium" ? 0.18 : 0.14;
+  ctx.fillStyle = theme === "night" ? "#6ec8ff" : theme === "canyon" ? "#1a1614" : "#2a2a2c";
+  for (let i = 0; i < (theme === "stadium" ? 56 : 36); i++) {
+    ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, 10 + hash(i) * 28, theme === "stadium" ? 1.5 : 1);
   }
   ctx.globalAlpha = 1;
   const t = tex(c, theme === "night" ? 14 : 16);
   t.repeat.set(1, 1);
+  return t;
+}
+
+export function makeLiveryTexture(night: boolean): THREE.CanvasTexture {
+  const size = 128;
+  const { c, ctx } = canvas(size);
+  ctx.fillStyle = night ? "#6b4ea8" : "#f4f1ea";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = night ? "#3de8ff" : "#ef5a24";
+  ctx.save();
+  ctx.transform(1, 0, -0.78, 1, 0, 0);
+  for (let i = -size; i < size * 2; i += 28) {
+    ctx.fillRect(i, -16, 15, size + 32);
+  }
+  ctx.restore();
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = night ? "#12182a" : "#1a1a1e";
+  ctx.fillRect(0, size * 0.72, size, size * 0.28);
+  ctx.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
   return t;
 }
 
@@ -70,8 +95,8 @@ export function makeGroundTexture(theme: ThemeId): THREE.CanvasTexture {
     theme === "stadium"
       ? [92, 138, 72]
       : theme === "canyon"
-        ? [138, 88, 52]
-        : [22, 28, 36];
+        ? [156, 82, 42]
+        : [26, 22, 38];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;

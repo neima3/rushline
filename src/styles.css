@@ -92,6 +92,123 @@ body {
   user-select: none;
 }
 
+.hud-chrome {
+  position: relative;
+  background: rgba(8, 10, 16, 0.58);
+  border: 1px solid rgba(94, 232, 255, 0.18);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+.hud-chrome::before,
+.hud-pause-card::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.hud-chrome::before {
+  top: 5px;
+  left: 5px;
+  border-top: 1.5px solid #5ee8ff;
+  border-left: 1.5px solid #5ee8ff;
+}
+
+.hud-timer-plate {
+  min-width: 7.4rem;
+  padding: 0.42rem 0.95rem 0.5rem;
+  border-radius: 14px;
+}
+
+.hud-timer {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.72),
+    0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+.hud-timer-frac {
+  margin-top: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(244, 244, 242, 0.72);
+}
+
+.hud-speed-pill {
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.32rem 0.95rem 0.38rem;
+  border-radius: 999px;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.32),
+    inset 0 -1.5px 0 #5ee8ff;
+}
+
+.hud-speed-pill::before {
+  display: none;
+}
+
+.hud-speed {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.75),
+    0 0 16px rgba(0, 0, 0, 0.4);
+}
+
+.hud-speed-unit {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--color-muted);
+}
+
+.hud-meta {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+.hud-medal {
+  box-shadow: none;
+}
+
+.hud-chip {
+  background: rgba(8, 10, 16, 0.62);
+  border: 1px solid rgba(94, 232, 255, 0.16);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.hud-pause-card {
+  border-radius: 16px;
+  background: rgba(8, 10, 16, 0.86);
+}
+
+.hud-pause-card::after {
+  right: 8px;
+  bottom: 8px;
+  border-right: 1.5px solid #ff5aa8;
+  border-bottom: 1.5px solid #ff5aa8;
+}
+
+@media (max-width: 768px) {
+  .hud-chrome,
+  .hud-chip,
+  .play-control.hud-chip {
+    background: rgba(8, 10, 16, 0.82);
+  }
+
+  .hud-timer-plate {
+    min-width: 8.2rem;
+  }
+}
+
 [data-allow-scroll] {
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;

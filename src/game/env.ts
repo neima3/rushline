@@ -174,8 +174,10 @@ function buildCanyon(
 ) {
   const ring = trackOutRadius(track) + 36;
   const rockGeo = new THREE.BoxGeometry(1, 1, 1);
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a6240, roughness: 0.96 });
-  const rockPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; rz: number }[] = [];
+  const rockDark = new THREE.MeshStandardMaterial({ color: 0x3a2438, roughness: 0.97 });
+  const rockLite = new THREE.MeshStandardMaterial({ color: 0xd07840, roughness: 0.88 });
+  const darkPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; rz: number }[] = [];
+  const litePlaced: typeof darkPlaced = [];
   for (let i = 0; i < 56; i++) {
     const a = hash(i) * Math.PI * 2;
     let r = 55 + hash(i + 4) * 170;
@@ -190,25 +192,30 @@ function buildCanyon(
       z = Math.sin(a) * r;
     }
     if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 14)) continue;
-    rockPlaced.push({ x, y: h / 2 - 10, z, sx, h, sz, ry: a * 0.7, rz: (hash(i + 5) - 0.5) * 0.08 });
+    const entry = { x, y: h / 2 - 10, z, sx, h, sz, ry: a * 0.7, rz: (hash(i + 5) - 0.5) * 0.08 };
+    (hash(i + 9) > 0.42 ? litePlaced : darkPlaced).push(entry);
   }
-  const rocks = new THREE.InstancedMesh(rockGeo, rockMat, rockPlaced.length);
-  rocks.castShadow = true;
-  rocks.receiveShadow = true;
-  for (let i = 0; i < rockPlaced.length; i++) {
-    const p = rockPlaced[i]!;
-    _dummy.position.set(p.x, p.y, p.z);
-    _dummy.scale.set(p.sx, p.h, p.sz);
-    _dummy.rotation.set(0, p.ry, p.rz);
-    _dummy.updateMatrix();
-    rocks.setMatrixAt(i, _dummy.matrix);
-  }
-  group.add(rocks);
+  const placeRocks = (placed: typeof darkPlaced, mat: THREE.Material) => {
+    const rocks = new THREE.InstancedMesh(rockGeo, mat, placed.length);
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+    for (let i = 0; i < placed.length; i++) {
+      const p = placed[i]!;
+      _dummy.position.set(p.x, p.y, p.z);
+      _dummy.scale.set(p.sx, p.h, p.sz);
+      _dummy.rotation.set(0, p.ry, p.rz);
+      _dummy.updateMatrix();
+      rocks.setMatrixAt(i, _dummy.matrix);
+    }
+    group.add(rocks);
+  };
+  placeRocks(darkPlaced, rockDark);
+  placeRocks(litePlaced, rockLite);
   geos.push(rockGeo);
-  mats.push(rockMat);
+  mats.push(rockDark, rockLite);
 
   const mesaGeo = new THREE.CylinderGeometry(1, 1.4, 1, 6);
-  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xb07a4e, roughness: 0.92 });
+  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xe07838, roughness: 0.88 });
   const mesaPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number }[] = [];
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + 0.4;
@@ -241,7 +248,7 @@ function buildCanyon(
   mats.push(mesaMat);
 
   const cactusGeo = new THREE.CylinderGeometry(0.22, 0.28, 2.4, 6);
-  const cactusMat = new THREE.MeshStandardMaterial({ color: 0x3d6a3a, roughness: 0.8 });
+  const cactusMat = new THREE.MeshStandardMaterial({ color: 0x6a7048, roughness: 0.88 });
   const cacti = new THREE.InstancedMesh(cactusGeo, cactusMat, 24);
   for (let i = 0; i < 24; i++) {
     const sm = track.samples[Math.floor((i / 24) * track.samples.length)]!;
@@ -261,7 +268,8 @@ function buildCanyon(
   geos.push(cactusGeo);
   mats.push(cactusMat);
 
-  addTrackRocks(track, group, geos, mats, 0x8a5a38);
+  addTrackRocks(track, group, geos, mats, 0x2e1c28, 0xe08848);
+  addRidgeFoliage(track, group, geos, mats);
 }
 
 function buildNight(
@@ -273,11 +281,11 @@ function buildNight(
 ) {
   const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
   const bldgMat = new THREE.MeshStandardMaterial({
-    color: 0x1a2436,
-    roughness: 0.62,
+    color: 0x1c1830,
+    roughness: 0.58,
     metalness: 0.18,
-    emissive: 0x152038,
-    emissiveIntensity: 0.7,
+    emissive: 0x2a1848,
+    emissiveIntensity: 0.55,
   });
   const ring = trackOutRadius(track) + 40;
   const n = 40;
@@ -326,8 +334,16 @@ function buildNight(
     emissive: 0x3aa0ff,
     emissiveIntensity: 2.2,
   });
+  const neonMag = new THREE.MeshStandardMaterial({
+    color: 0xff5aa8,
+    emissive: 0xff2a88,
+    emissiveIntensity: 2.1,
+  });
   const neonN = 48;
   const neons = new THREE.InstancedMesh(neonGeo, neonMat, neonN);
+  const neonsM = new THREE.InstancedMesh(neonGeo, neonMag, neonN);
+  let ci = 0;
+  let mi = 0;
   for (let i = 0; i < neonN; i++) {
     const sm = track.samples[Math.floor((i / neonN) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
@@ -338,11 +354,14 @@ function buildNight(
     _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
     _dummy.scale.set(2.8, 1, 1);
     _dummy.updateMatrix();
-    neons.setMatrixAt(i, _dummy.matrix);
+    if (side < 0) neonsM.setMatrixAt(mi++, _dummy.matrix);
+    else neons.setMatrixAt(ci++, _dummy.matrix);
   }
-  group.add(neons);
+  neons.count = ci;
+  neonsM.count = mi;
+  group.add(neons, neonsM);
   geos.push(neonGeo);
-  mats.push(neonMat);
+  mats.push(neonMat, neonMag);
 }
 
 function decorateTrackside(
@@ -471,13 +490,19 @@ function addTrackRocks(
   group: THREE.Group,
   geos: THREE.BufferGeometry[],
   mats: THREE.Material[],
-  color: number,
+  dark: number,
+  lite = dark,
 ) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: dark, roughness: 0.96 });
+  const liteMat = new THREE.MeshStandardMaterial({ color: lite, roughness: 0.9 });
   const n = 28;
-  const mesh = new THREE.InstancedMesh(geo, mat, n);
-  mesh.castShadow = true;
+  const darkMesh = new THREE.InstancedMesh(geo, darkMat, n);
+  const liteMesh = new THREE.InstancedMesh(geo, liteMat, n);
+  darkMesh.castShadow = true;
+  liteMesh.castShadow = true;
+  let di = 0;
+  let li = 0;
   for (let i = 0; i < n; i++) {
     const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
@@ -487,11 +512,52 @@ function addTrackRocks(
     _dummy.scale.set(1.2 + hash(i) * 2.2, h, 1.2 + hash(i + 2) * 2);
     _dummy.rotation.set(0, hash(i) * 6, 0);
     _dummy.updateMatrix();
-    mesh.setMatrixAt(i, _dummy.matrix);
+    if (hash(i + 7) > 0.45) {
+      liteMesh.setMatrixAt(li++, _dummy.matrix);
+    } else {
+      darkMesh.setMatrixAt(di++, _dummy.matrix);
+    }
   }
-  group.add(mesh);
+  darkMesh.count = di;
+  liteMesh.count = li;
+  group.add(darkMesh, liteMesh);
   geos.push(geo);
-  mats.push(mat);
+  mats.push(darkMat, liteMat);
+}
+
+function addRidgeFoliage(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const bushGeo = new THREE.IcosahedronGeometry(0.85, 0);
+  const sage = new THREE.MeshStandardMaterial({ color: 0x4a6a38, roughness: 0.95 });
+  const olive = new THREE.MeshStandardMaterial({ color: 0x2e4a28, roughness: 0.96 });
+  const n = 40;
+  const aMesh = new THREE.InstancedMesh(bushGeo, sage, n);
+  const bMesh = new THREE.InstancedMesh(bushGeo, olive, n);
+  aMesh.castShadow = true;
+  bMesh.castShadow = true;
+  let ai = 0;
+  let bi = 0;
+  for (let i = 0; i < n; i++) {
+    const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 4.2 + hash(i + 2) * 7;
+    const s = 0.7 + hash(i + 4) * 1.1;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + 0.45 * s, sm.z + sm.rz * side * d);
+    _dummy.scale.set(s, s * (0.7 + hash(i) * 0.5), s);
+    _dummy.rotation.set(hash(i) * 0.4, hash(i + 3) * 6, 0);
+    _dummy.updateMatrix();
+    if (i % 2 === 0) aMesh.setMatrixAt(ai++, _dummy.matrix);
+    else bMesh.setMatrixAt(bi++, _dummy.matrix);
+  }
+  aMesh.count = ai;
+  bMesh.count = bi;
+  group.add(aMesh, bMesh);
+  geos.push(bushGeo);
+  mats.push(sage, olive);
 }
 
 function addTireStacks(

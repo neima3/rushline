@@ -1,11 +1,23 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./types";
 import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
-import { qualityProfile, type Settings } from "./settings";
+import type { Settings } from "./settings";
+import {
+  applyGraphicsKnobs,
+  fogWindow,
+  isOnCurb,
+  QUALITY_PRESETS,
+  resolveQuality,
+  SETTINGS_TIER_COST,
+  type GraphicsKnobs,
+  type QualityProfile,
+  type QualityTier,
+} from "./quality";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -138,31 +150,31 @@ export function clearChaseCamera(
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0x9ec4e6,
+    fog: 0xb8d4ea,
     ground: 0x6ea05a,
-    hemiSky: 0xcfe8ff,
+    hemiSky: 0xe8f4ff,
     hemiGround: 0x8a9a6a,
-    sun: 0xfff4e0,
-    sunPos: [80, 120, 40],
-    exposure: 1.1,
+    sun: 0xfff6e8,
+    sunPos: [90, 110, 28],
+    exposure: 1.06,
     sky: "/textures/sky-stadium.jpg",
   },
   canyon: {
-    fog: 0xc9966e,
-    ground: 0x8a5a38,
-    hemiSky: 0xffc9a0,
-    hemiGround: 0x6a4028,
-    sun: 0xffd0a0,
-    sunPos: [-60, 40, 80],
-    exposure: 1.02,
+    fog: 0xd49268,
+    ground: 0x8a4e2e,
+    hemiSky: 0xffc090,
+    hemiGround: 0x4a2818,
+    sun: 0xffb070,
+    sunPos: [-90, 22, 48],
+    exposure: 1.06,
     sky: "/textures/sky-canyon.jpg",
   },
   night: {
-    fog: 0x243850,
-    ground: 0x222836,
-    hemiSky: 0x6a88b0,
-    hemiGround: 0x3a5068,
-    sun: 0xd0e4ff,
+    fog: 0x2c2848,
+    ground: 0x1c1828,
+    hemiSky: 0x7a6ab0,
+    hemiGround: 0x4a3860,
+    sun: 0xc8b8ff,
     sunPos: [20, 80, -40],
     exposure: 1.24,
     sky: "/textures/sky-night.jpg",
@@ -180,10 +192,16 @@ export class World {
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
   private fill: THREE.DirectionalLight;
+  private fill2: THREE.DirectionalLight;
   private skyMesh: THREE.Mesh | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
   private post: PostFx;
+  private quality: QualityProfile = resolveQuality();
+  private pmrem: THREE.PMREMGenerator | null = null;
+  private envMap: THREE.Texture | null = null;
+  private viewW = 800;
+  private viewH = 600;
   private disposables: { dispose: () => void }[] = [];
   private textures: THREE.Texture[] = [];
   private camPos = new THREE.Vector3(0, 8, 16);
@@ -200,12 +218,14 @@ export class World {
   private fogBase = { near: 80, far: 440 };
   private fogNearMul = 1;
   private fogFarMul = 1;
+  private fogOn = true;
   private dprCap = 2;
   private camDistance = 1;
   private camFov = 58;
   private camShake = 1;
   private ghostOpacity = 0.34;
   private cameraFar = 900;
+  private knobs: GraphicsKnobs | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -214,12 +234,14 @@ export class World {
       powerPreference: "high-performance",
       alpha: false,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setSize(canvas.clientWidth || 800, canvas.clientHeight || 600, false);
+    this.viewW = canvas.clientWidth || 800;
+    this.viewH = canvas.clientHeight || 600;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.pixelRatioCap));
+    this.renderer.setSize(this.viewW, this.viewH, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = this.quality.shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene.background = new THREE.Color(0x8eb8dc);
@@ -231,8 +253,11 @@ export class World {
     this.fill = new THREE.DirectionalLight(0x8ab4d8, 0);
     this.fill.position.set(12, -42, 18);
     this.fill.castShadow = false;
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1536, 1536);
+    this.fill2 = new THREE.DirectionalLight(0xb8c8dc, 0);
+    this.fill2.position.set(-22, 36, -14);
+    this.fill2.castShadow = false;
+    this.sun.castShadow = this.quality.shadows;
+    this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     this.sun.shadow.camera.near = 10;
     this.sun.shadow.camera.far = 280;
     this.sun.shadow.camera.left = -70;
@@ -240,7 +265,7 @@ export class World {
     this.sun.shadow.camera.top = 70;
     this.sun.shadow.camera.bottom = -70;
     this.sun.shadow.bias = -0.0003;
-    this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target, this.fill2, this.fill2.target);
 
     const groundGeo = new THREE.PlaneGeometry(900, 900);
     groundGeo.rotateX(-Math.PI / 2);
@@ -259,47 +284,156 @@ export class World {
     this.scene.add(this.car.group, this.ghost.group, this.vfx.root);
     this.post = new PostFx(this.renderer, this.scene, this.camera);
     this.disposables.push(groundGeo, this.ground.material as THREE.Material);
+    this.vfx.setQuality(this.quality);
+    this.applyEnvironmentMap();
   }
 
-  applySettings(s: Settings) {
-    const q = qualityProfile(s.quality);
-    this.camDistance = s.chaseDistance;
-    this.camFov = s.fov;
-    this.camShake = s.cameraShake;
-    this.vfx.density = q.particleDensity;
-    if (this.ghostOpacity !== s.ghostOpacity) {
-      this.ghostOpacity = s.ghostOpacity;
-      this.ghost.setOpacity(s.ghostOpacity);
+  private currentKnobs(): GraphicsKnobs {
+    return {
+      quality: this.quality.tier,
+      shadows: this.quality.shadows,
+      bloom: this.quality.bloom,
+      particleDensity: this.knobs?.particleDensity,
+      dprCap: this.dprCap,
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      cameraFar: this.cameraFar,
+      fogEnabled: this.fogOn,
+    };
+  }
+
+  private patchKnobs(partial: Partial<GraphicsKnobs>) {
+    this.applySettings({ ...this.currentKnobs(), ...partial });
+  }
+
+  applySettings(s: Settings | GraphicsKnobs) {
+    const cost = SETTINGS_TIER_COST[s.quality];
+    const full = s as Settings;
+    const extra = s as GraphicsKnobs;
+    this.knobs = {
+      quality: s.quality,
+      shadows: s.shadows,
+      bloom: s.bloom,
+      particleDensity: extra.particleDensity ?? cost.particleDensity,
+      dprCap: extra.dprCap ?? cost.dprCap,
+      fogNearMul: extra.fogNearMul ?? cost.fogNearMul,
+      fogFarMul: extra.fogFarMul ?? cost.fogFarMul,
+      cameraFar: extra.cameraFar ?? cost.cameraFar,
+      fogEnabled: extra.fogEnabled !== false,
+    };
+    this.quality = applyGraphicsKnobs(QUALITY_PRESETS[s.quality], this.knobs);
+    this.fogNearMul = this.knobs.fogNearMul ?? 1;
+    this.fogFarMul = this.knobs.fogFarMul ?? 1;
+    this.fogOn = this.knobs.fogEnabled !== false;
+    this.dprCap = this.knobs.dprCap ?? 2;
+    this.cameraFar = this.knobs.cameraFar ?? 900;
+    if (typeof full.chaseDistance === "number") this.camDistance = full.chaseDistance;
+    if (typeof full.fov === "number") this.camFov = full.fov;
+    if (typeof full.cameraShake === "number") this.camShake = full.cameraShake;
+    if (typeof full.ghostOpacity === "number" && this.ghostOpacity !== full.ghostOpacity) {
+      this.ghostOpacity = full.ghostOpacity;
+      this.ghost.setOpacity(full.ghostOpacity);
     }
-    const dprChanged = this.dprCap !== q.dprCap;
-    const fogChanged = this.fogNearMul !== q.fogNearMul || this.fogFarMul !== q.fogFarMul || this.cameraFar !== q.cameraFar;
-    this.dprCap = q.dprCap;
-    this.fogNearMul = q.fogNearMul;
-    this.fogFarMul = q.fogFarMul;
-    this.cameraFar = q.cameraFar;
+    this.vfx.setQuality(this.quality);
+    this.vfx.density = this.knobs.particleDensity ?? this.quality.sparkScale;
     this.renderer.shadowMap.enabled = s.shadows;
     this.sun.castShadow = s.shadows;
-    if (this.sun.shadow.mapSize.x !== q.shadowMap) {
+    if (this.sun.shadow.mapSize.x !== this.quality.shadowMap) {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
-      this.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
+      this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     }
-    if (fogChanged) this.applyFog();
-    this.post.configure(s.bloom, s.motionBlur);
-    if (dprChanged || fogChanged) {
-      const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
-      const r = parent.getBoundingClientRect();
-      this.resize(Math.max(1, r.width), Math.max(1, r.height));
-    }
+    this.applyFog();
+    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false);
+    this.tuneBloom(this.theme);
+    this.applyEnvironmentMap();
+    if (this.builtTrack) this.applyThemeLights(this.theme);
+    const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
+    const r = parent.getBoundingClientRect();
+    this.resize(Math.max(1, r.width), Math.max(1, r.height));
+  }
+
+  setQuality(tier: QualityTier) {
+    const cost = SETTINGS_TIER_COST[tier];
+    this.patchKnobs({
+      quality: tier,
+      shadows: QUALITY_PRESETS[tier].shadows,
+      bloom: QUALITY_PRESETS[tier].bloom,
+      particleDensity: cost.particleDensity,
+      dprCap: cost.dprCap,
+      fogNearMul: cost.fogNearMul,
+      fogFarMul: cost.fogFarMul,
+      cameraFar: cost.cameraFar,
+    });
+  }
+
+  setShadows(on: boolean) {
+    this.patchKnobs({ shadows: on });
+  }
+
+  setBloom(on: boolean) {
+    this.patchKnobs({ bloom: on });
+  }
+
+  setFogEnabled(on: boolean) {
+    this.patchKnobs({ fogEnabled: on });
+  }
+
+  /** Day themes only. Helix Night stays 88/460. */
+  setFogDensity(nearMul: number, farMul = nearMul) {
+    this.patchKnobs({
+      fogEnabled: true,
+      fogNearMul: Math.max(0.2, nearMul),
+      fogFarMul: Math.max(0.2, farMul),
+    });
+  }
+
+  setPixelRatioCap(cap: number) {
+    this.patchKnobs({ dprCap: Math.max(0.75, Math.min(2.5, cap)) });
+  }
+
+  get shadows() {
+    return this.quality.shadows;
+  }
+
+  get bloom() {
+    return this.quality.bloom;
+  }
+
+  get fogEnabled() {
+    return this.fogOn;
+  }
+
+  get pixelRatioCap() {
+    return this.quality.pixelRatioCap;
+  }
+
+  getGraphics() {
+    const fog = this.scene.fog as THREE.Fog;
+    return {
+      quality: this.quality.tier,
+      shadows: this.quality.shadows,
+      bloom: this.quality.bloom,
+      dprCap: this.dprCap,
+      pixelRatioCap: this.quality.pixelRatioCap,
+      particleDensity: this.knobs?.particleDensity ?? this.quality.sparkScale,
+      fogEnabled: this.fogOn,
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      fogNear: fog?.near ?? 80,
+      fogFar: fog?.far ?? 440,
+    };
   }
 
   resize(w: number, h: number) {
     if (w < 1 || h < 1) return;
+    this.viewW = w;
+    this.viewH = h;
     const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.far = this.cameraFar;
+    this.camera.far = this.theme === "night" ? 900 : this.cameraFar;
     this.camera.updateProjectionMatrix();
     this.post.setSize(w, h, dpr);
   }
@@ -307,9 +441,14 @@ export class World {
   private applyFog() {
     const fog = this.scene.fog as THREE.Fog | null;
     if (!fog) return;
-    fog.near = this.fogBase.near * this.fogNearMul;
-    fog.far = this.fogBase.far * this.fogFarMul;
-    this.camera.far = this.cameraFar;
+    const win = fogWindow(this.theme, {
+      fogNearMul: this.fogNearMul,
+      fogFarMul: this.fogFarMul,
+      fogEnabled: this.fogOn,
+    });
+    fog.near = win.near;
+    fog.far = win.far;
+    this.camera.far = this.theme === "night" ? 900 : this.cameraFar;
     this.camera.updateProjectionMatrix();
   }
 
@@ -328,18 +467,10 @@ export class World {
     this.fogBase.near = theme === "night" ? 88 : 80;
     this.fogBase.far = theme === "night" ? 460 : 440;
     this.applyFog();
-    this.hemi.color.set(pack.hemiSky);
-    this.hemi.groundColor.set(pack.hemiGround);
-    this.sun.color.set(pack.sun);
-    this.sun.position.set(...pack.sunPos);
-    this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 1.02 : 1.45;
-    this.hemi.intensity = theme === "night" ? 1.32 : 0.75;
-    this.fill.color.set(0x8ab4d8);
-    this.fill.intensity = theme === "night" ? 0.4 : 0;
-    this.fill.position.set(12, -42, 18);
-    this.fill.target.position.set(0, 0, 0);
+    this.applyThemeLights(theme);
     this.renderer.toneMappingExposure = pack.exposure;
+    this.scene.environmentIntensity = theme === "night" ? 0.28 : this.quality.environment ? 0.42 : 0;
+    this.tuneBloom(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
     applyGroundMaterial(this.ground, theme, this.textures);
@@ -357,7 +488,11 @@ export class World {
     this.disposables.push(...env.geos, ...env.mats);
     this.textures.push(...env.textures);
     this.nightLights = env.lights;
+    this.applyThemeLights(theme);
+    this.car.setTheme(theme);
+    this.ghost.setTheme(theme);
     this.car.setHeadlights(theme === "night");
+    this.vfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog);
 
     const start = sampleAt(track, 6);
@@ -490,9 +625,14 @@ export class World {
     this.car.applyPose(steer, snap.speed, snap.slide, snap.airborne, dt);
     this.car.setBrakeLights(brake > 0.2);
     this.car.setBoostVisual(Math.max(snap.boost > 0.05 ? 0.6 + snap.boost * 0.4 : 0, snap.driftCharge * 0.35));
+    const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s).width : 12;
+    const curb = isOnCurb(snap.n, width, snap.airborne);
+    if (snap.boost > 0.05) this.vfx.emitTrail(snap, 6);
     if (snap.boost > 0.05 || snap.slide > 0.4 || snap.airborne) {
       this.vfx.emitSparks(snap, snap.boost > 0.05 ? 7 : snap.slide > 0.5 ? 4 : 2, snap.boost > 0.05);
     }
+    if (curb && Math.abs(snap.speed) > 6) this.vfx.emitCurbSparks(snap);
+    if (snap.slide > 0.32 && Math.abs(snap.speed) > 8 && !snap.airborne) this.vfx.emitSmoke(snap, 3);
     this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
@@ -682,6 +822,10 @@ export class World {
       this.fill.target.position.set(snap.px, snap.py, snap.pz);
       this.fill.position.set(snap.px + 10, snap.py - 36, snap.pz + 16);
     }
+    if (this.fill2.intensity > 0) {
+      this.fill2.target.position.set(snap.px, snap.py, snap.pz);
+      this.fill2.position.set(snap.px - 20, snap.py + 32, snap.pz - 12);
+    }
   }
 
   addTrauma(v: number) {
@@ -695,6 +839,53 @@ export class World {
   render() {
     if (this.skyMesh) this.skyMesh.position.copy(this.camera.position);
     this.post.render();
+  }
+
+  private applyThemeLights(theme: ThemeId) {
+    const pack = THEMES[theme];
+    this.hemi.color.set(pack.hemiSky);
+    this.hemi.groundColor.set(pack.hemiGround);
+    this.sun.color.set(pack.sun);
+    this.sun.position.set(...pack.sunPos);
+    this.sun.target.position.set(0, 0, 0);
+    this.sun.intensity = theme === "night" ? 0.95 : theme === "canyon" ? 1.55 : 1.52;
+    this.hemi.intensity = theme === "night" ? 1.32 : theme === "canyon" ? 0.82 : 0.88;
+    const nightFill = theme === "night" && this.quality.nightFills;
+    this.fill.color.set(theme === "night" ? 0xb878d8 : 0x8ab4d8);
+    this.fill.intensity = nightFill ? 0.5 : 0;
+    this.fill.position.set(12, -42, 18);
+    this.fill.target.position.set(0, 0, 0);
+    this.fill2.color.set(theme === "night" ? 0xe890c8 : 0xb8c8dc);
+    this.fill2.intensity = nightFill ? 0.28 : 0;
+    this.fill2.position.set(-22, 36, -14);
+    this.fill2.target.position.set(0, 0, 0);
+    for (const o of this.nightLights) {
+      const pl = o as THREE.PointLight;
+      if (pl.isPointLight) pl.visible = this.quality.nightFills || theme !== "night";
+    }
+  }
+
+  private applyEnvironmentMap() {
+    if (!this.quality.environment) {
+      this.scene.environment = null;
+      return;
+    }
+    if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    if (!this.envMap) {
+      const room = new RoomEnvironment();
+      this.envMap = this.pmrem.fromScene(room, 0.04).texture;
+      room.dispose();
+    }
+    this.scene.environment = this.envMap;
+  }
+
+  private tuneBloom(theme: ThemeId) {
+    const night = theme === "night";
+    this.post.tuneBloom(
+      this.quality.bloomStrength * (night ? 1 : 0.55),
+      this.quality.bloomRadius,
+      night ? Math.min(this.quality.bloomThreshold, 0.8) : Math.max(this.quality.bloomThreshold, 0.91),
+    );
   }
 
   private clearGroup(g: THREE.Group) {
@@ -716,6 +907,8 @@ export class World {
     this.clearGroup(this.envRoot);
     this.vfx.dispose();
     this.post.dispose();
+    this.envMap?.dispose();
+    this.pmrem?.dispose();
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures) t.dispose();
