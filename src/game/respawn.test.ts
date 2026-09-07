@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTrack, sampleAt } from "./track.ts";
-import { CarSim, pickSafeRespawnS } from "./physics.ts";
+import { CarSim, helixNearGate, helixRibbonOverhead, pickSafeRespawnS } from "./physics.ts";
+import { chaseSnapPlacement, clearChaseCamera } from "./scene.ts";
 
 const idle = {
   throttle: 0,
@@ -16,6 +17,28 @@ const idle = {
   back: false,
   menuY: 0,
 };
+
+const cruise = { ...idle, throttle: 0.5 };
+
+function leaveTrackAfterCp1() {
+  const helix = getTrack("helix");
+  const car = new CarSim();
+  car.reset(helix);
+  car.lastCp = 0;
+  car.s = helix.checkpoints[0]! + 8;
+  car.n = 22;
+  car.py = -8;
+  car.airborne = true;
+  return { helix, car };
+}
+
+function portraitChaseAboveRoad(car: CarSim, track: ReturnType<typeof getTrack>) {
+  const snap = car.snap();
+  const pose = chaseSnapPlacement(snap, track, "chase", 390 / 844);
+  clearChaseCamera(pose.cam, snap, track, "chase");
+  const road = sampleAt(track, snap.s);
+  return { snap, cam: pose.cam, road };
+}
 
 describe("leave-track respawn", () => {
   it("keeps Helix flats upright after the first loop", () => {
@@ -44,26 +67,76 @@ describe("leave-track respawn", () => {
     assert.ok(sampleAt(helix, hs).uy > 0.9);
   });
 
-  it("recovers Helix post-CP1 and repeated R onto an upright island", () => {
+  it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
     const helix = getTrack("helix");
-    const car = new CarSim();
-    car.reset(helix);
-    car.lastCp = 0;
-    car.s = helix.checkpoints[0]! + 8;
-    car.n = 20;
-    car.py = -8;
-    car.airborne = true;
+    const cp1 = helix.checkpoints[0]!;
+    const s = pickSafeRespawnS(helix, 0, cp1 + 8);
+    const sm = sampleAt(helix, s);
+    assert.ok(s >= 128 && s <= 140, `post-CP1 island s ${s}`);
+    assert.ok(Math.abs(s - cp1) > 7, `must not sit on CP1 arch s=${s} cp=${cp1}`);
+    assert.ok(sm.uy > 0.95, `sample uy ${sm.uy}`);
+    assert.ok(Math.abs(sm.ty) < 0.15, `sample ty ${sm.ty}`);
+    assert.equal(helixNearGate(helix, s), false);
+    assert.equal(helixRibbonOverhead(helix, sm), false);
+  });
+
+  it("recovers Helix post-CP1 leave-track→R upright with camera above the road", () => {
+    const { helix, car } = leaveTrackAfterCp1();
     for (let r = 0; r < 4; r++) {
-      car.n = 20;
+      car.n = 22;
       car.py = -8;
       car.airborne = true;
       car.respawn(helix);
-      assert.ok(car.uy > 0.9, `R${r} uy ${car.uy}`);
+      assert.ok(car.uy > 0.95, `R${r} uy ${car.uy}`);
       assert.equal(car.airborne, false);
       assert.ok(car.py > -0.2, `R${r} py ${car.py}`);
+      assert.ok(car.s >= 128 && car.s <= 140, `R${r} s ${car.s}`);
       const sm = sampleAt(helix, car.s);
-      assert.ok(sm.uy > 0.85, `R${r} sample uy ${sm.uy} at s=${car.s}`);
-      for (let i = 0; i < 20; i++) car.step(helix, idle, 1 / 60);
+      assert.ok(sm.uy > 0.95, `R${r} sample uy ${sm.uy} at s=${car.s}`);
+      assert.equal(helixNearGate(helix, car.s), false);
+      assert.equal(helixRibbonOverhead(helix, sm), false);
+      const { cam, road, snap } = portraitChaseAboveRoad(car, helix);
+      assert.ok(cam.y > snap.py + 2.2, `R${r} cam above car ${cam.y} vs py ${snap.py}`);
+      assert.ok(cam.y > road.y + 2.2, `R${r} cam above road ${cam.y} vs road ${road.y}`);
+      for (let i = 0; i < 90; i++) car.step(helix, cruise, 1 / 60);
+      assert.ok(car.uy > 0.85, `R${r} after cruise uy ${car.uy}`);
+      assert.equal(car.airborne, false);
+      assert.ok(car.py > -1, `R${r} after cruise py ${car.py}`);
+    }
+  });
+
+  it("recovers Circuit leave-track→R upright with camera above the road", () => {
+    const circuit = getTrack("circuit");
+    const pre = pickSafeRespawnS(circuit, -1, 8);
+    const post = pickSafeRespawnS(circuit, 0, circuit.checkpoints[0]! + 8);
+    assert.ok(pre >= 6 && pre < 50, `circuit #9 pre-CP s ${pre}`);
+    assert.ok(post > 160 && post < 180, `circuit post-CP1 s ${post}`);
+    assert.ok(sampleAt(circuit, pre).uy > 0.9);
+    assert.ok(sampleAt(circuit, post).uy > 0.9);
+
+    for (const lastCp of [-1, 0] as const) {
+      const car = new CarSim();
+      car.reset(circuit);
+      car.lastCp = lastCp;
+      car.s = lastCp < 0 ? 12 : circuit.checkpoints[0]! + 10;
+      for (let r = 0; r < 3; r++) {
+        car.n = 22;
+        car.py = -8;
+        car.airborne = true;
+        car.respawn(circuit);
+        assert.ok(car.uy > 0.9, `circuit cp${lastCp} R${r} uy ${car.uy}`);
+        assert.equal(car.airborne, false);
+        assert.ok(car.py > -0.2, `circuit cp${lastCp} R${r} py ${car.py}`);
+        const sm = sampleAt(circuit, car.s);
+        assert.ok(sm.uy > 0.88, `circuit cp${lastCp} R${r} sample uy ${sm.uy} at s=${car.s}`);
+        const { cam, road, snap } = portraitChaseAboveRoad(car, circuit);
+        assert.ok(cam.y > snap.py + 1.5, `circuit cp${lastCp} R${r} cam above car ${cam.y}`);
+        assert.ok(cam.y > road.y + 1.5, `circuit cp${lastCp} R${r} cam above road ${cam.y}`);
+        for (let i = 0; i < 60; i++) car.step(circuit, cruise, 1 / 60);
+        assert.ok(car.uy > 0.85, `circuit cp${lastCp} R${r} after cruise uy ${car.uy}`);
+        assert.equal(car.airborne, false);
+        assert.ok(car.py > -1, `circuit cp${lastCp} R${r} after cruise py ${car.py}`);
+      }
     }
   });
 

@@ -492,7 +492,7 @@ export function nearestSample(
   y: number,
   z: number,
   hintS: number,
-  opts?: { noWrap?: boolean; minUy?: number },
+  opts?: { noWrap?: boolean; minUy?: number; maxDs?: number; window?: number },
 ): Sample {
   const { samples } = track;
   const n = samples.length;
@@ -503,14 +503,24 @@ export function nearestSample(
   let bestD = Infinity;
   let fallback = best;
   let fallbackD = Infinity;
-  const window = Math.min(n, 80);
+  const window = Math.min(n, opts?.window ?? 80);
   const minUy = opts?.minUy;
+  const maxDs = opts?.maxDs;
   const wrap = track.def.closed && !opts?.noWrap;
+  const L = track.length || 1;
   for (let k = -window; k <= window; k++) {
     let i = start + k;
     if (wrap) i = ((i % n) + n) % n;
     else if (i < 0 || i >= n) continue;
     const sm = samples[i]!;
+    if (maxDs != null) {
+      let ds = sm.s - hintS;
+      if (wrap) {
+        ds = ((ds % L) + L) % L;
+        if (ds > L * 0.5) ds -= L;
+      }
+      if (Math.abs(ds) > maxDs) continue;
+    }
     const d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
     if (d < fallbackD) {
       fallbackD = d;
