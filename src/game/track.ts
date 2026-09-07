@@ -548,7 +548,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 }
 
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
-  stadium: { r: 0.9, g: 0.91, b: 0.93 },
+  stadium: { r: 0.84, g: 0.85, b: 0.87 },
   canyon: { r: 0.18, g: 0.16, b: 0.15 },
   night: { r: 0.36, g: 0.38, b: 0.5 },
 };
@@ -856,8 +856,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   const roadMat = new THREE.MeshStandardMaterial({
     map: asphalt,
     vertexColors: true,
-    roughness: theme === "night" ? 0.3 : theme === "stadium" ? 0.38 : 0.78,
-    metalness: theme === "night" ? 0.2 : theme === "stadium" ? 0.16 : 0.04,
+    roughness: theme === "night" ? 0.3 : theme === "stadium" ? 0.46 : 0.78,
+    metalness: theme === "night" ? 0.2 : theme === "stadium" ? 0.1 : 0.04,
     emissive: theme === "night" ? 0x24304c : 0x000000,
     emissiveIntensity: theme === "night" ? 0.48 : 0,
     side: THREE.DoubleSide,

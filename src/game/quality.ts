@@ -129,6 +129,56 @@ export function fogWindow(
   };
 }
 
+export type ThemeLightLevels = {
+  sun: number;
+  hemi: number;
+  exposure: number;
+  env: number;
+  bloomMul: number;
+  bloomThreshold: number;
+};
+
+/**
+ * Per-theme light / bloom. Ridge + Helix stay on the #16 look.
+ * Green Circuit (stadium) pulls Medium/High so asphalt + car stay readable
+ * instead of washing out under day hemi/sun + High bloom/IBL.
+ */
+export function themeLightLevels(
+  theme: "stadium" | "canyon" | "night",
+  quality: Pick<QualityProfile, "tier" | "environment" | "bloomThreshold">,
+): ThemeLightLevels {
+  if (theme === "night") {
+    return {
+      sun: 0.95,
+      hemi: 1.32,
+      exposure: 1.24,
+      env: 0.28,
+      bloomMul: 1,
+      bloomThreshold: Math.min(quality.bloomThreshold, 0.8),
+    };
+  }
+  if (theme === "canyon") {
+    return {
+      sun: 1.55,
+      hemi: 0.82,
+      exposure: 1.06,
+      env: quality.environment ? 0.42 : 0,
+      bloomMul: 0.55,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.91),
+    };
+  }
+  const high = quality.tier === "high";
+  const med = quality.tier === "medium";
+  return {
+    sun: high ? 1.26 : med ? 1.34 : 1.42,
+    hemi: high ? 0.66 : med ? 0.74 : 0.8,
+    exposure: high ? 0.94 : med ? 1 : 1.06,
+    env: quality.environment ? (high ? 0.18 : 0.26) : 0,
+    bloomMul: high ? 0.28 : 0.4,
+    bloomThreshold: Math.max(quality.bloomThreshold, high ? 0.94 : 0.92),
+  };
+}
+
 export function readSettingsGraphics(): GraphicsKnobs | null {
   if (typeof localStorage === "undefined") return null;
   try {
