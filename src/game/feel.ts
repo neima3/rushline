@@ -1,4 +1,28 @@
+import type { TrackAssist } from "./settings";
 import type { TrackId } from "./types";
+
+export type { TrackAssist };
+
+/** Multipliers on the shipped phone (Medium) racing-line assists. */
+export type TrackAssistScale = {
+  heading: number;
+  plant: number;
+  curbPull: number;
+  curbHeading: number;
+};
+
+export function trackAssistScale(level: TrackAssist = "medium"): TrackAssistScale {
+  switch (level) {
+    case "off":
+      return { heading: 0, plant: 0, curbPull: 0, curbHeading: 0 };
+    case "low":
+      return { heading: 0.4, plant: 0.35, curbPull: 0.4, curbHeading: 0.35 };
+    case "high":
+      return { heading: 1.5, plant: 1.65, curbPull: 1.55, curbHeading: 1.45 };
+    default:
+      return { heading: 1, plant: 1, curbPull: 1, curbHeading: 1 };
+  }
+}
 
 /** First Ridge curve ends ~110; stay planted through that settle. */
 export const CANYON_PLANT_S = 120;
@@ -41,36 +65,56 @@ export function steerCurve(x: number) {
  * Heading return. Release snaps the nose back; light steer bleeds residual
  * yaw so the car does not keep sliding after a thumb twitch.
  */
-export function headingAlign(steerAbs: number, drifting: boolean): number {
-  if (drifting) return 0.26;
-  if (steerAbs < 0.08) return 8.4;
-  if (steerAbs < 0.22) return 1.35;
-  return 0.12;
+export function headingAlign(steerAbs: number, drifting: boolean, assist: TrackAssist = "medium"): number {
+  const k = trackAssistScale(assist).heading;
+  if (k <= 0) return 0;
+  if (drifting) return 0.26 * k;
+  if (steerAbs < 0.08) return 8.4 * k;
+  if (steerAbs < 0.22) return 1.35 * k;
+  return 0.12 * k;
 }
 
 export function driftSteerThreshold(slideHeld: boolean): number {
   return slideHeld ? 0.26 : 1;
 }
 
-export function stayPlanted(trackId: TrackId, s: number): boolean {
+export function stayPlanted(trackId: TrackId, s: number, assist: TrackAssist = "medium"): boolean {
+  if (trackAssistScale(assist).plant <= 0) return false;
   return trackId === "canyon" && s < CANYON_PLANT_S;
 }
 
-export function openingLandLock(trackId: TrackId): number {
-  return trackId === "canyon" ? 1.85 : 0;
+export function openingLandLock(trackId: TrackId, assist: TrackAssist = "medium"): number {
+  if (trackId !== "canyon") return 0;
+  return 1.85 * trackAssistScale(assist).plant;
 }
 
-export function openingHeadingBleed(trackId: TrackId, s: number, steerAbs: number, drifting: boolean): number {
-  if (drifting) return 0;
-  if (trackId === "canyon" && s < CANYON_PLANT_S && steerAbs < 0.28) return 3.6;
-  if (s < 72 && steerAbs < 0.22) return 2.2;
+export function openingHeadingBleed(
+  trackId: TrackId,
+  s: number,
+  steerAbs: number,
+  drifting: boolean,
+  assist: TrackAssist = "medium",
+): number {
+  const k = trackAssistScale(assist).heading;
+  if (k <= 0 || drifting) return 0;
+  if (trackId === "canyon" && s < CANYON_PLANT_S && steerAbs < 0.28) return 3.6 * k;
+  if (s < 72 && steerAbs < 0.22) return 2.2 * k;
   return 0;
 }
 
 /** Nudge Ridge opening back to the racing line unless the player is steering. */
-export function plantLateral(n: number, trackId: TrackId, s: number, steerAbs: number, dt: number): number {
+export function plantLateral(
+  n: number,
+  trackId: TrackId,
+  s: number,
+  steerAbs: number,
+  dt: number,
+  assist: TrackAssist = "medium",
+): number {
   if (trackId !== "canyon" || s >= 110 || steerAbs > 0.2) return n;
-  return n * (1 - Math.min(1, 1.9 * dt));
+  const k = trackAssistScale(assist).plant;
+  if (k <= 0) return n;
+  return n * (1 - Math.min(1, 1.9 * k * dt));
 }
 
 /**
@@ -83,8 +127,13 @@ export function curbSnap(input: {
   width: number;
   trackId: TrackId;
   s: number;
+  assist?: TrackAssist;
 }): { n: number; heading: number; hit: boolean; early: boolean } {
   if (input.trackId === "helix") {
+    return { n: input.n, heading: input.heading, hit: false, early: false };
+  }
+  const scale = trackAssistScale(input.assist ?? "medium");
+  if (scale.curbPull <= 0 && scale.curbHeading <= 0) {
     return { n: input.n, heading: input.heading, hit: false, early: false };
   }
   const asphalt = input.width * 0.5 - 1.18;
@@ -95,12 +144,12 @@ export function curbSnap(input: {
   }
   const early = input.trackId === "circuit" && input.s < CIRCUIT_CURB_S;
   const over = abs - asphalt;
-  const pull = Math.min(over + 0.06, early ? 0.48 : 0.24);
+  const pull = Math.min(over + 0.06, early ? 0.48 : 0.24) * scale.curbPull;
   const sign = Math.sign(input.n) || 1;
   let n = input.n - sign * pull;
   if (Math.abs(n) > wall) n = sign * (wall - 0.05);
-  let heading = input.heading + sign * (early ? 0.2 : 0.1);
-  if (early) heading *= 0.78;
+  let heading = input.heading + sign * (early ? 0.2 : 0.1) * scale.curbHeading;
+  if (early) heading *= 1 - 0.22 * scale.curbHeading;
   return { n, heading, hit: true, early };
 }
 

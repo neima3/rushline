@@ -2,6 +2,9 @@ export const SETTINGS_KEY = "rushline-settings-v1";
 
 export type Quality = "low" | "medium" | "high";
 
+export const TRACK_ASSIST_LEVELS = ["off", "low", "medium", "high"] as const;
+export type TrackAssist = (typeof TRACK_ASSIST_LEVELS)[number];
+
 export type Settings = {
   quality: Quality;
   shadows: boolean;
@@ -15,6 +18,7 @@ export type Settings = {
   fov: number;
   cameraShake: number;
   touchSteerSensitivity: number;
+  trackAssist: TrackAssist;
   autoThrottle: boolean;
   invertSteer: boolean;
   showSpeed: boolean;
@@ -95,6 +99,7 @@ export function defaultSettings(touch = false): Settings {
     fov: 58,
     cameraShake: 1,
     touchSteerSensitivity: 1,
+    trackAssist: touch ? "medium" : "off",
     autoThrottle: touch,
     invertSteer: false,
     showSpeed: true,
@@ -126,6 +131,10 @@ function bool(v: unknown, fallback: boolean) {
   return typeof v === "boolean" ? v : fallback;
 }
 
+export function isTrackAssist(v: unknown): v is TrackAssist {
+  return v === "off" || v === "low" || v === "medium" || v === "high";
+}
+
 export function parseSettings(raw: unknown, touch = false): Settings {
   const base = defaultSettings(touch);
   if (!raw || typeof raw !== "object") return base;
@@ -144,6 +153,7 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     fov: num(o.fov, base.fov, 50, 78),
     cameraShake: num(o.cameraShake, base.cameraShake, 0, 1.5),
     touchSteerSensitivity: num(o.touchSteerSensitivity, base.touchSteerSensitivity, 0.45, 2),
+    trackAssist: isTrackAssist(o.trackAssist) ? o.trackAssist : base.trackAssist,
     autoThrottle: bool(o.autoThrottle, base.autoThrottle),
     invertSteer: bool(o.invertSteer, base.invertSteer),
     showSpeed: bool(o.showSpeed, base.showSpeed),

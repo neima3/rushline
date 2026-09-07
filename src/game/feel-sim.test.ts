@@ -52,6 +52,29 @@ describe("mobile feel sims", () => {
     assert.ok(Math.abs(car.n) < sm.width * 0.5 - 0.55, `still on curb n=${car.n}`);
   });
 
+  it("Off track assist does not racing-line pull Circuit off the curb", () => {
+    const circuit = getTrack("circuit");
+    const setup = (assist: "off" | "medium") => {
+      const car = new CarSim();
+      car.trackAssist = assist;
+      car.reset(circuit);
+      car.s = 40;
+      car.speed = 16;
+      car.n = sampleAt(circuit, 40).width * 0.5 - 0.85;
+      car.heading = -0.22;
+      return car;
+    };
+    const off = setup("off");
+    const med = setup("medium");
+    const startN = off.n;
+    for (let i = 0; i < 12; i++) {
+      off.step(circuit, cruise, 1 / 60);
+      med.step(circuit, cruise, 1 / 60);
+    }
+    assert.ok(Math.abs(med.n) < Math.abs(startN), `medium should snap in, n=${med.n}`);
+    assert.ok(Math.abs(off.n) > Math.abs(med.n), `off ${off.n} should stay wider than medium ${med.n}`);
+  });
+
   it("does not change Helix post-CP1 R parking", () => {
     const helix = getTrack("helix");
     const cp1 = helix.checkpoints[0]!;

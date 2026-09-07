@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { TrackAssist } from "./settings";
 import type { Actions, BuiltTrack, CarSnap } from "./types";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
@@ -79,6 +80,8 @@ export class CarSim {
   justLand = false;
   skipInterp = true;
   justRespawn = false;
+  /** Medium matches the shipped phone racing-line assists. */
+  trackAssist: TrackAssist = "medium";
   private wasSlide = false;
   private airTime = 0;
   private landLock = 0;
@@ -110,7 +113,7 @@ export class CarSim {
     this.skipInterp = true;
     this.wasSlide = false;
     this.airTime = 0;
-    this.landLock = openingLandLock(track.def.id);
+    this.landLock = openingLandLock(track.def.id, this.trackAssist);
     this.airBlend = 0;
     this.recoverLock = 0;
     this.place(track);
@@ -321,17 +324,17 @@ export class CarSim {
     if (slideHeld && !drifting) turn *= 1.08;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
     this.heading += steer * turn * reverse * dt;
-    const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting);
+    const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting, this.trackAssist);
     if (bleed) this.heading *= 1 - bleed * dt;
 
-    const align = headingAlign(steerAbs, drifting);
+    const align = headingAlign(steerAbs, drifting, this.trackAssist);
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
     const maxYaw = drifting ? 0.76 : slideHeld ? 0.48 : 0.33;
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     this.s += this.speed * Math.cos(this.heading) * dt;
     this.n += -this.speed * Math.sin(this.heading) * dt;
-    this.n = plantLateral(this.n, track.def.id, this.s, steerAbs, dt);
+    this.n = plantLateral(this.n, track.def.id, this.s, steerAbs, dt, this.trackAssist);
 
     if (track.def.closed) {
       const L = track.length;
@@ -348,6 +351,7 @@ export class CarSim {
       width: sm.width,
       trackId: track.def.id,
       s: this.s,
+      assist: this.trackAssist,
     });
     this.n = snapped.n;
     this.heading = snapped.heading;
@@ -402,7 +406,7 @@ export class CarSim {
     if (
       this.recoverLock <= 0 &&
       this.landLock <= 0 &&
-      !stayPlanted(track.def.id, this.s) &&
+      !stayPlanted(track.def.id, this.s, this.trackAssist) &&
       shouldLeaveTrack(this.speed, sm.uy)
     ) {
       this.airborne = true;
