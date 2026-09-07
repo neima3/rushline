@@ -11,6 +11,7 @@ export type CarRig = {
   setBrakeLights: (on: boolean) => void;
   setBoostVisual: (amount: number) => void;
   setHeadlights: (on: boolean) => void;
+  setOpacity: (opacity: number) => void;
   applyPose: (steer: number, speed: number, slide: number, airborne: boolean, dt: number) => void;
 };
 
@@ -34,6 +35,7 @@ export function makeCar(ghost: boolean): CarRig {
   const taillights: THREE.Mesh[] = [];
   const flames: THREE.Mesh[] = [];
   const op = ghost ? 0.34 : 1;
+  const baseOpacity: number[] = [];
 
   const mat = (opts: MatOpts) => {
     const base = {
@@ -49,6 +51,7 @@ export function makeCar(ghost: boolean): CarRig {
       ? new THREE.MeshPhysicalMaterial({ ...base, transmission: ghost ? 0 : 0.15, thickness: 0.2 })
       : new THREE.MeshStandardMaterial(base);
     mats.push(m);
+    baseOpacity.push(m.opacity);
     return m;
   };
 
@@ -237,6 +240,15 @@ export function makeCar(ghost: boolean): CarRig {
     setBrakeLights,
     setBoostVisual,
     setHeadlights,
+    setOpacity: (opacity: number) => {
+      const k = ghost ? opacity / 0.34 : 1;
+      mats.forEach((m, i) => {
+        const next = Math.max(0, Math.min(1, (baseOpacity[i] ?? 1) * k));
+        m.opacity = next;
+        m.transparent = next < 0.99;
+        m.needsUpdate = true;
+      });
+    },
     applyPose,
   };
 }

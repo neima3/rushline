@@ -2,7 +2,10 @@ export class GameAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private sfx: GainNode | null = null;
+  private music: GainNode | null = null;
   private engine: GainNode | null = null;
+  private vols = { master: 0.8, sfx: 0.9, music: 0.42 };
+  private musicOsc: OscillatorNode[] = [];
   private osc: OscillatorNode | null = null;
   private osc2: OscillatorNode | null = null;
   private osc3: OscillatorNode | null = null;
@@ -22,13 +25,17 @@ export class GameAudio {
       this.ctx = new AC({ latencyHint: "interactive" });
       this.master = this.ctx.createGain();
       this.sfx = this.ctx.createGain();
+      this.music = this.ctx.createGain();
       this.engine = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 0.72;
-      this.sfx.gain.value = 0.9;
+      this.master.gain.value = this.muted ? 0 : this.vols.master * 0.9;
+      this.sfx.gain.value = this.vols.sfx;
+      this.music.gain.value = this.vols.music * 0.28;
       this.engine.gain.value = 0;
       this.sfx.connect(this.master);
-      this.engine.connect(this.master);
+      this.engine.connect(this.sfx);
+      this.music.connect(this.master);
       this.master.connect(this.ctx.destination);
+      this.startMusic();
 
       this.osc = this.ctx.createOscillator();
       this.osc.type = "sawtooth";
@@ -95,11 +102,58 @@ export class GameAudio {
     if (document.visibilityState === "visible") this.unlock();
   };
 
+  applyVolumes(master: number, sfx: number, music: number) {
+    this.vols = { master, sfx, music };
+    this.syncGains();
+  }
+
+  private syncGains() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.master?.gain.setTargetAtTime(this.muted ? 0 : this.vols.master * 0.9, t, 0.03);
+    this.sfx?.gain.setTargetAtTime(this.vols.sfx, t, 0.03);
+    this.music?.gain.setTargetAtTime(this.vols.music * 0.28, t, 0.05);
+  }
+
   setMuted(m: boolean) {
     this.muted = m;
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(m ? 0 : 0.72, this.ctx.currentTime, 0.03);
+    this.syncGains();
+  }
+
+  private startMusic() {
+    if (!this.ctx || !this.music || this.musicOsc.length) return;
+    const t = this.ctx.currentTime;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 480;
+    filter.Q.value = 0.7;
+    filter.connect(this.music);
+
+    const voices: [number, OscillatorType, number][] = [
+      [110, "sine", 0.16],
+      [164.81, "triangle", 0.07],
+      [220, "sine", 0.05],
+    ];
+    for (const [freq, type, gain] of voices) {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g);
+      g.connect(filter);
+      o.start(t);
+      this.musicOsc.push(o);
     }
+
+    const lfo = this.ctx.createOscillator();
+    const lfoG = this.ctx.createGain();
+    lfo.frequency.value = 0.07;
+    lfoG.gain.value = 90;
+    lfo.connect(lfoG);
+    lfoG.connect(filter.frequency);
+    lfo.start(t);
+    this.musicOsc.push(lfo);
   }
 
   setEngine(speed: number, throttle: number, boost: number, airborne: boolean, slide = 0) {
@@ -184,6 +238,8 @@ export class GameAudio {
       this.osc2?.stop();
       this.osc3?.stop();
       this.scrape?.stop();
+      for (const o of this.musicOsc) o.stop();
+      this.musicOsc = [];
       void this.ctx?.close();
     } catch {
       /* already closed */

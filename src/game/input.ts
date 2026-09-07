@@ -1,6 +1,7 @@
 import type { Actions, PadInfo } from "./types";
 import { padInfoFrom, pollPads, rumblePads } from "./gamepad";
 import { resolveSampleDrive } from "./auto-throttle";
+import { applySteerSettings } from "./settings";
 
 const GAME_CODES = new Set([
   "KeyW",
@@ -32,6 +33,8 @@ export class Input {
   touchSlide = 0;
   autoThrottle = false;
   touchMode = false;
+  touchSteerSensitivity = 1;
+  invertSteer = false;
   /** Throttle from keys / pad / touch before auto-throttle fills in. */
   manualThrottle = 0;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
@@ -194,7 +197,6 @@ export class Input {
     const active = gp != null && performance.now() - this.lastPadUse < 2500;
     this.pad = padInfoFrom(gp, active);
 
-    steer += this.touchSteer;
     const drive = resolveSampleDrive({
       throttle,
       brake,
@@ -211,7 +213,10 @@ export class Input {
     throttle = drive.throttle;
     brake = drive.brake;
 
-    steer = Math.max(-1, Math.min(1, steer));
+    steer = applySteerSettings(steer, 0, this.touchSteer, {
+      sensitivity: this.touchSteerSensitivity,
+      invert: this.invertSteer,
+    });
 
     const slideHeld =
       this.down("Space") ||

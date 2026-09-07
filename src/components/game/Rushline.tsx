@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { Game } from "@/game/Game";
+import { loadSettings } from "@/game/settings";
 import { useGame } from "@/game/store";
 import { Overlay } from "./Overlay";
 import { TouchPad } from "./TouchPad";
@@ -11,9 +12,7 @@ function isTouchPlay(): boolean {
 
 function applyTouchDefaults() {
   if (!isTouchPlay()) return;
-  const store = useGame.getState();
-  store.setTouch(true);
-  store.setAutoThrottle(true);
+  useGame.getState().setTouch(true);
 }
 
 export function Rushline() {
@@ -21,6 +20,7 @@ export function Rushline() {
   const gameRef = useRef<Game | null>(null);
 
   useLayoutEffect(() => {
+    useGame.getState().hydrateSettings(loadSettings());
     applyTouchDefaults();
   }, []);
 

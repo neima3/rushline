@@ -19,6 +19,7 @@ export class Vfx {
   private lastSkid: [number, number, number] | null = null;
   private mats: THREE.Material[] = [];
   private geos: THREE.BufferGeometry[] = [];
+  density = 1;
 
   constructor() {
     this.sparkPos = new Float32Array(MAX_SPARKS * 3);
@@ -60,7 +61,8 @@ export class Vfx {
   }
 
   emitSparks(snap: CarSnap, count: number, boost: boolean) {
-    for (let i = 0; i < count; i++) this.spawnSpark(snap, boost);
+    const n = Math.round(count * this.density);
+    for (let i = 0; i < n; i++) this.spawnSpark(snap, boost);
   }
 
   private spawnSpark(snap: CarSnap, boost: boolean) {
@@ -87,7 +89,7 @@ export class Vfx {
   }
 
   skid(snap: CarSnap, active: boolean) {
-    if (!active || snap.airborne) {
+    if (!active || snap.airborne || this.density < 0.12) {
       this.lastSkid = null;
       return;
     }
