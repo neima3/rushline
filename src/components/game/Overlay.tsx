@@ -1,5 +1,5 @@
 import type { ReactNode, RefObject } from "react";
-import { Flag, Gamepad2, Gauge, Pause, Settings2, Volume2, VolumeX } from "lucide-react";
+import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
 import { allTrackDefs, getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
@@ -39,7 +39,7 @@ export function Overlay({ gameRef }: Props) {
           onClick={() => setSettingsOpen(true)}
           aria-label="Settings"
         >
-          <Settings2 className="size-4" strokeWidth={1.75} />
+          <Settings className="size-4" strokeWidth={1.75} />
         </button>
       ) : null}
 

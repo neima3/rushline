@@ -117,7 +117,7 @@ type GameStore = {
   refreshBest: () => void;
 };
 
-const bootSettings = typeof window === "undefined" ? defaultSettings(false) : loadSettings();
+const bootSettings = defaultSettings(false);
 
 export const useGame = create<GameStore>((set) => ({
   phase: "menu",
