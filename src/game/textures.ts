@@ -31,7 +31,7 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
   const d = img.data;
   const base =
     theme === "stadium"
-      ? [176, 178, 182]
+      ? [198, 200, 204]
       : theme === "canyon"
         ? [36, 32, 30]
         : [28, 30, 42];
@@ -70,9 +70,9 @@ export function makeLiveryTexture(night: boolean): THREE.CanvasTexture {
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = night ? "#3de8ff" : "#ef5a24";
   ctx.save();
-  ctx.transform(1, 0, -0.72, 1, 0, 0);
-  for (let i = -size; i < size * 2; i += 26) {
-    ctx.fillRect(i, -16, 12, size + 32);
+  ctx.transform(1, 0, -0.78, 1, 0, 0);
+  for (let i = -size; i < size * 2; i += 28) {
+    ctx.fillRect(i, -16, 15, size + 32);
   }
   ctx.restore();
   ctx.globalAlpha = 0.22;

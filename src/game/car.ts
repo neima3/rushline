@@ -80,8 +80,7 @@ export function makeCar(ghost: boolean): CarRig {
     (bodyMat as THREE.MeshStandardMaterial).map = dayLivery;
     (bodyMat as THREE.MeshStandardMaterial).needsUpdate = true;
   }
-  const navy = mat({ color: 0x1a1a1e, roughness: 0.4, metalness: 0.45, clearcoat: 0.22, clearcoatRoughness: 0.32 });
-  const carbon = mat({ color: 0x101014, roughness: 0.4, metalness: 0.74 });
+  const carbon = mat({ color: 0x1a1a1e, roughness: 0.4, metalness: 0.55, clearcoat: 0.18, clearcoatRoughness: 0.3 });
   const glass = mat({
     color: 0x0c1218,
     roughness: 0.06,
@@ -139,7 +138,7 @@ export function makeCar(ghost: boolean): CarRig {
   add(mesh(new THREE.BoxGeometry(0.05, 0.035, 1.7), accent)).position.set(0.18, 0.47, 0.02);
   add(mesh(new THREE.BoxGeometry(0.05, 0.035, 1.7), accent)).position.set(-0.18, 0.47, 0.02);
   for (const x of [-0.55, 0.55]) {
-    const flank = add(mesh(new THREE.BoxGeometry(0.05, 0.16, 1.15), navy));
+    const flank = add(mesh(new THREE.BoxGeometry(0.05, 0.16, 1.15), bodyMat));
     flank.position.set(x, 0.34, -0.02);
   }
   add(mesh(new THREE.BoxGeometry(1.14, 0.08, 1.48), carbon)).position.set(0, 0.2, 0);
@@ -149,7 +148,7 @@ export function makeCar(ghost: boolean): CarRig {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
   }
-  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), carbon));
+  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), bodyMat));
   wing.position.set(0, 0.62, -1.05);
   for (const x of [-0.58, 0.58]) {
     const plate = add(mesh(new THREE.BoxGeometry(0.04, 0.16, 0.24), carbon));
@@ -286,7 +285,7 @@ export function makeCar(ghost: boolean): CarRig {
     }
     bm.emissive.setHex(night ? 0x1a2848 : 0x000000);
     bm.emissiveIntensity = night ? 0.22 : 0;
-    (navy as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
+    (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
     (accent as THREE.MeshStandardMaterial).color.setHex(night ? 0x3de8ff : 0xef5a24);
     (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? 0x146880 : 0x4a1808);
     (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;

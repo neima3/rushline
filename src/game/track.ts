@@ -548,7 +548,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
 }
 
 const THEME_ROAD: Record<ThemeId, { r: number; g: number; b: number }> = {
-  stadium: { r: 0.82, g: 0.83, b: 0.85 },
+  stadium: { r: 0.9, g: 0.91, b: 0.93 },
   canyon: { r: 0.18, g: 0.16, b: 0.15 },
   night: { r: 0.36, g: 0.38, b: 0.5 },
 };
@@ -667,9 +667,9 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     strip(roadPos, roadNrm, roadCol, roadUv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
 
     const stripe = Math.floor(a.s / 2.0) % 2 === 0;
-    const cw = theme === "stadium" ? 0.64 : 0.55;
-    const ch = theme === "stadium" ? 0.15 : 0.12;
-    const lift = 0.02;
+    const cw = theme === "stadium" ? 0.7 : 0.55;
+    const ch = theme === "stadium" ? 0.22 : 0.12;
+    const lift = theme === "stadium" ? 0.04 : 0.02;
     for (const side of [-1, 1] as const) {
       const aox = side < 0 ? alx : arx;
       const aoy = side < 0 ? aly : ary;
@@ -793,8 +793,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
       strip(markPos, markNrm, markCol, markUv, ly0x, ly0y, ly0z, ly1x, ly1y, ly1z, ly2x, ly2y, ly2z, ly3x, ly3y, ly3z, a.ux, a.uy, a.uz, white, u0, u1);
     }
 
-    const edgeW = theme === "canyon" ? 0.16 : 0.09;
-    const inset = theme === "canyon" ? 0.18 : 0.28;
+    const edgeW = theme === "canyon" ? 0.24 : 0.09;
+    const inset = theme === "canyon" ? 0.12 : 0.28;
     const edgeCol =
       theme === "stadium"
         ? { r: 0.98, g: 0.98, b: 0.96 }
@@ -856,8 +856,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
   const roadMat = new THREE.MeshStandardMaterial({
     map: asphalt,
     vertexColors: true,
-    roughness: theme === "night" ? 0.3 : theme === "stadium" ? 0.46 : 0.78,
-    metalness: theme === "night" ? 0.2 : theme === "stadium" ? 0.1 : 0.04,
+    roughness: theme === "night" ? 0.3 : theme === "stadium" ? 0.38 : 0.78,
+    metalness: theme === "night" ? 0.2 : theme === "stadium" ? 0.16 : 0.04,
     emissive: theme === "night" ? 0x24304c : 0x000000,
     emissiveIntensity: theme === "night" ? 0.48 : 0,
     side: THREE.DoubleSide,

@@ -215,7 +215,7 @@ function buildCanyon(
   mats.push(rockDark, rockLite);
 
   const mesaGeo = new THREE.CylinderGeometry(1, 1.4, 1, 6);
-  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xc86a38, roughness: 0.9 });
+  const mesaMat = new THREE.MeshStandardMaterial({ color: 0xe07838, roughness: 0.88 });
   const mesaPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number }[] = [];
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + 0.4;
@@ -248,7 +248,7 @@ function buildCanyon(
   mats.push(mesaMat);
 
   const cactusGeo = new THREE.CylinderGeometry(0.22, 0.28, 2.4, 6);
-  const cactusMat = new THREE.MeshStandardMaterial({ color: 0x3d6a3a, roughness: 0.8 });
+  const cactusMat = new THREE.MeshStandardMaterial({ color: 0x6a7048, roughness: 0.88 });
   const cacti = new THREE.InstancedMesh(cactusGeo, cactusMat, 24);
   for (let i = 0; i < 24; i++) {
     const sm = track.samples[Math.floor((i / 24) * track.samples.length)]!;
