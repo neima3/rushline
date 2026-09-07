@@ -30,7 +30,7 @@ void main() {
   vec3 dir = normalize(vDir);
   vec3 sky = fogColor;
   if (hasMap > 0.5) {
-    sky = sRGBToLinear(texture2D(map, dirToEquirect(dir))).rgb;
+    sky = sRGBTransferEOTF(texture2D(map, dirToEquirect(dir))).rgb;
   }
   float w = smoothstep(-0.1, 0.28, dir.y);
   gl_FragColor = vec4(mix(fogColor, sky * tint, w), 1.0);
