@@ -20,7 +20,7 @@ export function Minimap({ trackId, s, n, heading, ghostS, ghostN }: Props) {
 
   return (
     <div
-      className="pointer-events-none h-[5.75rem] w-[5.75rem] overflow-hidden rounded-lg border border-border bg-bg/70 p-1.5 backdrop-blur-sm md:h-32 md:w-32"
+      className="hud-minimap pointer-events-none h-[5.75rem] w-[5.75rem] overflow-hidden rounded-lg p-1.5 md:h-32 md:w-32"
       aria-hidden
     >
       <svg viewBox="0 0 100 100" className="size-full">

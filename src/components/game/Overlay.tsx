@@ -409,16 +409,16 @@ function Hud({
         <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} ticks />
       </div>
       {wrongWay ? (
-        <p className="absolute left-1/2 top-1/3 -translate-x-1/2 font-display text-3xl tracking-wide text-danger">
+        <p className="hud-wrong-way absolute left-1/2 top-1/3 -translate-x-1/2 font-display text-3xl tracking-wide text-danger">
           Wrong way
         </p>
       ) : null}
       {countdown != null && countdown > 0 ? (
-        <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-8xl leading-none">
+        <p className="hud-countdown absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-8xl leading-none">
           {countdown}
         </p>
       ) : countdown === 0 ? (
-        <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-7xl leading-none">
+        <p className="hud-countdown hud-countdown-go absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-display text-7xl leading-none">
           GO
         </p>
       ) : null}
@@ -442,13 +442,13 @@ function Meter({
   if (!show) return null;
   const filled = Math.max(0, Math.min(1, value));
   return (
-    <div className="mt-2 w-20 md:ml-auto">
-      <p className={cn("text-[10px] uppercase tracking-widest", tone === "ok" ? "text-ok" : "text-medal-gold")}>
+    <div className="hud-meter mt-2 w-20 md:ml-auto">
+      <p className={cn("hud-meter-label text-[10px] uppercase tracking-widest", tone === "ok" ? "text-ok" : "text-medal-gold")}>
         {label}
       </p>
-      <div className="relative mt-1 h-1 overflow-hidden rounded-full bg-border">
+      <div className="hud-meter-track relative mt-1 h-1.5 overflow-hidden rounded-full">
         <div
-          className={cn("h-full", tone === "ok" ? "bg-ok" : "bg-medal-gold")}
+          className={cn("hud-meter-fill h-full", tone === "ok" ? "hud-meter-fill-ok" : "hud-meter-fill-gold")}
           style={{ width: `${Math.round(filled * 100)}%` }}
         />
         {ticks

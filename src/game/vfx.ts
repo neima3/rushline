@@ -42,23 +42,23 @@ export class Vfx {
   constructor() {
     this.sparks = this.makeCloud(MAX_SPARKS, {
       color: 0xffc878,
-      size: 0.12,
+      size: 0.14,
       map: sparkSprite(),
-      opacity: 0.95,
+      opacity: 0.96,
       additive: true,
     });
     this.smoke = this.makeCloud(MAX_SMOKE, {
       color: 0xc8c4bc,
-      size: 0.42,
+      size: 0.46,
       map: smokeSprite(),
-      opacity: 0.42,
+      opacity: 0.4,
       additive: false,
     });
     this.trail = this.makeCloud(MAX_TRAIL, {
       color: 0xffb45a,
-      size: 0.22,
+      size: 0.28,
       map: trailSprite(),
-      opacity: 0.88,
+      opacity: 0.92,
       additive: true,
     });
     this.textures.push(
@@ -76,7 +76,7 @@ export class Vfx {
     const skidMat = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.68,
       depthWrite: false,
     });
     this.skidMesh = new THREE.LineSegments(this.skidGeo, skidMat);
@@ -102,8 +102,9 @@ export class Vfx {
     this.trailColor.setHex(night ? 0x4ef0ff : 0xff8a3a);
     (this.trail.points.material as THREE.PointsMaterial).color.copy(this.trailColor);
     (this.smoke.points.material as THREE.PointsMaterial).color.setHex(canyon ? 0xc4a078 : night ? 0xb8a0d0 : 0xc8c4bc);
-    (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : 0xffc878);
-    (this.sparks.points.material as THREE.PointsMaterial).size = night ? 0.16 : 0.14;
+    (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : 0xffd090);
+    (this.sparks.points.material as THREE.PointsMaterial).size = night ? 0.18 : 0.15;
+    (this.trail.points.material as THREE.PointsMaterial).size = night ? 0.32 : 0.28;
   }
 
   emitSparks(snap: CarSnap, count: number, boost: boolean) {
@@ -158,6 +159,7 @@ export class Vfx {
     const life = new Float32Array(max);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("life", new THREE.BufferAttribute(life, 1));
     const mat = new THREE.PointsMaterial({
       color: opts.color,
       size: opts.size,
@@ -168,6 +170,17 @@ export class Vfx {
       sizeAttenuation: true,
       blending: opts.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
+    mat.customProgramCacheKey = () => "rushline-vfx-life";
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = `attribute float life;\nvarying float vLife;\n${shader.vertexShader}`.replace(
+        "void main() {",
+        "void main() {\n\tvLife = max(life, 0.0);",
+      );
+      shader.fragmentShader = `varying float vLife;\n${shader.fragmentShader}`.replace(
+        "#include <color_fragment>",
+        "diffuseColor.a *= smoothstep(0.0, 0.11, vLife);\n#include <color_fragment>",
+      );
+    };
     const points = new THREE.Points(geo, mat);
     points.frustumCulled = false;
     this.root.add(points);
@@ -183,36 +196,39 @@ export class Vfx {
     kind: "spark" | "boostSpark" | "curb" | "smoke" | "trail" | "land" | "turbo",
   ) {
     const slot = pickSlot(cloud.life, cap);
-    const rear = kind === "trail" || kind === "turbo" ? 1.15 : kind === "land" ? 0.35 : 1.02;
-    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" ? 1.15 : 0.7);
+    const rear = kind === "trail" || kind === "turbo" ? 1.22 : kind === "land" ? 0.35 : 1.02;
+    const pipe = kind === "trail" || kind === "turbo" || kind === "boostSpark" ? (Math.random() < 0.5 ? -0.2 : 0.2) : 0;
+    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" ? 1.15 : 0.55);
+    const rx = -snap.fz;
+    const rz = snap.fx;
     cloud.life[slot] =
       kind === "smoke" || kind === "land"
-        ? 0.45 + Math.random() * 0.4
+        ? 0.5 + Math.random() * 0.42
         : kind === "trail" || kind === "turbo"
-          ? 0.18 + Math.random() * 0.2
-          : 0.22 + Math.random() * 0.26;
-    cloud.pos[slot * 3] = snap.px - snap.fx * rear + (kind === "smoke" || kind === "land" ? -snap.fz : 1) * side * 0.35;
-    cloud.pos[slot * 3 + 1] = snap.py + (kind === "land" ? 0.02 : kind === "smoke" ? 0.12 : 0.08) + Math.random() * 0.1;
-    cloud.pos[slot * 3 + 2] = snap.pz - snap.fz * rear + (kind === "smoke" || kind === "land" ? snap.fx : 1) * side * 0.35;
+          ? 0.26 + Math.random() * 0.2
+          : 0.24 + Math.random() * 0.28;
+    cloud.pos[slot * 3] = snap.px - snap.fx * rear + rx * pipe + (kind === "smoke" || kind === "land" ? rx : 1) * side * 0.35;
+    cloud.pos[slot * 3 + 1] = snap.py + (kind === "land" ? 0.02 : kind === "smoke" ? 0.12 : 0.1) + Math.random() * 0.1;
+    cloud.pos[slot * 3 + 2] = snap.pz - snap.fz * rear + rz * pipe + (kind === "smoke" || kind === "land" ? rz : 1) * side * 0.35;
     if (kind === "smoke" || kind === "land") {
       const up = kind === "land" ? 1.8 : 0.55;
       cloud.vel[slot * 3] = -snap.fx * (0.6 + Math.random()) + (Math.random() - 0.5) * (kind === "land" ? 2.4 : 0.8);
       cloud.vel[slot * 3 + 1] = up + Math.random() * 0.9;
       cloud.vel[slot * 3 + 2] = -snap.fz * (0.6 + Math.random()) + (Math.random() - 0.5) * (kind === "land" ? 2.4 : 0.8);
     } else if (kind === "trail" || kind === "turbo") {
-      const punch = kind === "turbo" ? 9 : 6;
-      cloud.vel[slot * 3] = -snap.fx * (punch + Math.random() * 4) + (Math.random() - 0.5) * 0.8;
-      cloud.vel[slot * 3 + 1] = 0.15 + Math.random() * 0.45;
-      cloud.vel[slot * 3 + 2] = -snap.fz * (punch + Math.random() * 4) + (Math.random() - 0.5) * 0.8;
+      const punch = kind === "turbo" ? 9 : 7.2;
+      cloud.vel[slot * 3] = -snap.fx * (punch + Math.random() * 4.5) + rx * (Math.random() - 0.5) * 0.45;
+      cloud.vel[slot * 3 + 1] = 0.08 + Math.random() * 0.28;
+      cloud.vel[slot * 3 + 2] = -snap.fz * (punch + Math.random() * 4.5) + rz * (Math.random() - 0.5) * 0.45;
     } else if (kind === "curb") {
       cloud.vel[slot * 3] = -snap.fx * (1.2 + Math.random() * 2) + (Math.random() - 0.5) * 3.2;
       cloud.vel[slot * 3 + 1] = 1.4 + Math.random() * 2.4;
       cloud.vel[slot * 3 + 2] = -snap.fz * (1.2 + Math.random() * 2) + (Math.random() - 0.5) * 3.2;
     } else {
       const boost = kind === "boostSpark";
-      cloud.vel[slot * 3] = -snap.fx * (2 + Math.random() * 4) + (Math.random() - 0.5) * 2;
-      cloud.vel[slot * 3 + 1] = (boost ? 2.2 : 0.6) + Math.random() * 2;
-      cloud.vel[slot * 3 + 2] = -snap.fz * (2 + Math.random() * 4) + (Math.random() - 0.5) * 2;
+      cloud.vel[slot * 3] = -snap.fx * (2.4 + Math.random() * 4.4) + rx * (Math.random() - 0.5) * (boost ? 2.6 : 2);
+      cloud.vel[slot * 3 + 1] = (boost ? 2.6 : 0.6) + Math.random() * 2.2;
+      cloud.vel[slot * 3 + 2] = -snap.fz * (2.4 + Math.random() * 4.4) + rz * (Math.random() - 0.5) * (boost ? 2.6 : 2);
     }
   }
 
@@ -284,6 +300,8 @@ function stepCloud(cloud: Cloud, cap: number, dt: number, gravity: number, drag:
     }
   }
   (cloud.points.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+  const lifeAttr = cloud.points.geometry.getAttribute("life") as THREE.BufferAttribute | undefined;
+  if (lifeAttr) lifeAttr.needsUpdate = true;
 }
 
 function pickSlot(life: Float32Array, cap: number) {
@@ -306,19 +324,20 @@ function sparkSprite() {
   const cx = 24;
   const cy = 24;
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 22);
-  g.addColorStop(0, "rgba(255,255,240,1)");
-  g.addColorStop(0.28, "rgba(255,200,90,0.9)");
-  g.addColorStop(1, "rgba(255,80,20,0)");
+  g.addColorStop(0, "rgba(255,255,248,1)");
+  g.addColorStop(0.18, "rgba(255,230,160,0.95)");
+  g.addColorStop(0.42, "rgba(255,140,50,0.55)");
+  g.addColorStop(1, "rgba(255,40,10,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 48, 48);
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = "rgba(255,240,200,0.85)";
-  ctx.lineWidth = 1.4;
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
+  ctx.strokeStyle = "rgba(255,248,220,0.7)";
+  ctx.lineWidth = 1.15;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20);
+    ctx.lineTo(cx + Math.cos(a) * 18, cy + Math.sin(a) * 18);
     ctx.stroke();
   }
   const t = new THREE.CanvasTexture(c);
@@ -328,18 +347,31 @@ function sparkSprite() {
 
 function trailSprite() {
   const c = document.createElement("canvas");
-  c.width = 24;
-  c.height = 48;
+  c.width = 32;
+  c.height = 64;
   const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(12, 0, 12, 48);
+  const g = ctx.createLinearGradient(16, 0, 16, 64);
   g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(0.35, "rgba(180,255,255,0.85)");
-  g.addColorStop(1, "rgba(255,80,180,0)");
+  g.addColorStop(0.22, "rgba(255,250,230,0.95)");
+  g.addColorStop(0.55, "rgba(255,150,70,0.75)");
+  g.addColorStop(1, "rgba(255,40,80,0)");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.moveTo(12, 2);
-  ctx.lineTo(20, 44);
-  ctx.lineTo(4, 44);
+  ctx.moveTo(16, 2);
+  ctx.lineTo(26, 58);
+  ctx.lineTo(6, 58);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = "lighter";
+  const core = ctx.createLinearGradient(16, 8, 16, 56);
+  core.addColorStop(0, "rgba(255,255,255,0)");
+  core.addColorStop(0.4, "rgba(255,255,255,0.85)");
+  core.addColorStop(1, "rgba(255,180,80,0)");
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.moveTo(16, 10);
+  ctx.lineTo(20, 54);
+  ctx.lineTo(12, 54);
   ctx.closePath();
   ctx.fill();
   const t = new THREE.CanvasTexture(c);
@@ -351,10 +383,10 @@ function smokeSprite() {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(32, 32, 4, 32, 32, 30);
-  g.addColorStop(0, "rgba(230,228,222,0.55)");
-  g.addColorStop(0.45, "rgba(180,176,168,0.28)");
-  g.addColorStop(1, "rgba(120,118,112,0)");
+  const g = ctx.createRadialGradient(32, 30, 3, 32, 32, 30);
+  g.addColorStop(0, "rgba(236,234,228,0.5)");
+  g.addColorStop(0.4, "rgba(176,172,164,0.26)");
+  g.addColorStop(1, "rgba(110,108,102,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c);

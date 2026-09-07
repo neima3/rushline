@@ -142,6 +142,7 @@ export type ThemeLightLevels = {
  * Per-theme light / bloom. Ridge + Helix stay on the #16 look.
  * Green Circuit (stadium) pulls Medium/High so asphalt + car stay readable
  * instead of washing out under day hemi/sun + High bloom/IBL.
+ * High env stays 0.08 — sky IBL may replace the studio room, not the intensity.
  */
 export function themeLightLevels(
   theme: "stadium" | "canyon" | "night",

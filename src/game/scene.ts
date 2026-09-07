@@ -4,6 +4,7 @@ import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./typ
 import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
+import { bakeSkyEnvironment, SkyDome } from "./sky";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
 import type { Settings } from "./settings";
@@ -38,6 +39,7 @@ type ThemePack = {
   sunPos: [number, number, number];
   exposure: number;
   sky: string;
+  skyTint: number;
 };
 
 const _snapCam = new THREE.Vector3();
@@ -160,6 +162,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sunPos: [90, 110, 28],
     exposure: 1.06,
     sky: "/textures/sky-stadium.jpg",
+    skyTint: 0xf4f7fb,
   },
   canyon: {
     fog: 0xd49268,
@@ -170,6 +173,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sunPos: [-90, 22, 48],
     exposure: 1.06,
     sky: "/textures/sky-canyon.jpg",
+    skyTint: 0xffe4cc,
   },
   night: {
     fog: 0x2c2848,
@@ -180,6 +184,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sunPos: [20, 80, -40],
     exposure: 1.24,
     sky: "/textures/sky-night.jpg",
+    skyTint: 0xe6dcff,
   },
 };
 
@@ -195,13 +200,15 @@ export class World {
   private sun: THREE.DirectionalLight;
   private fill: THREE.DirectionalLight;
   private fill2: THREE.DirectionalLight;
-  private skyMesh: THREE.Mesh | null = null;
+  private sky: SkyDome | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
   private post: PostFx;
   private quality: QualityProfile = resolveQuality();
   private pmrem: THREE.PMREMGenerator | null = null;
-  private envMap: THREE.Texture | null = null;
+  private roomEnvRT: THREE.WebGLRenderTarget | null = null;
+  private skyEnvRT: THREE.WebGLRenderTarget | null = null;
+  private skyTex: THREE.Texture | null = null;
   private viewW = 800;
   private viewH = 600;
   private disposables: { dispose: () => void }[] = [];
@@ -269,7 +276,8 @@ export class World {
     this.sun.shadow.camera.right = 70;
     this.sun.shadow.camera.top = 70;
     this.sun.shadow.camera.bottom = -70;
-    this.sun.shadow.bias = -0.0003;
+    this.sun.shadow.bias = -0.00028;
+    this.sun.shadow.normalBias = 0.028;
     this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target, this.fill2, this.fill2.target);
 
     const groundGeo = new THREE.PlaneGeometry(900, 900);
@@ -496,7 +504,7 @@ export class World {
     this.ghost.setTheme(theme);
     this.car.setHeadlights(theme === "night");
     this.vfx.setTheme(theme);
-    this.loadSky(pack.sky, pack.fog);
+    this.loadSky(pack.sky, pack.fog, pack.skyTint);
 
     const start = sampleAt(track, 6);
     this.camFwd.set(start.tx, start.ty, start.tz).normalize();
@@ -546,35 +554,30 @@ export class World {
     clearChaseCamera(this.camPos, snap, track, mode);
   }
 
-  private loadSky(url: string, fog: number) {
-    if (this.skyMesh) {
-      this.scene.remove(this.skyMesh);
-      this.skyMesh.geometry.dispose();
-      (this.skyMesh.material as THREE.Material).dispose();
-      this.skyMesh = null;
+  private loadSky(url: string, fog: number, tint: number) {
+    if (this.sky) {
+      this.scene.remove(this.sky.mesh);
+      this.sky.dispose();
+      this.sky = null;
     }
-    const geo = new THREE.SphereGeometry(420, 32, 20);
-    const mat = new THREE.MeshBasicMaterial({
-      color: fog,
-      side: THREE.BackSide,
-      fog: false,
-      depthWrite: false,
-    });
-    this.skyMesh = new THREE.Mesh(geo, mat);
-    this.scene.add(this.skyMesh);
+    this.skyEnvRT?.dispose();
+    this.skyEnvRT = null;
+    this.skyTex = null;
+    this.sky = new SkyDome(fog, tint);
+    this.scene.add(this.sky.mesh);
     this.loader.load(
       url,
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 4;
-        mat.map = tex;
-        mat.color.set(0xffffff);
-        mat.needsUpdate = true;
+        tex.anisotropy = 6;
+        this.skyTex = tex;
+        this.sky?.setMap(tex);
         this.textures.push(tex);
+        this.bakeSkyEnv(tex);
       },
       undefined,
       () => {
-        /* keep solid color */
+        this.applyEnvironmentMap();
       },
     );
   }
@@ -653,9 +656,9 @@ export class World {
     );
     const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s).width : 12;
     const curb = isOnCurb(snap.n, width, snap.airborne);
-    if (snap.boost > 0.05) this.vfx.emitTrail(snap, 7);
+    if (snap.boost > 0.05) this.vfx.emitTrail(snap, 9);
     if (snap.boost > 0.05 || snap.slide > 0.4 || snap.airborne) {
-      this.vfx.emitSparks(snap, snap.boost > 0.05 ? 8 : snap.slide > 0.5 ? 5 : 2, snap.boost > 0.05);
+      this.vfx.emitSparks(snap, snap.boost > 0.05 ? 9 : snap.slide > 0.5 ? 4 : 2, snap.boost > 0.05);
     }
     if (curb && Math.abs(snap.speed) > 6) this.vfx.emitCurbSparks(snap);
     if (snap.slide > 0.32 && Math.abs(snap.speed) > 8 && !snap.airborne) this.vfx.emitSmoke(snap, 4);
@@ -873,7 +876,7 @@ export class World {
   }
 
   render() {
-    if (this.skyMesh) this.skyMesh.position.copy(this.camera.position);
+    if (this.sky) this.sky.mesh.position.copy(this.camera.position);
     this.post.render();
   }
 
@@ -904,18 +907,35 @@ export class World {
     }
   }
 
+  private bakeSkyEnv(tex: THREE.Texture) {
+    if (!this.quality.environment) return;
+    if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    const rt = bakeSkyEnvironment(this.pmrem, tex);
+    this.skyEnvRT?.dispose();
+    this.skyEnvRT = rt;
+    this.scene.environment = rt.texture;
+  }
+
   private applyEnvironmentMap() {
     if (!this.quality.environment) {
       this.scene.environment = null;
       return;
     }
     if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
-    if (!this.envMap) {
+    if (!this.skyEnvRT && this.skyTex) {
+      this.bakeSkyEnv(this.skyTex);
+      return;
+    }
+    if (this.skyEnvRT) {
+      this.scene.environment = this.skyEnvRT.texture;
+      return;
+    }
+    if (!this.roomEnvRT) {
       const room = new RoomEnvironment();
-      this.envMap = this.pmrem.fromScene(room, 0.04).texture;
+      this.roomEnvRT = this.pmrem.fromScene(room, 0.04);
       room.dispose();
     }
-    this.scene.environment = this.envMap;
+    this.scene.environment = this.roomEnvRT.texture;
   }
 
   private tuneBloom(theme: ThemeId) {
@@ -946,17 +966,15 @@ export class World {
     this.clearGroup(this.envRoot);
     this.vfx.dispose();
     this.post.dispose();
-    this.envMap?.dispose();
+    this.skyEnvRT?.dispose();
+    this.roomEnvRT?.dispose();
     this.pmrem?.dispose();
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures) t.dispose();
     this.car.mats.forEach((m) => m.dispose());
     this.ghost.mats.forEach((m) => m.dispose());
-    if (this.skyMesh) {
-      this.skyMesh.geometry.dispose();
-      (this.skyMesh.material as THREE.Material).dispose();
-    }
+    this.sky?.dispose();
   }
 }
 
