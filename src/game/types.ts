@@ -120,6 +120,9 @@ export type HudState = {
   driftCharge: number;
   s: number;
   n: number;
+  heading: number;
+  ghostS: number | null;
+  ghostN: number | null;
 };
 
 export type ResultsState = {

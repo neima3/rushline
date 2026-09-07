@@ -4,6 +4,8 @@ import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
+import { PostFx } from "./postfx";
+import { qualityProfile, type Settings } from "./settings";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -37,6 +39,7 @@ export function chaseSnapPlacement(
   track: BuiltTrack | null,
   mode: CameraMode,
   aspect: number,
+  chaseDistance = 1,
 ): { cam: THREE.Vector3; look: THREE.Vector3 } {
   const helixSnap = track?.def.id === "helix";
   _snapFwd.set(snap.fx, 0, snap.fz);
@@ -52,7 +55,7 @@ export function chaseSnapPlacement(
   const portrait = aspect > 0 && aspect < 0.72;
   const hood = mode === "hood";
   let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? (helixSnap ? 4.35 : 3.7) : helixSnap ? 3.8 : 2.55;
-  let dist = hood ? 0.52 : (helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0);
+  let dist = hood ? 0.52 : ((helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0)) * chaseDistance;
   // Helix only: pre-CP R sits near the start. A 7m chase pull-back walks
   // through the finish seam and reads as under-geo at night.
   if (helixSnap && !hood && snap.s < dist + 6) {
@@ -180,6 +183,7 @@ export class World {
   private skyMesh: THREE.Mesh | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
+  private post: PostFx;
   private disposables: { dispose: () => void }[] = [];
   private textures: THREE.Texture[] = [];
   private camPos = new THREE.Vector3(0, 8, 16);
@@ -193,6 +197,15 @@ export class World {
   private nightLights: THREE.Object3D[] = [];
   private theme: ThemeId = "stadium";
   private builtTrack: BuiltTrack | null = null;
+  private fogBase = { near: 80, far: 440 };
+  private fogNearMul = 1;
+  private fogFarMul = 1;
+  private dprCap = 2;
+  private camDistance = 1;
+  private camFov = 58;
+  private camShake = 1;
+  private ghostOpacity = 0.34;
+  private cameraFar = 900;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -244,15 +257,59 @@ export class World {
     this.ghost = makeCar(true);
     this.ghost.group.visible = false;
     this.scene.add(this.car.group, this.ghost.group, this.vfx.root);
+    this.post = new PostFx(this.renderer, this.scene, this.camera);
     this.disposables.push(groundGeo, this.ground.material as THREE.Material);
+  }
+
+  applySettings(s: Settings) {
+    const q = qualityProfile(s.quality);
+    this.camDistance = s.chaseDistance;
+    this.camFov = s.fov;
+    this.camShake = s.cameraShake;
+    this.vfx.density = q.particleDensity;
+    if (this.ghostOpacity !== s.ghostOpacity) {
+      this.ghostOpacity = s.ghostOpacity;
+      this.ghost.setOpacity(s.ghostOpacity);
+    }
+    const dprChanged = this.dprCap !== q.dprCap;
+    const fogChanged = this.fogNearMul !== q.fogNearMul || this.fogFarMul !== q.fogFarMul || this.cameraFar !== q.cameraFar;
+    this.dprCap = q.dprCap;
+    this.fogNearMul = q.fogNearMul;
+    this.fogFarMul = q.fogFarMul;
+    this.cameraFar = q.cameraFar;
+    this.renderer.shadowMap.enabled = s.shadows;
+    this.sun.castShadow = s.shadows;
+    if (this.sun.shadow.mapSize.x !== q.shadowMap) {
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+      this.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
+    }
+    if (fogChanged) this.applyFog();
+    this.post.configure(s.bloom, s.motionBlur);
+    if (dprChanged || fogChanged) {
+      const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
+      const r = parent.getBoundingClientRect();
+      this.resize(Math.max(1, r.width), Math.max(1, r.height));
+    }
   }
 
   resize(w: number, h: number) {
     if (w < 1 || h < 1) return;
-    const mobile = w < 720;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2));
+    const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
+    this.camera.far = this.cameraFar;
+    this.camera.updateProjectionMatrix();
+    this.post.setSize(w, h, dpr);
+  }
+
+  private applyFog() {
+    const fog = this.scene.fog as THREE.Fog | null;
+    if (!fog) return;
+    fog.near = this.fogBase.near * this.fogNearMul;
+    fog.far = this.fogBase.far * this.fogFarMul;
+    this.camera.far = this.cameraFar;
     this.camera.updateProjectionMatrix();
   }
 
@@ -268,8 +325,9 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    (this.scene.fog as THREE.Fog).near = theme === "night" ? 88 : 80;
-    (this.scene.fog as THREE.Fog).far = theme === "night" ? 460 : 440;
+    this.fogBase.near = theme === "night" ? 88 : 80;
+    this.fogBase.far = theme === "night" ? 460 : 440;
+    this.applyFog();
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
     this.sun.color.set(pack.sun);
@@ -331,7 +389,7 @@ export class World {
     this.camUp.crossVectors(this.camFwd, _right).normalize();
 
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
-    const pose = chaseSnapPlacement(snap, this.builtTrack, mode, this.camera.aspect);
+    const pose = chaseSnapPlacement(snap, this.builtTrack, mode, this.camera.aspect, this.camDistance);
     this.camPos.copy(pose.cam);
     this.lookPos.copy(pose.look);
     this.keepCameraClear(snap, this.builtTrack, mode);
@@ -339,7 +397,7 @@ export class World {
     this.camera.up.copy(_worldUp);
     if (helixSnap) this.camUp.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
-    this.camera.fov = portrait ? 60 : 58;
+    this.camera.fov = portrait ? this.camFov + 2 : this.camFov;
     this.camera.updateProjectionMatrix();
   }
 
@@ -439,7 +497,7 @@ export class World {
   }
 
   applyGhost(track: BuiltTrack, frames: GhostFrame[] | null, time: number) {
-    if (!frames || frames.length < 2) {
+    if (!frames || frames.length < 2 || this.ghostOpacity <= 0.01) {
       this.ghost.group.visible = false;
       return;
     }
@@ -490,7 +548,7 @@ export class World {
       this.camera.position.copy(this.camPos);
       this.camera.up.copy(_worldUp);
       this.camera.lookAt(this.lookPos);
-      this.camera.fov += (56 - this.camera.fov) * (1 - Math.exp(-3 * dt));
+      this.camera.fov += (this.camFov - 2 - this.camera.fov) * (1 - Math.exp(-3 * dt));
       this.camera.updateProjectionMatrix();
       return;
     }
@@ -565,7 +623,7 @@ export class World {
       _desired.set(snap.px - _fwd.x * back, snap.py + lift, snap.pz - _fwd.z * back);
       _look.set(snap.px + _fwd.x * 16, snap.py + 0.38 + steep * 0.15, snap.pz + _fwd.z * 16);
     } else {
-      const dist = 6.5 + spd * 0.02 + (snap.airborne ? 1.15 : 0) + (helix ? -steep * 0.5 : steep * 1.2);
+      const dist = (6.5 + spd * 0.02 + (snap.airborne ? 1.15 : 0) + (helix ? -steep * 0.5 : steep * 1.2)) * this.camDistance;
       const height = 2.3 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * (helix ? 1.5 : 2.8);
       const lean = -snap.heading * (snap.airborne ? 0.16 : helix ? 0.28 : 0.18);
       // Flats (including every R recovery) use world-up like Circuit. Only ride
@@ -593,7 +651,7 @@ export class World {
     this.keepCameraClear(snap, track, mode);
 
     this.trauma = Math.max(0, this.trauma - dt * 2.5);
-    const shake = reduced ? 0 : this.trauma * this.trauma * 0.5;
+    const shake = reduced ? 0 : this.trauma * this.trauma * 0.5 * this.camShake;
     this.camera.position.copy(this.camPos);
     this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.14;
     this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.1;
@@ -610,7 +668,11 @@ export class World {
     }
     this.camera.lookAt(this.lookPos);
 
-    const targetFov = THREE.MathUtils.clamp(54 + spd * 0.15 + (snap.boost > 0 ? 3.2 : 0), 52, 65);
+    const targetFov = THREE.MathUtils.clamp(
+      this.camFov - 4 + spd * 0.15 + (snap.boost > 0 ? 3.2 : 0),
+      this.camFov - 6,
+      this.camFov + 7,
+    );
     this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4.2 * dt));
     this.camera.updateProjectionMatrix();
     this.sun.target.position.set(snap.px, snap.py, snap.pz);
@@ -632,7 +694,7 @@ export class World {
 
   render() {
     if (this.skyMesh) this.skyMesh.position.copy(this.camera.position);
-    this.renderer.render(this.scene, this.camera);
+    this.post.render();
   }
 
   private clearGroup(g: THREE.Group) {
@@ -653,6 +715,7 @@ export class World {
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
     this.vfx.dispose();
+    this.post.dispose();
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures) t.dispose();

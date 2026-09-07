@@ -6,6 +6,7 @@ import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio } from "./audio";
 import { readSave, TRACK_ORDER, useGame, writeSave } from "./store";
+import type { Settings } from "./settings";
 
 type Probe = {
   getYaw: () => number;
@@ -53,6 +54,9 @@ export class Game {
   private menuYPrev = 0;
   private padAcc = 0;
   private camSnapAfterSim = false;
+  private unsubSettings: (() => void) | null = null;
+  private frames = 0;
+  private fpsAt = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -66,6 +70,10 @@ export class Game {
     this.canvas.style.outline = "none";
     this.input.attach(this.canvas);
     this.input.onPauseHotkey = () => {
+      if (useGame.getState().settingsOpen) {
+        useGame.getState().setSettingsOpen(false);
+        return;
+      }
       if (this.phase === "race" || this.phase === "countdown") this.pause();
       else if (this.phase === "paused") this.resume();
     };
@@ -91,10 +99,24 @@ export class Game {
     };
     window.__rushline = this;
 
+    this.syncSettings(useGame.getState().settings);
+    this.unsubSettings = useGame.subscribe((s, prev) => {
+      if (s.settings !== prev.settings) this.syncSettings(s.settings);
+    });
+
     this.lastT = performance.now();
+    this.fpsAt = this.lastT;
     this.raf = requestAnimationFrame(this.loop);
     useGame.getState().setReady(true);
     useGame.getState().refreshBest();
+  }
+
+  private syncSettings(s: Settings) {
+    this.world.applySettings(s);
+    this.audio.applyVolumes(s.master, s.sfx, s.music);
+    this.input.touchSteerSensitivity = s.touchSteerSensitivity;
+    this.input.invertSteer = s.invertSteer;
+    this.input.autoThrottle = s.autoThrottle;
   }
 
   private fit() {
@@ -135,9 +157,6 @@ export class Game {
   setTouch(v: boolean) {
     this.input.touchMode = v;
     useGame.getState().setTouch(v);
-    if (v && !useGame.getState().autoThrottle) {
-      this.setAutoThrottle(true);
-    }
   }
 
   capturePlayFocus() {
@@ -286,15 +305,18 @@ export class Game {
       }
     }
 
-    this.handleMenuPad(actions);
-
-    if (actions.pause && (this.phase === "race" || this.phase === "countdown")) this.pause();
-    else if (actions.pause && this.phase === "paused") this.resume();
-    if (actions.camera) this.setCamera(this.camera === "chase" ? "hood" : "chase");
-    if (actions.restart && (this.phase === "race" || this.phase === "paused" || this.phase === "results")) {
-      this.startRace(this.trackId);
+    if (store.settingsOpen) {
+      if (actions.back || actions.confirm || actions.pause) useGame.getState().setSettingsOpen(false);
+    } else {
+      this.handleMenuPad(actions);
+      if (actions.pause && (this.phase === "race" || this.phase === "countdown")) this.pause();
+      else if (actions.pause && this.phase === "paused") this.resume();
+      if (actions.camera) this.setCamera(this.camera === "chase" ? "hood" : "chase");
+      if (actions.restart && (this.phase === "race" || this.phase === "paused" || this.phase === "results")) {
+        this.startRace(this.trackId);
+      }
+      if (actions.respawn && this.phase === "race") this.applyRespawn();
     }
-    if (actions.respawn && this.phase === "race") this.applyRespawn();
 
     const simulate = this.phase === "race" || this.phase === "countdown";
     if (this.phase === "countdown") {
@@ -383,10 +405,18 @@ export class Game {
     this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide);
     this.world.render();
 
+    this.frames++;
+    if (now - this.fpsAt > 400) {
+      useGame.getState().setFps(Math.round((this.frames * 1000) / (now - this.fpsAt)));
+      this.frames = 0;
+      this.fpsAt = now;
+    }
+
     this.hudAcc += dt;
     if (this.hudAcc > 0.08) {
       this.hudAcc = 0;
       const medal = this.phase === "race" ? medalFor(this.trackId, this.time) : null;
+      const ghost = ghostAt(this.ghost, this.time);
       useGame.getState().setHud({
         time: this.time,
         speed: vis.speed,
@@ -402,6 +432,9 @@ export class Game {
         driftCharge: vis.driftCharge,
         s: this.car.s,
         n: this.car.n,
+        heading: this.car.heading,
+        ghostS: ghost?.s ?? null,
+        ghostN: ghost?.n ?? null,
       });
     }
   };
@@ -501,6 +534,8 @@ export class Game {
   dispose() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+    this.unsubSettings?.();
+    this.unsubSettings = null;
     this.ro.disconnect();
     this.input.detach();
     this.audio.dispose();
@@ -508,4 +543,15 @@ export class Game {
     if (window.__rushline === this) delete window.__rushline;
     if (window.__controlsTest) delete window.__controlsTest;
   }
+}
+
+function ghostAt(frames: GhostFrame[] | null, time: number): { s: number; n: number } | null {
+  if (!frames || frames.length < 2) return null;
+  let i = 0;
+  while (i < frames.length - 1 && frames[i + 1]!.t < time) i++;
+  const a = frames[i]!;
+  const b = frames[Math.min(frames.length - 1, i + 1)]!;
+  const span = b.t - a.t || 1;
+  const t = Math.max(0, Math.min(1, (time - a.t) / span));
+  return { s: a.s + (b.s - a.s) * t, n: a.n + (b.n - a.n) * t };
 }

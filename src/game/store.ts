@@ -1,4 +1,12 @@
 import { create } from "zustand";
+import {
+  applyQuality,
+  defaultSettings,
+  loadSettings,
+  persistSettings,
+  type Quality,
+  type Settings,
+} from "./settings";
 import type {
   CameraMode,
   HudState,
@@ -28,6 +36,9 @@ const emptyHud = (): HudState => ({
   driftCharge: 0,
   s: 6,
   n: 0,
+  heading: 0,
+  ghostS: null,
+  ghostN: null,
 });
 
 const emptyPad = (): PadInfo => ({
@@ -84,6 +95,9 @@ type GameStore = {
   touch: boolean;
   pad: PadInfo;
   best: Partial<Record<TrackId, number>>;
+  settings: Settings;
+  settingsOpen: boolean;
+  fps: number;
   setPhase: (p: Phase) => void;
   setTrack: (id: TrackId) => void;
   setHud: (h: Partial<HudState>) => void;
@@ -94,8 +108,16 @@ type GameStore = {
   setReady: (v: boolean) => void;
   setTouch: (v: boolean) => void;
   setPad: (p: PadInfo) => void;
+  setSettingsOpen: (v: boolean) => void;
+  hydrateSettings: (s: Settings) => void;
+  patchSettings: (p: Partial<Settings>) => void;
+  setQuality: (q: Quality) => void;
+  resetSettings: (touch: boolean) => void;
+  setFps: (n: number) => void;
   refreshBest: () => void;
 };
+
+const bootSettings = defaultSettings(false);
 
 export const useGame = create<GameStore>((set) => ({
   phase: "menu",
@@ -104,21 +126,50 @@ export const useGame = create<GameStore>((set) => ({
   results: null,
   camera: "chase",
   muted: false,
-  autoThrottle: false,
+  autoThrottle: bootSettings.autoThrottle,
   ready: false,
   touch: false,
   pad: emptyPad(),
   best: {},
+  settings: bootSettings,
+  settingsOpen: false,
+  fps: 0,
   setPhase: (phase) => set({ phase }),
   setTrack: (trackId) => set({ trackId }),
   setHud: (h) => set((s) => ({ hud: { ...s.hud, ...h } })),
   setResults: (results) => set({ results }),
   setCamera: (camera) => set({ camera }),
   setMuted: (muted) => set({ muted }),
-  setAutoThrottle: (autoThrottle) => set({ autoThrottle }),
+  setAutoThrottle: (autoThrottle) =>
+    set((s) => {
+      const settings = { ...s.settings, autoThrottle };
+      persistSettings(settings);
+      return { autoThrottle, settings };
+    }),
   setReady: (ready) => set({ ready }),
   setTouch: (touch) => set({ touch }),
   setPad: (pad) => set({ pad }),
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  hydrateSettings: (settings) => set({ settings, autoThrottle: settings.autoThrottle }),
+  patchSettings: (p) =>
+    set((s) => {
+      const settings = { ...s.settings, ...p };
+      persistSettings(settings);
+      return { settings, autoThrottle: settings.autoThrottle };
+    }),
+  setQuality: (q) =>
+    set((s) => {
+      const settings = applyQuality(s.settings, q);
+      persistSettings(settings);
+      return { settings, autoThrottle: settings.autoThrottle };
+    }),
+  resetSettings: (touch) =>
+    set(() => {
+      const settings = defaultSettings(touch);
+      persistSettings(settings);
+      return { settings, autoThrottle: settings.autoThrottle };
+    }),
+  setFps: (fps) => set({ fps }),
   refreshBest: () => set({ best: { ...readSave().best } }),
 }));
 

@@ -1,10 +1,12 @@
 import type { ReactNode, RefObject } from "react";
-import { Flag, Gamepad2, Gauge, Pause, Volume2, VolumeX } from "lucide-react";
+import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
 import { allTrackDefs, getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { Medal, TrackId } from "@/game/types";
 import { cn, formatSpeed, formatTime } from "@/lib/utils";
+import { SettingsPanel } from "./SettingsPanel";
+import { Minimap } from "./Minimap";
 
 type Props = {
   gameRef: RefObject<Game | null>;
@@ -20,11 +22,27 @@ export function Overlay({ gameRef }: Props) {
   const ready = useGame((s) => s.ready);
   const auto = useGame((s) => s.autoThrottle);
   const pad = useGame((s) => s.pad);
+  const settingsOpen = useGame((s) => s.settingsOpen);
+  const setSettingsOpen = useGame((s) => s.setSettingsOpen);
+  const settings = useGame((s) => s.settings);
+  const fps = useGame((s) => s.fps);
+  const touch = useGame((s) => s.touch);
   const trackId = useGame((s) => s.trackId);
   const g = () => gameRef.current;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
+      {phase === "menu" || phase === "select" ? (
+        <button
+          type="button"
+          className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          <Settings className="size-4" strokeWidth={1.75} />
+        </button>
+      ) : null}
+
       {phase === "menu" || phase === "select" ? (
         <Menu
           ready={ready}
@@ -58,6 +76,8 @@ export function Overlay({ gameRef }: Props) {
           trackId={trackId}
           s={hud.s}
           n={hud.n}
+          showSpeed={settings.showSpeed}
+          showMinimap={settings.showMinimap}
         />
       ) : null}
 
@@ -92,11 +112,12 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {phase === "paused" ? (
+      {phase === "paused" && !settingsOpen ? (
         <Modal
           title="Paused"
           actions={[
             { label: "Resume", primary: true, onClick: () => g()?.resume() },
+            { label: "Options", onClick: () => setSettingsOpen(true) },
             { label: "Restart", onClick: () => g()?.startRace() },
             { label: "Menu", onClick: () => g()?.menu() },
           ]}
@@ -121,6 +142,27 @@ export function Overlay({ gameRef }: Props) {
           ]}
         />
       ) : null}
+
+      {settings.showFps && (phase === "race" || phase === "countdown" || phase === "paused") ? (
+        <p className="absolute top-[max(0.95rem,env(safe-area-inset-top))] left-[max(3.6rem,calc(env(safe-area-inset-left)+2.85rem))] text-xs tabular-nums text-muted">
+          {fps} fps
+        </p>
+      ) : null}
+
+      {settings.showMinimap && (phase === "race" || phase === "countdown" || phase === "paused") ? (
+        <div className="absolute bottom-[max(2.6rem,env(safe-area-inset-bottom))] left-[max(0.85rem,env(safe-area-inset-left))] hidden md:block">
+          <Minimap
+            trackId={trackId}
+            s={hud.s}
+            n={hud.n}
+            heading={hud.heading}
+            ghostS={hud.ghostS}
+            ghostN={hud.ghostN}
+          />
+        </div>
+      ) : null}
+
+      {settingsOpen ? <SettingsPanel touch={touch} onClose={() => setSettingsOpen(false)} /> : null}
 
       {phase === "race" ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
@@ -272,6 +314,8 @@ function Hud({
   trackId,
   s,
   n,
+  showSpeed,
+  showMinimap,
 }: {
   time: number;
   speed: number;
@@ -287,18 +331,22 @@ function Hud({
   trackId: TrackId;
   s: number;
   n: number;
+  showSpeed: boolean;
+  showMinimap: boolean;
 }) {
   return (
     <>
-      <MiniMap trackId={trackId} s={s} n={n} />
+      {showMinimap ? <MiniMap trackId={trackId} s={s} n={n} /> : null}
       <div className="absolute top-[max(3.25rem,calc(env(safe-area-inset-top)+2.55rem))] left-1/2 flex -translate-x-1/2 flex-col items-center px-16">
         <p className="font-display text-[2rem] tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl">
           {formatTime(time)}
         </p>
-        <p className="mt-0.5 font-display text-xl tabular-nums leading-none md:hidden">
-          {formatSpeed(speed)}
-          <span className="ml-1 text-[10px] font-sans uppercase tracking-widest text-muted">km/h</span>
-        </p>
+        {showSpeed ? (
+          <p className="mt-0.5 font-display text-xl tabular-nums leading-none md:hidden">
+            {formatSpeed(speed)}
+            <span className="ml-1 text-[10px] font-sans uppercase tracking-widest text-muted">km/h</span>
+          </p>
+        ) : null}
         <div className="mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
             <Flag className="size-3" />
@@ -315,8 +363,12 @@ function Hud({
         </div>
       </div>
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
-        <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
-        <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
+        {showSpeed ? (
+          <>
+            <p className="font-display text-4xl tabular-nums leading-none">{formatSpeed(speed)}</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted">km/h</p>
+          </>
+        ) : null}
         <Meter label="Boost" value={Math.min(1, boost / 1.0)} tone="ok" show={boost > 0.05} />
         <Meter label="Turbo" value={driftCharge} tone="gold" show={driftCharge > 0.05} ticks />
       </div>
