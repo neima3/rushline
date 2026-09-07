@@ -400,6 +400,8 @@ export class Game {
         countdown: this.phase === "countdown" ? Math.max(1, Math.ceil(this.countdown)) : this.time < 450 ? 0 : null,
         splittime: null,
         driftCharge: vis.driftCharge,
+        s: this.car.s,
+        n: this.car.n,
       });
     }
   };

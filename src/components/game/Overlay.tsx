@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { Flag, Gamepad2, Gauge, Pause, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
-import { allTrackDefs, TRACK_DEFS } from "@/game/track";
+import { allTrackDefs, getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { Medal, TrackId } from "@/game/types";
 import { cn, formatSpeed, formatTime } from "@/lib/utils";
@@ -20,6 +20,7 @@ export function Overlay({ gameRef }: Props) {
   const ready = useGame((s) => s.ready);
   const auto = useGame((s) => s.autoThrottle);
   const pad = useGame((s) => s.pad);
+  const trackId = useGame((s) => s.trackId);
   const g = () => gameRef.current;
 
   return (
@@ -54,6 +55,9 @@ export function Overlay({ gameRef }: Props) {
           countdown={phase === "countdown" ? hud.countdown : null}
           boost={hud.boost}
           driftCharge={hud.driftCharge}
+          trackId={trackId}
+          s={hud.s}
+          n={hud.n}
         />
       ) : null}
 
@@ -265,6 +269,9 @@ function Hud({
   countdown,
   boost,
   driftCharge,
+  trackId,
+  s,
+  n,
 }: {
   time: number;
   speed: number;
@@ -277,18 +284,22 @@ function Hud({
   countdown: number | null;
   boost: number;
   driftCharge: number;
+  trackId: TrackId;
+  s: number;
+  n: number;
 }) {
   return (
     <>
-      <div className="absolute top-[max(3.5rem,calc(env(safe-area-inset-top)+2.75rem))] left-1/2 flex -translate-x-1/2 flex-col items-center">
-        <p className="font-display text-4xl tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl">
+      <MiniMap trackId={trackId} s={s} n={n} />
+      <div className="absolute top-[max(3.25rem,calc(env(safe-area-inset-top)+2.55rem))] left-1/2 flex -translate-x-1/2 flex-col items-center px-16">
+        <p className="font-display text-[2rem] tabular-nums leading-none tracking-tight sm:text-5xl md:text-6xl">
           {formatTime(time)}
         </p>
-        <p className="mt-1 font-display text-2xl tabular-nums leading-none md:hidden">
+        <p className="mt-0.5 font-display text-xl tabular-nums leading-none md:hidden">
           {formatSpeed(speed)}
           <span className="ml-1 text-[10px] font-sans uppercase tracking-widest text-muted">km/h</span>
         </p>
-        <div className="mt-2 flex items-center gap-3 text-xs font-medium uppercase tracking-widest text-muted">
+        <div className="mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
             <Flag className="size-3" />
             {lap}/{laps}
@@ -428,6 +439,51 @@ function Modal({
 
 function keepPlayFocus(e: { preventDefault: () => void }) {
   e.preventDefault();
+}
+
+function MiniMap({ trackId, s, n }: { trackId: TrackId; s: number; n: number }) {
+  const track = getTrack(trackId);
+  const step = Math.max(1, Math.floor(track.samples.length / 72));
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  const pts: { x: number; z: number }[] = [];
+  for (let i = 0; i < track.samples.length; i += step) {
+    const sm = track.samples[i]!;
+    pts.push({ x: sm.x, z: sm.z });
+    if (sm.x < minX) minX = sm.x;
+    if (sm.x > maxX) maxX = sm.x;
+    if (sm.z < minZ) minZ = sm.z;
+    if (sm.z > maxZ) maxZ = sm.z;
+  }
+  const pad = 8;
+  const size = 72;
+  const span = Math.max(maxX - minX, maxZ - minZ, 1);
+  const to = (x: number, z: number) => {
+    const u = (x - (minX + maxX) * 0.5) / span;
+    const v = (z - (minZ + maxZ) * 0.5) / span;
+    return { x: size / 2 + u * (size - pad * 2), y: size / 2 + v * (size - pad * 2) };
+  };
+  const d = pts
+    .map((p, i) => {
+      const q = to(p.x, p.z);
+      return `${i === 0 ? "M" : "L"}${q.x.toFixed(1)} ${q.y.toFixed(1)}`;
+    })
+    .join(" ");
+  const sm = sampleAt(track, s);
+  const car = to(sm.x + sm.rx * n, sm.z + sm.rz * n);
+  return (
+    <div
+      data-minimap="1"
+      className="pointer-events-none absolute top-[max(4.55rem,calc(env(safe-area-inset-top)+3.7rem))] left-[max(0.7rem,env(safe-area-inset-left))] md:hidden"
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-md border border-border/80 bg-bg/55">
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" className="text-muted" />
+        <circle cx={car.x} cy={car.y} r="2.6" className="fill-accent" />
+      </svg>
+    </div>
+  );
 }
 
 function GhostChip({

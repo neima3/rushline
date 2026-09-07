@@ -52,7 +52,15 @@ describe("autoThrottleCap", () => {
   });
 
   it("restores touch cruise after the Ridge settle", () => {
-    const after = autoThrottleCap({
+    const cruise = autoThrottleCap({
+      trackId: "canyon",
+      s: 200,
+      speed: 18,
+      firstCp: 147,
+      touchMode: true,
+      countdown: false,
+    });
+    const held = autoThrottleCap({
       trackId: "canyon",
       s: 200,
       speed: 30,
@@ -60,7 +68,9 @@ describe("autoThrottleCap", () => {
       touchMode: true,
       countdown: false,
     });
-    assert.equal(after, 0.5);
+    assert.ok(cruise >= 0.48 && cruise <= 0.5, `cruise ${cruise}`);
+    assert.ok(held < cruise, "high-speed cruise should bleed instead of cliffing");
+    assert.ok(held >= 0.2 && held <= 0.28, `held ${held}`);
   });
 
   it("does not cap desktop Circuit auto-throttle after countdown", () => {
@@ -86,7 +96,17 @@ describe("autoThrottleCap", () => {
       touchMode: true,
       countdown: false,
     });
-    assert.equal(early, 0.14);
+    const faster = autoThrottleCap({
+      trackId: "circuit",
+      s: 20,
+      speed: 26,
+      firstCp: 80,
+      touchMode: true,
+      countdown: false,
+    });
+    assert.ok(early < 0.28, `early ${early}`);
+    assert.ok(faster <= 0.16, `faster ${faster}`);
+    assert.ok(faster < early);
   });
 });
 
@@ -298,6 +318,13 @@ describe("hitDrivePad", () => {
     assert.equal(hitDrivePad(48, 148, QA_PADS), "accel");
     assert.equal(hitDrivePad(48, 92, QA_PADS), "brake");
     assert.equal(hitDrivePad(48, 124, QA_PADS), "brake");
+  });
+
+  it("inflates Accel/Slide but still loses the seam to Brake", () => {
+    assert.equal(hitDrivePad(48, 132, QA_PADS), "brake", "inside Accel but in Brake slop");
+    assert.equal(hitDrivePad(-6, 148, QA_PADS), "accel", "fat-finger just left of Accel");
+    assert.equal(hitDrivePad(48, -6, QA_PADS), "slide");
+    assert.equal(hitDrivePad(48, 188, QA_PADS), "accel");
   });
 });
 

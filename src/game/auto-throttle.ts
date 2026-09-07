@@ -1,4 +1,5 @@
 import type { TrackId } from "./types";
+import { BRAKE_HIT_SLOP, PAD_HIT_SLOP, blendHold, smoothstep } from "./feel.ts";
 
 /** First Ridge curve ends ~110; keep auto-throttle tame through that settle. */
 const CANYON_SETTLE_S = 120;
@@ -106,19 +107,30 @@ function inflatePad(r: PadRect, pad: number): PadRect {
 }
 
 /**
- * Pedal cluster hit-test. Brake wins overlaps (including a small slop so a
- * fat Chrome device-mode touch on the Accel/Brake seam cannot steal Accel).
+ * Pedal cluster hit-test. Every pad gets a fat-finger inflate; Brake still
+ * wins the Accel seam (and the empty gap between the two faces).
  */
 export function hitDrivePad(
   x: number,
   y: number,
   pads: { brake: PadRect; accel: PadRect; slide: PadRect },
-  brakeSlop = 10,
+  brakeSlop = BRAKE_HIT_SLOP,
+  padSlop = PAD_HIT_SLOP,
 ): DriveKind | null {
   if (containsPad(inflatePad(pads.brake, brakeSlop), x, y)) return "brake";
-  if (containsPad(pads.accel, x, y)) return "accel";
-  if (containsPad(pads.slide, x, y)) return "slide";
+  if (inBrakeAccelSeam(x, y, pads.brake, pads.accel, brakeSlop)) return "brake";
+  if (containsPad(inflatePad(pads.accel, padSlop), x, y)) return "accel";
+  if (containsPad(inflatePad(pads.slide, padSlop), x, y)) return "slide";
   return null;
+}
+
+function inBrakeAccelSeam(x: number, y: number, brake: PadRect, accel: PadRect, slop: number) {
+  const left = Math.min(brake.left, accel.left) - slop;
+  const right = Math.max(brake.right, accel.right) + slop;
+  if (x < left || x > right) return false;
+  const lo = Math.min(brake.bottom, accel.top);
+  const hi = Math.max(brake.bottom, accel.top);
+  return y >= lo - 2 && y <= hi + 2;
 }
 
 /**
@@ -265,18 +277,22 @@ export function autoThrottleCap(opts: {
 
   if (opts.trackId === "canyon") {
     if (opts.s < CANYON_SETTLE_S) {
-      return opts.speed > OPENING_SPEED ? OPENING_HOLD : OPENING_THROTTLE;
+      return blendHold(opts.speed, OPENING_SPEED, OPENING_THROTTLE, OPENING_HOLD, 4);
     }
     const full = opts.touchMode ? TOUCH_CRUISE : 1;
-    const t = Math.min(1, (opts.s - CANYON_SETTLE_S) / CANYON_BLEND_S);
-    return OPENING_THROTTLE + (full - OPENING_THROTTLE) * t;
+    const t = smoothstep((opts.s - CANYON_SETTLE_S) / CANYON_BLEND_S);
+    const blended = OPENING_THROTTLE + (full - OPENING_THROTTLE) * t;
+    if (!opts.touchMode) return blended;
+    return blendHold(opts.speed, TOUCH_LATE_SPEED, blended, 0.22, 6);
   }
 
   if (!opts.touchMode) return 1;
 
   const early = opts.s < opts.firstCp;
-  if (opts.speed > (early ? OPENING_SPEED : TOUCH_LATE_SPEED)) return OPENING_HOLD;
-  return early ? OPENING_THROTTLE : TOUCH_CRUISE;
+  const cruise = early ? OPENING_THROTTLE : TOUCH_CRUISE;
+  const trip = early ? OPENING_SPEED : TOUCH_LATE_SPEED;
+  const hold = early ? OPENING_HOLD : 0.22;
+  return blendHold(opts.speed, trip, cruise, hold, early ? 4 : 6);
 }
 
 /** Hold brake long enough that a Safari pointercancel blip cannot re-arm auto-throttle. */
