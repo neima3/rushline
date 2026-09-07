@@ -351,7 +351,6 @@ function Hud({
             <span className="hud-speed-unit">KM/H</span>
           </div>
         ) : null}
-        </div>
         <div className="hud-meta mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
           <span className="flex items-center gap-1">
             <Flag className="size-3" />
