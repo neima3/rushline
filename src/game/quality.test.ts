@@ -10,6 +10,7 @@ import {
   SETTINGS_KEY,
   SETTINGS_TIER_COST,
   resolveQuality,
+  themeLightLevels,
 } from "./quality.ts";
 
 describe("quality presets", () => {
@@ -70,6 +71,29 @@ describe("quality presets", () => {
     assert.equal(profile.pixelRatioCap, 1);
     assert.equal(profile.smokeScale, low.particleDensity);
     assert.equal(SETTINGS_KEY, "rushline-settings-v1");
+  });
+
+  it("pulls Circuit day exposure at Medium/High without touching Ridge or Helix", () => {
+    const low = themeLightLevels("stadium", QUALITY_PRESETS.low);
+    const med = themeLightLevels("stadium", QUALITY_PRESETS.medium);
+    const high = themeLightLevels("stadium", QUALITY_PRESETS.high);
+    assert.ok(high.sun < med.sun && med.sun < low.sun);
+    assert.ok(high.hemi < med.hemi && med.hemi < low.hemi);
+    assert.ok(high.exposure < med.exposure && med.exposure <= low.exposure);
+    assert.ok(high.sun < 1.52 && high.hemi < 0.88 && high.exposure < 1.06);
+    assert.ok(high.bloomMul < 0.35 && high.bloomThreshold >= 0.96);
+
+    const ridge = themeLightLevels("canyon", QUALITY_PRESETS.high);
+    assert.equal(ridge.sun, 1.55);
+    assert.equal(ridge.hemi, 0.82);
+    assert.equal(ridge.exposure, 1.06);
+    assert.equal(ridge.bloomMul, 0.55);
+
+    const helix = themeLightLevels("night", QUALITY_PRESETS.high);
+    assert.equal(helix.sun, 0.95);
+    assert.equal(helix.hemi, 1.32);
+    assert.equal(helix.exposure, 1.24);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.5, fogFarMul: 0.5 }), NIGHT_FOG);
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {

@@ -31,7 +31,7 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
   const d = img.data;
   const base =
     theme === "stadium"
-      ? [198, 200, 204]
+      ? [158, 160, 164]
       : theme === "canyon"
         ? [36, 32, 30]
         : [28, 30, 42];

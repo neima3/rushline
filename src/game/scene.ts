@@ -14,6 +14,7 @@ import {
   QUALITY_PRESETS,
   resolveQuality,
   SETTINGS_TIER_COST,
+  themeLightLevels,
   type GraphicsKnobs,
   type QualityProfile,
   type QualityTier,
@@ -150,9 +151,9 @@ export function clearChaseCamera(
 
 const THEMES: Record<ThemeId, ThemePack> = {
   stadium: {
-    fog: 0xb8d4ea,
+    fog: 0x9ec4e6,
     ground: 0x6ea05a,
-    hemiSky: 0xe8f4ff,
+    hemiSky: 0xc4dcf0,
     hemiGround: 0x8a9a6a,
     sun: 0xfff6e8,
     sunPos: [90, 110, 28],
@@ -468,8 +469,6 @@ export class World {
     this.fogBase.far = theme === "night" ? 460 : 440;
     this.applyFog();
     this.applyThemeLights(theme);
-    this.renderer.toneMappingExposure = pack.exposure;
-    this.scene.environmentIntensity = theme === "night" ? 0.28 : this.quality.environment ? 0.42 : 0;
     this.tuneBloom(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
@@ -843,13 +842,16 @@ export class World {
 
   private applyThemeLights(theme: ThemeId) {
     const pack = THEMES[theme];
+    const look = themeLightLevels(theme, this.quality);
     this.hemi.color.set(pack.hemiSky);
     this.hemi.groundColor.set(pack.hemiGround);
     this.sun.color.set(pack.sun);
     this.sun.position.set(...pack.sunPos);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.intensity = theme === "night" ? 0.95 : theme === "canyon" ? 1.55 : 1.52;
-    this.hemi.intensity = theme === "night" ? 1.32 : theme === "canyon" ? 0.82 : 0.88;
+    this.sun.intensity = look.sun;
+    this.hemi.intensity = look.hemi;
+    this.renderer.toneMappingExposure = look.exposure;
+    this.scene.environmentIntensity = look.env;
     const nightFill = theme === "night" && this.quality.nightFills;
     this.fill.color.set(theme === "night" ? 0xb878d8 : 0x8ab4d8);
     this.fill.intensity = nightFill ? 0.5 : 0;
@@ -880,11 +882,11 @@ export class World {
   }
 
   private tuneBloom(theme: ThemeId) {
-    const night = theme === "night";
+    const look = themeLightLevels(theme, this.quality);
     this.post.tuneBloom(
-      this.quality.bloomStrength * (night ? 1 : 0.55),
+      this.quality.bloomStrength * look.bloomMul,
       this.quality.bloomRadius,
-      night ? Math.min(this.quality.bloomThreshold, 0.8) : Math.max(this.quality.bloomThreshold, 0.91),
+      look.bloomThreshold,
     );
   }
 
