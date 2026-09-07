@@ -1,6 +1,16 @@
 import * as THREE from "three";
 import type { Actions, BuiltTrack, CarSnap } from "./types";
 import { crossedGate, nearestSample, sampleAt } from "./track";
+import {
+  curbSnap,
+  driftSteerThreshold,
+  headingAlign,
+  openingHeadingBleed,
+  openingLandLock,
+  plantLateral,
+  stayPlanted,
+  steerCurve,
+} from "./feel.ts";
 
 const ACCEL = 28;
 const BRAKE = 40;
@@ -100,7 +110,7 @@ export class CarSim {
     this.skipInterp = true;
     this.wasSlide = false;
     this.airTime = 0;
-    this.landLock = 0;
+    this.landLock = openingLandLock(track.def.id);
     this.airBlend = 0;
     this.recoverLock = 0;
     this.place(track);
@@ -296,7 +306,7 @@ export class CarSim {
     const steer = steerCurve(actions.steer);
     const steerAbs = Math.abs(steer);
     const slideHeld = actions.slide >= 0.2;
-    const drifting = slideHeld && steerAbs > 0.18 && speedAbs > 8;
+    const drifting = slideHeld && steerAbs > driftSteerThreshold(slideHeld) && speedAbs > 8;
 
     if (this.wasSlide && !slideHeld) this.releaseTurbo();
     if (drifting) {
@@ -311,15 +321,17 @@ export class CarSim {
     if (slideHeld && !drifting) turn *= 1.08;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
     this.heading += steer * turn * reverse * dt;
-    if (this.s < 72 && steerAbs < 0.22 && !drifting) this.heading *= 1 - 2.2 * dt;
+    const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting);
+    if (bleed) this.heading *= 1 - bleed * dt;
 
-    const align = drifting ? 0.26 : steerAbs < 0.1 ? 5.4 : 0.07;
+    const align = headingAlign(steerAbs, drifting);
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
     const maxYaw = drifting ? 0.76 : slideHeld ? 0.48 : 0.33;
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     this.s += this.speed * Math.cos(this.heading) * dt;
     this.n += -this.speed * Math.sin(this.heading) * dt;
+    this.n = plantLateral(this.n, track.def.id, this.s, steerAbs, dt);
 
     if (track.def.closed) {
       const L = track.length;
@@ -330,6 +342,20 @@ export class CarSim {
     }
 
     const sm = sampleAt(track, this.s);
+    const snapped = curbSnap({
+      n: this.n,
+      heading: this.heading,
+      width: sm.width,
+      trackId: track.def.id,
+      s: this.s,
+    });
+    this.n = snapped.n;
+    this.heading = snapped.heading;
+    if (snapped.hit) {
+      this.speed = Math.min(this.speed * (snapped.early ? 0.88 : 0.93), this.speed);
+      this.boost = 0;
+      this.wallHit = Math.max(this.wallHit, snapped.early ? 0.12 : 0.08);
+    }
     const half = sm.width * 0.5 - 0.72;
     if (this.n > half) {
       this.n = half - 0.06;
@@ -373,7 +399,12 @@ export class CarSim {
     this.vy = this.fy * this.speed;
     this.vz = this.fz * this.speed;
 
-    if (this.recoverLock <= 0 && this.landLock <= 0 && shouldLeaveTrack(this.speed, sm.uy)) {
+    if (
+      this.recoverLock <= 0 &&
+      this.landLock <= 0 &&
+      !stayPlanted(track.def.id, this.s) &&
+      shouldLeaveTrack(this.speed, sm.uy)
+    ) {
       this.airborne = true;
       this.airTime = 0;
       this.airBlend = 0;
@@ -633,12 +664,7 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function steerCurve(x: number) {
-  const s = Math.sign(x);
-  const a = Math.abs(x);
-  if (a < 0.04) return 0;
-  return s * (a * a * 0.32 + a * 0.68);
-}
+export { steerCurve } from "./feel.ts";
 
 export function turboFromCharge(charge: number) {
   if (charge >= TURBO_FULL) return 1.02;

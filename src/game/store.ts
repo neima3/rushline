@@ -26,6 +26,8 @@ const emptyHud = (): HudState => ({
   countdown: null,
   splittime: null,
   driftCharge: 0,
+  s: 6,
+  n: 0,
 });
 
 const emptyPad = (): PadInfo => ({

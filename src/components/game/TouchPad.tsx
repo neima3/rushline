@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
+import { shapeTouchSteer } from "@/game/feel";
 import { RotateCcw } from "lucide-react";
 
 type Props = {
@@ -34,7 +35,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
       const r = el.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width;
       const steer = -(x - 0.5) * 2;
-      onSteer(Math.max(-1, Math.min(1, steer)));
+      onSteer(shapeTouchSteer(steer));
     };
     const down = (e: PointerEvent) => {
       e.preventDefault();
@@ -77,16 +78,17 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
       <div
         ref={steerRef}
         data-play-control="1"
-        className="play-control pointer-events-auto h-32 w-[46%] max-w-60 touch-none rounded-xl border border-border bg-surface/80 select-none"
+        className="play-control pointer-events-auto h-36 w-[48%] max-w-64 touch-none rounded-xl border border-border bg-surface/80 select-none"
         aria-label="Steer"
       >
-        <div className="flex h-full items-center justify-between px-5 text-sm font-medium text-muted">
+        <div className="relative flex h-full items-center justify-between px-5 text-sm font-medium text-muted">
+          <span className="pointer-events-none absolute top-2 bottom-2 left-1/2 w-px -translate-x-1/2 bg-fg/20" />
           <span>L</span>
           <span className="text-xs uppercase tracking-widest">Steer</span>
           <span>R</span>
         </div>
       </div>
-      <div className="pointer-events-auto flex flex-col items-end gap-2">
+      <div className="pointer-events-auto flex flex-col items-end gap-2.5">
         <button
           type="button"
           aria-label="Respawn"
@@ -320,10 +322,10 @@ function DriveCluster({
   }, [onThrottle, onBrake, onSlide]);
 
   return (
-    <div ref={clusterRef} className="flex flex-col items-end gap-2" data-drive-cluster="1">
-      <PadFace label="Slide" faceRef={slideRef} pressed={held.slide} />
-      <PadFace label="Brake" faceRef={brakeRef} pressed={held.brake} />
-      <PadFace label="Accel" faceRef={accelRef} pressed={held.accel} accent />
+    <div ref={clusterRef} className="flex flex-col items-end gap-3" data-drive-cluster="1">
+      <PadFace label="Slide" faceRef={slideRef} pressed={held.slide} size="md" />
+      <PadFace label="Brake" faceRef={brakeRef} pressed={held.brake} size="lg" />
+      <PadFace label="Accel" faceRef={accelRef} pressed={held.accel} size="lg" accent />
     </div>
   );
 }
@@ -333,12 +335,15 @@ function PadFace({
   faceRef,
   pressed,
   accent,
+  size = "md",
 }: {
   label: string;
   faceRef: RefObject<HTMLDivElement | null>;
   pressed: boolean;
   accent?: boolean;
+  size?: "md" | "lg";
 }) {
+  const box = size === "lg" ? "h-[4.15rem] min-h-[4.15rem] w-[7.6rem]" : "h-16 min-h-16 w-[7.25rem]";
   return (
     <div
       ref={faceRef}
@@ -349,7 +354,7 @@ function PadFace({
       aria-label={label}
       aria-pressed={pressed}
       data-held={pressed ? "1" : "0"}
-      className={`play-control flex h-14 min-h-14 w-24 items-center justify-center touch-none select-none rounded-lg border text-sm font-medium ${
+      className={`play-control flex items-center justify-center touch-none select-none rounded-lg border text-sm font-medium ${box} ${
         accent ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface/90 text-fg"
       } ${pressed ? "ring-2 ring-fg brightness-125" : ""}`}
       onContextMenu={(e) => e.preventDefault()}

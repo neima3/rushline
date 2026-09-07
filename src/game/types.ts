@@ -118,6 +118,8 @@ export type HudState = {
   countdown: number | null;
   splittime: number | null;
   driftCharge: number;
+  s: number;
+  n: number;
 };
 
 export type ResultsState = {
