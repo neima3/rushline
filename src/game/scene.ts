@@ -6,7 +6,7 @@ import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
-import { qualityProfile, type Settings } from "./settings";
+import type { Settings } from "./settings";
 import {
   applyGraphicsKnobs,
   fogWindow,
@@ -291,16 +291,17 @@ export class World {
   applySettings(s: Settings | GraphicsKnobs) {
     const cost = SETTINGS_TIER_COST[s.quality];
     const full = s as Settings;
+    const extra = s as GraphicsKnobs;
     this.knobs = {
       quality: s.quality,
       shadows: s.shadows,
       bloom: s.bloom,
-      particleDensity: s.particleDensity ?? cost.particleDensity,
-      dprCap: s.dprCap ?? cost.dprCap,
-      fogNearMul: s.fogNearMul ?? cost.fogNearMul,
-      fogFarMul: s.fogFarMul ?? cost.fogFarMul,
-      cameraFar: s.cameraFar ?? cost.cameraFar,
-      fogEnabled: s.fogEnabled !== false,
+      particleDensity: extra.particleDensity ?? cost.particleDensity,
+      dprCap: extra.dprCap ?? cost.dprCap,
+      fogNearMul: extra.fogNearMul ?? cost.fogNearMul,
+      fogFarMul: extra.fogFarMul ?? cost.fogFarMul,
+      cameraFar: extra.cameraFar ?? cost.cameraFar,
+      fogEnabled: extra.fogEnabled !== false,
     };
     this.quality = applyGraphicsKnobs(QUALITY_PRESETS[s.quality], this.knobs);
     this.fogNearMul = this.knobs.fogNearMul ?? 1;

@@ -140,7 +140,6 @@ body {
 }
 
 .hud-speed-pill {
-  display: inline-flex;
   align-items: baseline;
   gap: 0.4rem;
   padding: 0.32rem 0.95rem 0.38rem;

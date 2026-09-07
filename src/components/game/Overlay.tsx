@@ -369,7 +369,7 @@ function Hud({
       </div>
       <div className="absolute top-[max(3.75rem,calc(env(safe-area-inset-top)+3rem))] right-[max(1rem,env(safe-area-inset-right))] hidden text-right md:block">
         {showSpeed ? (
-          <div className="hud-chrome hud-speed-pill ml-auto">
+          <div className="hud-chrome hud-speed-pill ml-auto inline-flex">
             <span className="hud-speed text-4xl leading-none">{formatSpeed(speed)}</span>
             <span className="hud-speed-unit">KM/H</span>
           </div>
