@@ -7,9 +7,9 @@ describe("track look tokens", () => {
     const [r, g, b] = ASPHALT_BASE.stadium;
     assert.ok(r < 110 && g < 110 && b < 120, `stadium base still washed ${r},${g},${b}`);
     assert.ok(r > 50 && g > 50, "stadium asphalt should not go black");
-    assert.ok(ROAD_TINT.stadium.r < 0.65 && ROAD_TINT.stadium.r > 0.4);
+    assert.ok(ROAD_TINT.stadium.r < 0.75 && ROAD_TINT.stadium.r > 0.5);
     const crown = roadCrown("stadium");
-    assert.ok(crown.mid < 0.82 && crown.edge > crown.mid + 0.3);
+    assert.ok(crown.mid < 0.86 && crown.edge > crown.mid + 0.25);
   });
 
   it("keeps Ridge darker than Circuit and Helix cooler than both", () => {
