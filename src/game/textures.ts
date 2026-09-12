@@ -79,6 +79,12 @@ export function makeLiveryTexture(night: boolean): THREE.CanvasTexture {
   ctx.fillStyle = night ? "#12182a" : "#1a1a1e";
   ctx.fillRect(0, size * 0.72, size, size * 0.28);
   ctx.globalAlpha = 1;
+  const gloss = ctx.createLinearGradient(0, 0, 0, size);
+  gloss.addColorStop(0, night ? "rgba(180,230,255,0.18)" : "rgba(255,255,255,0.16)");
+  gloss.addColorStop(0.35, "rgba(255,255,255,0)");
+  gloss.addColorStop(1, "rgba(0,0,0,0.08)");
+  ctx.fillStyle = gloss;
+  ctx.fillRect(0, 0, size, size);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;

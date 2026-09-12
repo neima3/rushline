@@ -94,17 +94,20 @@ body {
 
 .hud-chrome {
   position: relative;
-  background: rgba(8, 10, 16, 0.58);
-  border: 1px solid rgba(94, 232, 255, 0.18);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.72), rgba(8, 10, 16, 0.56));
+  border: 1px solid rgba(94, 232, 255, 0.24);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .hud-chrome::before,
+.hud-chrome::after,
 .hud-pause-card::after {
   content: "";
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   pointer-events: none;
 }
 
@@ -115,10 +118,21 @@ body {
   border-left: 1.5px solid #5ee8ff;
 }
 
+.hud-chrome::after {
+  right: 5px;
+  bottom: 5px;
+  border-right: 1.5px solid #ff5aa8;
+  border-bottom: 1.5px solid #ff5aa8;
+}
+
 .hud-timer-plate {
   min-width: 7.4rem;
-  padding: 0.42rem 0.95rem 0.5rem;
+  padding: 0.46rem 1.05rem 0.52rem;
   border-radius: 14px;
+}
+
+.hud-timer-plate::after {
+  display: none;
 }
 
 .hud-timer {
@@ -127,29 +141,32 @@ body {
   letter-spacing: -0.03em;
   text-shadow:
     0 1px 0 rgba(0, 0, 0, 0.72),
+    0 0 18px rgba(94, 232, 255, 0.18),
     0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
 .hud-timer-frac {
-  margin-top: 0.1rem;
+  margin-top: 0.12rem;
   font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
-  color: rgba(244, 244, 242, 0.72);
+  letter-spacing: 0.18em;
+  color: rgba(244, 244, 242, 0.7);
 }
 
 .hud-speed-pill {
   align-items: baseline;
   gap: 0.4rem;
-  padding: 0.32rem 0.95rem 0.38rem;
+  padding: 0.34rem 1rem 0.4rem;
   border-radius: 999px;
   box-shadow:
     0 10px 28px rgba(0, 0, 0, 0.32),
-    inset 0 -1.5px 0 #5ee8ff;
+    inset 0 -1.5px 0 #5ee8ff,
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.hud-speed-pill::before {
+.hud-speed-pill::before,
+.hud-speed-pill::after {
   display: none;
 }
 
@@ -160,7 +177,7 @@ body {
   letter-spacing: -0.04em;
   text-shadow:
     0 1px 0 rgba(0, 0, 0, 0.75),
-    0 0 16px rgba(0, 0, 0, 0.4);
+    0 0 16px rgba(94, 232, 255, 0.16);
 }
 
 .hud-speed-unit {
@@ -176,7 +193,7 @@ body {
 }
 
 .hud-medal {
-  box-shadow: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
 }
 
 .hud-medal-now {
@@ -190,14 +207,16 @@ body {
 }
 
 .hud-chip {
-  background: rgba(8, 10, 16, 0.62);
-  border: 1px solid rgba(94, 232, 255, 0.16);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.74), rgba(8, 10, 16, 0.6));
+  border: 1px solid rgba(94, 232, 255, 0.2);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .hud-pause-card {
   border-radius: 16px;
-  background: rgba(8, 10, 16, 0.86);
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.92), rgba(8, 10, 16, 0.88));
 }
 
 .hud-pause-card::after {
@@ -205,6 +224,52 @@ body {
   bottom: 8px;
   border-right: 1.5px solid #ff5aa8;
   border-bottom: 1.5px solid #ff5aa8;
+}
+
+.hud-meter-track {
+  background: rgba(44, 44, 51, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.hud-meter-fill-ok {
+  background: linear-gradient(90deg, #5ee8ff, #8dccad);
+  box-shadow: 0 0 10px rgba(94, 232, 255, 0.45);
+}
+
+.hud-meter-fill-gold {
+  background: linear-gradient(90deg, #e0c48a, #c4a574);
+  box-shadow: 0 0 10px rgba(196, 165, 116, 0.4);
+}
+
+.hud-meter-label {
+  letter-spacing: 0.16em;
+}
+
+.hud-countdown {
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.7),
+    0 0 28px rgba(94, 232, 255, 0.28);
+}
+
+.hud-countdown-go {
+  color: #8dccad;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.7),
+    0 0 32px rgba(141, 204, 173, 0.4);
+}
+
+.hud-wrong-way {
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 0 18px rgba(224, 120, 112, 0.45);
+}
+
+.hud-minimap {
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.78), rgba(8, 10, 16, 0.64));
+  border: 1px solid rgba(94, 232, 255, 0.2);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 @media (max-width: 768px) {

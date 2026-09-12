@@ -37,6 +37,10 @@ type MatOpts = {
   physical?: boolean;
   clearcoat?: number;
   clearcoatRoughness?: number;
+  sheen?: number;
+  sheenRoughness?: number;
+  sheenColor?: number;
+  envMapIntensity?: number;
 };
 
 export function makeCar(ghost: boolean): CarRig {
@@ -65,10 +69,14 @@ export function makeCar(ghost: boolean): CarRig {
       opts.physical || opts.clearcoat
         ? new THREE.MeshPhysicalMaterial({
             ...base,
-            transmission: opts.physical && !ghost ? 0.12 : 0,
-            thickness: opts.physical ? 0.18 : 0,
+            transmission: opts.physical && !ghost ? 0.1 : 0,
+            thickness: opts.physical ? 0.2 : 0,
             clearcoat: ghost ? 0 : (opts.clearcoat ?? 0),
             clearcoatRoughness: opts.clearcoatRoughness ?? 0.22,
+            sheen: ghost ? 0 : (opts.sheen ?? 0),
+            sheenRoughness: opts.sheenRoughness ?? 0.42,
+            sheenColor: new THREE.Color(opts.sheenColor ?? 0xffe4c4),
+            envMapIntensity: opts.envMapIntensity ?? 1,
           })
         : new THREE.MeshStandardMaterial(base);
     mats.push(m);
@@ -80,34 +88,47 @@ export function makeCar(ghost: boolean): CarRig {
   const nightLivery = ghost ? null : makeLiveryTexture(true);
   const bodyMat = mat({
     color: 0xffffff,
-    roughness: 0.24,
-    metalness: 0.38,
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.18,
+    roughness: 0.14,
+    metalness: 0.44,
+    clearcoat: 0.86,
+    clearcoatRoughness: 0.07,
+    sheen: 0.42,
+    sheenRoughness: 0.36,
+    sheenColor: 0xffe6cc,
+    envMapIntensity: 1.12,
   });
   if (dayLivery) {
     (bodyMat as THREE.MeshStandardMaterial).map = dayLivery;
     (bodyMat as THREE.MeshStandardMaterial).needsUpdate = true;
   }
-  const carbon = mat({ color: 0x1a1a1e, roughness: 0.4, metalness: 0.55, clearcoat: 0.18, clearcoatRoughness: 0.3 });
+  const carbon = mat({
+    color: 0x1a1a1e,
+    roughness: 0.32,
+    metalness: 0.62,
+    clearcoat: 0.28,
+    clearcoatRoughness: 0.22,
+  });
   const glass = mat({
     color: 0x0c1218,
-    roughness: 0.06,
-    metalness: 0.88,
+    roughness: 0.04,
+    metalness: 0.22,
     transparent: true,
-    opacity: ghost ? 0.18 : 0.58,
+    opacity: ghost ? 0.18 : 0.56,
     physical: true,
-    clearcoat: 0.7,
-    clearcoatRoughness: 0.08,
+    clearcoat: 1,
+    clearcoatRoughness: 0.05,
+    envMapIntensity: 1.35,
   });
   const gold = mat({
     color: 0xd2ae62,
-    roughness: 0.28,
-    metalness: 0.72,
+    roughness: 0.18,
+    metalness: 0.86,
     emissive: 0x3a2a14,
     emissiveIntensity: 0.22,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.2,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.12,
+    sheen: 0.2,
+    sheenColor: 0xffd88a,
   });
   const accent = mat({
     color: 0xef5a24,
@@ -117,7 +138,13 @@ export function makeCar(ghost: boolean): CarRig {
     emissiveIntensity: 0.2,
   });
   const rubber = mat({ color: 0x0c0c0e, roughness: 0.92, metalness: 0.04 });
-  const rim = mat({ color: 0xd0d4dc, roughness: 0.22, metalness: 0.88, clearcoat: 0.4, clearcoatRoughness: 0.18 });
+  const rim = mat({
+    color: 0xd0d4dc,
+    roughness: 0.14,
+    metalness: 0.92,
+    clearcoat: 0.62,
+    clearcoatRoughness: 0.1,
+  });
   const headMat = mat({ color: 0xf2f0e4, roughness: 0.15, metalness: 0.4, emissive: 0xf2f0e4, emissiveIntensity: ghost ? 0.1 : 1.15 });
   const tailMat = mat({ color: 0xff2a22, roughness: 0.3, metalness: 0.2, emissive: 0xff2a22, emissiveIntensity: ghost ? 0.1 : 0.65 });
   const flameMat = mat({
@@ -127,8 +154,10 @@ export function makeCar(ghost: boolean): CarRig {
     emissive: 0xff6a20,
     emissiveIntensity: 1.8,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.92,
   });
+  flameMat.blending = THREE.AdditiveBlending;
+  flameMat.depthWrite = false;
 
   const add = (mesh: THREE.Mesh, parent: THREE.Object3D = body) => {
     mesh.castShadow = !ghost;
@@ -210,8 +239,9 @@ export function makeCar(ghost: boolean): CarRig {
   }
 
   let cabinGlow: THREE.PointLight | null = null;
+  let boostLight: THREE.PointLight | null = null;
   if (!ghost) {
-    const flameGeo = new THREE.ConeGeometry(0.06, 0.32, 6);
+    const flameGeo = new THREE.ConeGeometry(0.07, 0.38, 7);
     flameGeo.rotateX(-Math.PI / 2);
     for (const x of [-0.18, 0.18]) {
       const f = new THREE.Mesh(flameGeo, flameMat);
@@ -225,6 +255,9 @@ export function makeCar(ghost: boolean): CarRig {
     glow.position.set(0, 0.45, 0.2);
     body.add(glow);
     cabinGlow = glow;
+    boostLight = new THREE.PointLight(0xff7a2a, 0, 7.5, 2);
+    boostLight.position.set(0, 0.22, -1.28);
+    body.add(boostLight);
   }
 
   group.add(body);
@@ -296,11 +329,16 @@ export function makeCar(ghost: boolean): CarRig {
   };
 
   const setBoostVisual = (amount: number) => {
+    const on = amount > 0.05 && !ghost;
+    const flicker = on ? 0.82 + Math.random() * 0.36 : 1;
     for (const f of flames) {
-      f.visible = amount > 0.05 && !ghost;
-      f.scale.set(1, 1, 0.4 + amount * 1.8);
+      f.visible = on;
+      f.scale.set(0.75 + amount * 0.55, 0.75 + amount * 0.55, (0.42 + amount * 2.15) * flicker);
     }
-    if (!ghost) (flameMat as THREE.MeshStandardMaterial).emissiveIntensity = 1.2 + amount * 2.2;
+    if (!ghost) {
+      (flameMat as THREE.MeshStandardMaterial).emissiveIntensity = 1.35 + amount * 3.1 * flicker;
+      if (boostLight) boostLight.intensity = on ? 1.05 + amount * 2.6 : 0;
+    }
   };
 
   const setHeadlights = (on: boolean) => {
@@ -318,12 +356,24 @@ export function makeCar(ghost: boolean): CarRig {
       bm.needsUpdate = true;
     }
     bm.emissive.setHex(night ? 0x1a2848 : 0x000000);
-    bm.emissiveIntensity = night ? 0.22 : 0;
+    bm.emissiveIntensity = night ? 0.18 : 0;
+    const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
+    bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : 0xffe6cc);
+    // Circuit High scene env stays 0.08 so asphalt does not wash. The car
+    // multiplies that back up so clearcoat can still read the sky.
+    const env = night ? 1.3 : theme === "canyon" ? 1.22 : 3.45;
+    bodyPhys.envMapIntensity = env;
+    bodyPhys.clearcoat = night ? 0.78 : 0.86;
+    (glass as THREE.MeshPhysicalMaterial).envMapIntensity = env * 1.1;
+    (gold as THREE.MeshPhysicalMaterial).envMapIntensity = env;
+    (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
+    (rim as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.85;
     (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
     (accent as THREE.MeshStandardMaterial).color.setHex(night ? 0x3de8ff : 0xef5a24);
     (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? 0x146880 : 0x4a1808);
     (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;
     (rim as THREE.MeshStandardMaterial).color.setHex(night ? 0x8a78c0 : 0xd0d4dc);
+    if (boostLight) boostLight.color.setHex(night ? 0x4ef0ff : 0xff7a2a);
   };
 
   return {
