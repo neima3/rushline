@@ -238,6 +238,7 @@ export class World {
   private landJuice = 0;
   private boostJuice = 0;
   private wasAir = false;
+  private prevBoost = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -522,6 +523,7 @@ export class World {
     this.landJuice = 0;
     this.boostJuice = 0;
     this.wasAir = false;
+    this.prevBoost = 0;
     const helixSnap = this.builtTrack?.def.id === "helix";
     // Circuit keeps the #9 hold. Helix Night needs a longer snap so chase
     // cannot walk under the ribbon on the same frame as R.
@@ -642,10 +644,12 @@ export class World {
       this.boostJuice = 1;
       this.vfx.emitTurbo(snap);
     }
-    if (snap.justBoost) {
-      this.boostJuice = Math.max(this.boostJuice, 0.78);
+    const padHit = snap.justBoost || (snap.boost > 0.16 && this.prevBoost <= 0.08);
+    if (padHit) {
+      this.boostJuice = Math.max(this.boostJuice, snap.justBoost ? 0.92 : 0.78);
       this.vfx.emitBoostBurst(snap);
     }
+    this.prevBoost = snap.boost;
     this.wasAir = snap.airborne;
     this.landJuice = Math.max(0, this.landJuice - dt * 3.4);
     this.boostJuice = Math.max(0, this.boostJuice - dt * 2.5);

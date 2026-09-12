@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
+import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
 import { allTrackDefs, getTrack, medalFor, medalPace, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { Medal, TrackId } from "@/game/types";
@@ -362,10 +363,11 @@ function Hud({
           {ghostDelta != null ? (
             <p
               className={cn(
-                "hud-ghost-delta mt-1 text-[11px] font-semibold tabular-nums tracking-wide",
+                "hud-ghost-delta mt-1 font-semibold tabular-nums tracking-wide",
                 ghostDelta > 20 ? "text-danger" : ghostDelta < -20 ? "text-ok" : "text-muted",
               )}
             >
+              <span className="hud-ghost-tag">GHOST</span>
               {formatDelta(ghostDelta)}
             </p>
           ) : null}
@@ -385,12 +387,18 @@ function Hud({
             CP {cp}/{cpTotal}
           </span>
           <span className="flex items-center gap-1.5">
-            <MedalRow medal={medal} compact pace />
-            {medal && medalRemain != null ? (
-              <span className="tabular-nums tracking-wide text-fg/80">{formatTime(medalRemain)}</span>
-            ) : (
-              <span className="text-subtle">—</span>
-            )}
+            <span className="hidden sm:flex">
+              <MedalRow medal={medal} compact pace />
+            </span>
+            <span
+              className={cn(
+                "hud-pace-chip tabular-nums tracking-wide",
+                medal ? "text-fg" : "text-subtle",
+              )}
+            >
+              {medalPaceLabel(medal)}
+              {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}
+            </span>
           </span>
         </div>
         <div className="mt-1 flex gap-3 md:hidden">

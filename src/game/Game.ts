@@ -439,6 +439,7 @@ export class Game {
     const alpha = Math.max(0, Math.min(1, this.acc / FIXED_DT));
     const vis = lerpSnap(this.prev, this.curr, alpha);
     this.world.applyCar(vis, dt, actions.steer, actions.brake);
+    this.car.clearFeelPulses();
     this.world.applyGhost(this.track, this.ghost, this.time);
     this.world.stepParticles(dt);
     const attract = this.phase === "menu" || this.phase === "select";
