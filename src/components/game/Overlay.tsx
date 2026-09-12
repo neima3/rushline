@@ -283,9 +283,12 @@ function Menu({
                 type="button"
                 onMouseDown={keepPlayFocus}
                 onClick={() => onRace(t.id)}
-                className="flex overflow-hidden rounded-xl border border-border bg-surface text-left"
+                data-track={t.id}
+                className="track-card flex overflow-hidden rounded-xl border border-border bg-surface text-left"
               >
-                <img src={t.thumb} alt="" className="h-24 w-28 shrink-0 object-cover" crossOrigin="anonymous" />
+                <span className="track-card-thumb relative h-24 w-28 shrink-0 overflow-hidden">
+                  <img src={t.thumb} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                </span>
                 <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
                   <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
                   <span className="mt-1 text-xs text-muted">{t.blurb}</span>
@@ -389,7 +392,7 @@ function Hud({
             {medalPaceLabel(medal)}
             {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}
           </span>
-          <div className="hud-meta flex items-center gap-2.5 text-[11px] font-medium uppercase tracking-widest text-muted">
+          <div className="hud-meta flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest">
             <span className="flex items-center gap-1">
               <Flag className="size-3" />
               {lap}/{laps}
@@ -648,10 +651,11 @@ function MiniMap({
       data-minimap="1"
       className="pointer-events-none absolute top-[max(4.55rem,calc(env(safe-area-inset-top)+3.7rem))] left-[max(0.7rem,env(safe-area-inset-left))] md:hidden"
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-md border border-border/80 bg-bg/55">
-        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" className="text-muted" />
-        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.2" fill="#5ee8ff" opacity="0.9" /> : null}
-        <circle cx={car.x} cy={car.y} r="2.6" className="fill-accent" />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="hud-minimap-mobile rounded-md">
+        <path d={d} fill="none" stroke="rgba(8,10,16,0.75)" strokeWidth="3.4" strokeLinejoin="round" />
+        <path d={d} fill="none" stroke="rgba(244,244,242,0.78)" strokeWidth="1.8" strokeLinejoin="round" />
+        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.3" fill="#5ee8ff" stroke="#081018" strokeWidth="0.7" /> : null}
+        <circle cx={car.x} cy={car.y} r="2.8" fill="#f4f4f2" stroke="#09090b" strokeWidth="0.8" />
       </svg>
     </div>
   );

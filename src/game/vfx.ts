@@ -117,6 +117,12 @@ export class Vfx {
     for (let i = 0; i < n; i++) this.spawn(this.sparks, this.sparkCap, snap, "curb");
   }
 
+  /** Wheel-contact sparks while sliding — lateral, low, short. */
+  emitSlideSparks(snap: CarSnap) {
+    const n = Math.max(0, Math.round(6 * this.sparkScale));
+    for (let i = 0; i < n; i++) this.spawn(this.sparks, this.sparkCap, snap, "slide");
+  }
+
   emitSmoke(snap: CarSnap, count: number) {
     const n = Math.max(0, Math.round(count * this.smokeScale));
     for (let i = 0; i < n; i++) this.spawn(this.smoke, this.smokeCap, snap, "smoke");
@@ -128,9 +134,9 @@ export class Vfx {
   }
 
   emitLand(snap: CarSnap, hard: boolean) {
-    const smokeN = Math.max(0, Math.round((hard ? 14 : 7) * this.smokeScale));
-    const sparkN = Math.max(0, Math.round((hard ? 10 : 4) * this.sparkScale));
-    for (let i = 0; i < smokeN; i++) this.spawn(this.smoke, this.smokeCap, snap, "land");
+    const dustN = Math.max(0, Math.round((hard ? 16 : 8) * this.smokeScale));
+    const sparkN = Math.max(0, Math.round((hard ? 6 : 0) * this.sparkScale));
+    for (let i = 0; i < dustN; i++) this.spawn(this.smoke, this.smokeCap, snap, "dust");
     for (let i = 0; i < sparkN; i++) this.spawn(this.sparks, this.sparkCap, snap, "spark");
   }
 
@@ -193,28 +199,54 @@ export class Vfx {
     cloud: Cloud,
     cap: number,
     snap: CarSnap,
-    kind: "spark" | "boostSpark" | "curb" | "smoke" | "trail" | "land" | "turbo",
+    kind: "spark" | "boostSpark" | "curb" | "slide" | "smoke" | "trail" | "land" | "dust" | "turbo",
   ) {
     const slot = pickSlot(cloud.life, cap);
-    const rear = kind === "trail" || kind === "turbo" ? 1.22 : kind === "land" ? 0.35 : 1.02;
-    const pipe = kind === "trail" || kind === "turbo" || kind === "boostSpark" ? (Math.random() < 0.5 ? -0.2 : 0.2) : 0;
-    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" ? 1.15 : 0.55);
+    const rear =
+      kind === "trail" || kind === "turbo" ? 1.22 : kind === "land" || kind === "dust" ? 0.2 : kind === "slide" ? 0.15 : 1.02;
+    const pipe =
+      kind === "trail" || kind === "turbo" || kind === "boostSpark"
+        ? Math.random() < 0.5
+          ? -0.2
+          : 0.2
+        : kind === "slide"
+          ? Math.random() < 0.5
+            ? -0.52
+            : 0.52
+          : 0;
+    const along = kind === "slide" ? (Math.random() < 0.5 ? 0.62 : -0.58) : 0;
+    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" || kind === "dust" ? 1.15 : 0.55);
     const rx = -snap.fz;
     const rz = snap.fx;
+    const puff = kind === "smoke" || kind === "land" || kind === "dust";
     cloud.life[slot] =
-      kind === "smoke" || kind === "land"
-        ? 0.5 + Math.random() * 0.42
-        : kind === "trail" || kind === "turbo"
-          ? 0.26 + Math.random() * 0.2
-          : 0.24 + Math.random() * 0.28;
-    cloud.pos[slot * 3] = snap.px - snap.fx * rear + rx * pipe + (kind === "smoke" || kind === "land" ? rx : 1) * side * 0.35;
-    cloud.pos[slot * 3 + 1] = snap.py + (kind === "land" ? 0.02 : kind === "smoke" ? 0.12 : 0.1) + Math.random() * 0.1;
-    cloud.pos[slot * 3 + 2] = snap.pz - snap.fz * rear + rz * pipe + (kind === "smoke" || kind === "land" ? rz : 1) * side * 0.35;
-    if (kind === "smoke" || kind === "land") {
+      kind === "dust"
+        ? 0.62 + Math.random() * 0.48
+        : kind === "smoke" || kind === "land"
+          ? 0.5 + Math.random() * 0.42
+          : kind === "slide"
+            ? 0.16 + Math.random() * 0.14
+            : kind === "trail" || kind === "turbo"
+              ? 0.26 + Math.random() * 0.2
+              : 0.24 + Math.random() * 0.28;
+    cloud.pos[slot * 3] = snap.px - snap.fx * (rear - along) + rx * pipe + (puff ? rx : 1) * side * 0.35;
+    cloud.pos[slot * 3 + 1] =
+      snap.py + (kind === "dust" || kind === "land" ? 0.01 : kind === "slide" ? -0.18 : kind === "smoke" ? 0.12 : 0.1) + Math.random() * 0.08;
+    cloud.pos[slot * 3 + 2] = snap.pz - snap.fz * (rear - along) + rz * pipe + (puff ? rz : 1) * side * 0.35;
+    if (kind === "dust") {
+      cloud.vel[slot * 3] = -snap.fx * (0.25 + Math.random() * 0.5) + rx * (Math.random() - 0.5) * 3.4;
+      cloud.vel[slot * 3 + 1] = 0.35 + Math.random() * 0.7;
+      cloud.vel[slot * 3 + 2] = -snap.fz * (0.25 + Math.random() * 0.5) + rz * (Math.random() - 0.5) * 3.4;
+    } else if (kind === "smoke" || kind === "land") {
       const up = kind === "land" ? 1.8 : 0.55;
       cloud.vel[slot * 3] = -snap.fx * (0.6 + Math.random()) + (Math.random() - 0.5) * (kind === "land" ? 2.4 : 0.8);
       cloud.vel[slot * 3 + 1] = up + Math.random() * 0.9;
       cloud.vel[slot * 3 + 2] = -snap.fz * (0.6 + Math.random()) + (Math.random() - 0.5) * (kind === "land" ? 2.4 : 0.8);
+    } else if (kind === "slide") {
+      const out = Math.sign(pipe) || (Math.random() < 0.5 ? -1 : 1);
+      cloud.vel[slot * 3] = rx * out * (2.2 + Math.random() * 3.4) - snap.fx * (0.4 + Math.random());
+      cloud.vel[slot * 3 + 1] = 0.15 + Math.random() * 0.85;
+      cloud.vel[slot * 3 + 2] = rz * out * (2.2 + Math.random() * 3.4) - snap.fz * (0.4 + Math.random());
     } else if (kind === "trail" || kind === "turbo") {
       const punch = kind === "turbo" ? 9 : 7.2;
       cloud.vel[slot * 3] = -snap.fx * (punch + Math.random() * 4.5) + rx * (Math.random() - 0.5) * 0.45;

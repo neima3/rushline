@@ -661,11 +661,14 @@ export class World {
     const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s).width : 12;
     const curb = isOnCurb(snap.n, width, snap.airborne);
     if (snap.boost > 0.05) this.vfx.emitTrail(snap, 9);
-    if (snap.boost > 0.05 || snap.slide > 0.4 || snap.airborne) {
-      this.vfx.emitSparks(snap, snap.boost > 0.05 ? 9 : snap.slide > 0.5 ? 4 : 2, snap.boost > 0.05);
+    if (snap.boost > 0.05 || snap.airborne) {
+      this.vfx.emitSparks(snap, snap.boost > 0.05 ? 9 : 2, snap.boost > 0.05);
     }
     if (curb && Math.abs(snap.speed) > 6) this.vfx.emitCurbSparks(snap);
-    if (snap.slide > 0.32 && Math.abs(snap.speed) > 8 && !snap.airborne) this.vfx.emitSmoke(snap, 4);
+    if (snap.slide > 0.32 && Math.abs(snap.speed) > 8 && !snap.airborne) {
+      this.vfx.emitSmoke(snap, 4);
+      this.vfx.emitSlideSparks(snap);
+    }
     this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
