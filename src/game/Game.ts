@@ -1,6 +1,14 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
 import { getTrack, medalFor, medalPace } from "./track";
-import { ghostSplitMs } from "./feel";
+import {
+  cpFlashHoldMs,
+  cpFlashLabel,
+  ghostDeltaSmooth,
+  ghostLead,
+  ghostRaceSplitMs,
+  ghostSplitMs,
+  ghostTimeAtS,
+} from "./feel";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
@@ -49,6 +57,9 @@ export class Game {
   private attractS = 0;
   private recording: GhostFrame[] = [];
   private ghost: GhostFrame[] | null = null;
+  private ghostSmooth: number | null = null;
+  private cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null = null;
+  private cpFlashUntil = 0;
   private reduced = false;
   private injectSteer: number | null = null;
   private canvas: HTMLCanvasElement;
@@ -245,6 +256,9 @@ export class Game {
     this.countdownAt = performance.now();
     this.pausedFrom = null;
     this.recording = [];
+    this.ghostSmooth = null;
+    this.cpFlash = null;
+    this.cpFlashUntil = 0;
     this.phase = "countdown";
     this.lastT = this.countdownAt;
     this.world.snapCamera(this.curr, this.camera);
@@ -263,6 +277,8 @@ export class Game {
       ghostDelta: null,
       ghostS: null,
       ghostN: null,
+      ghostLead: null,
+      cpFlash: null,
       wrongWay: false,
     });
     this.audio.unlock();
@@ -406,12 +422,18 @@ export class Game {
         if (this.car.justCp || this.car.justLap) {
           this.audio.checkpoint();
           this.world.addTrauma(0.12);
+          this.world.flashTiming(this.car.snap(), this.car.justLap ? "lap" : "cp");
+          this.armCpFlash(this.car.justLap ? "lap" : "cp", now);
         }
         if (this.car.wallHit > 0.15) {
           this.audio.crash();
           this.input.rumble("crash");
         }
-        if (this.car.justFinish) this.onFinish();
+        if (this.car.justFinish) {
+          this.armCpFlash("finish", now);
+          this.world.flashTiming(this.car.snap(), "finish");
+          this.onFinish();
+        }
         if (this.car.justRespawn) {
           this.camSnapAfterSim = true;
           this.afterSimRespawn();
@@ -444,7 +466,7 @@ export class Game {
     const vis = lerpSnap(this.prev, this.curr, alpha);
     this.world.applyCar(vis, dt, actions.steer, actions.brake);
     this.car.clearFeelPulses();
-    this.world.applyGhost(this.track, this.ghost, this.time);
+    this.world.applyGhost(this.track, this.ghost, this.time, this.car.s, this.ghostSmooth);
     this.world.stepParticles(dt);
     const attract = this.phase === "menu" || this.phase === "select";
     this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
@@ -466,10 +488,20 @@ export class Game {
           ? medalPace(this.trackId, this.phase === "countdown" ? 0 : this.time)
           : { holding: null, remain: null };
       const ghost = ghostAt(this.ghost, this.time);
-      const ghostDelta =
-        ghost && this.phase === "race"
-          ? ghostSplitMs(ghost.s, this.car.s, vis.speed, this.track.length, this.track.def.closed)
-          : null;
+      let ghostDelta: number | null = null;
+      if (ghost && this.phase === "race") {
+        const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
+        ghostDelta = ghostRaceSplitMs(this.time, atS);
+        if (ghostDelta == null) {
+          ghostDelta = ghostSplitMs(ghost.s, this.car.s, vis.speed, this.track.length, this.track.def.closed);
+        }
+        this.ghostSmooth = ghostDeltaSmooth(this.ghostSmooth, ghostDelta, this.hudAcc || 0.08);
+        ghostDelta = this.ghostSmooth;
+      } else {
+        this.ghostSmooth = null;
+      }
+      const flash = now < this.cpFlashUntil ? this.cpFlash : null;
+      if (!flash) this.cpFlash = null;
       useGame.getState().setHud({
         time: this.time,
         speed: vis.speed,
@@ -489,10 +521,23 @@ export class Game {
         ghostS: ghost?.s ?? null,
         ghostN: ghost?.n ?? null,
         ghostDelta,
+        ghostLead: ghostLead(ghostDelta),
         medalRemain: pace.remain,
+        cpFlash: flash,
       });
     }
   };
+
+  private armCpFlash(kind: "cp" | "lap" | "finish", now: number) {
+    const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
+    const delta = this.phase === "race" ? ghostRaceSplitMs(this.time, atS) : null;
+    this.cpFlash = {
+      kind,
+      delta,
+      label: cpFlashLabel(kind, this.car.lastCp + 1),
+    };
+    this.cpFlashUntil = now + cpFlashHoldMs();
+  }
 
   private onFinish() {
     const time = this.time;

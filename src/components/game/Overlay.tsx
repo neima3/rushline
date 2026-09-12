@@ -72,8 +72,10 @@ export function Overlay({ gameRef }: Props) {
           medal={hud.medal}
           medalRemain={hud.medalRemain}
           ghostDelta={hud.ghostDelta}
+          ghostLead={hud.ghostLead}
           ghostS={hud.ghostS}
           ghostN={hud.ghostN}
+          cpFlash={hud.cpFlash}
           wrongWay={hud.wrongWay}
           countdown={phase === "countdown" ? hud.countdown : null}
           boost={hud.boost}
@@ -320,8 +322,10 @@ function Hud({
   medal,
   medalRemain,
   ghostDelta,
+  ghostLead,
   ghostS,
   ghostN,
+  cpFlash,
   wrongWay,
   countdown,
   boost,
@@ -341,8 +345,10 @@ function Hud({
   medal: Medal | null;
   medalRemain: number | null;
   ghostDelta: number | null;
+  ghostLead: "ahead" | "behind" | "even" | null;
   ghostS: number | null;
   ghostN: number | null;
+  cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
   wrongWay: boolean;
   countdown: number | null;
   boost: number;
@@ -372,7 +378,29 @@ function Hud({
               {formatDelta(ghostDelta)}
             </p>
           ) : null}
+          {ghostLead ? (
+            <p
+              className={cn(
+                "hud-ghost-lead",
+                ghostLead === "ahead" ? "text-ok" : ghostLead === "behind" ? "text-danger" : "text-muted",
+              )}
+            >
+              {ghostLead === "ahead" ? "▲ AHEAD" : ghostLead === "behind" ? "▼ BEHIND" : "● EVEN"}
+            </p>
+          ) : null}
         </div>
+        {cpFlash ? (
+          <p
+            key={`${cpFlash.kind}-${cpFlash.label}-${cpFlash.delta ?? "x"}`}
+            className={cn(
+              "hud-cp-toast",
+              cpFlash.delta == null ? "text-fg" : cpFlash.delta > 12 ? "text-danger" : cpFlash.delta < -12 ? "text-ok" : "text-fg",
+            )}
+          >
+            <span>{cpFlash.label}</span>
+            {cpFlash.delta != null ? <span className="hud-cp-toast-delta">{formatDelta(cpFlash.delta)}</span> : null}
+          </p>
+        ) : null}
         {showSpeed ? (
           <div className="hud-chrome hud-speed-pill mt-2 inline-flex md:hidden">
             <span className="hud-speed text-[1.65rem] leading-none">{formatSpeed(speed)}</span>

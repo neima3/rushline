@@ -2,15 +2,23 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   CANYON_PLANT_S,
+  airRibbonPull,
+  airYawSettle,
   camBoostPull,
   camFollowRate,
   camFovTarget,
   camFwdRate,
   camLandDrop,
   camLookAhead,
+  cpFlashHoldMs,
+  cpFlashLabel,
   curbSnap,
   driftSteerThreshold,
+  ghostDeltaSmooth,
+  ghostLead,
+  ghostRaceSplitMs,
   ghostSplitMs,
+  ghostTimeAtS,
   headingAlign,
   headingReturn,
   airPitchAccel,
@@ -26,8 +34,13 @@ import {
   plantLateral,
   residualAlign,
   shapeTouchSteer,
+  slideCommitted,
+  slideReleaseSnap,
+  slideYawLimit,
   stayPlanted,
+  steerBite,
   steerCurve,
+  steerFilter,
   TOUCH_STEER_DEADZONE,
   trackAssistScale,
 } from "./feel.ts";
@@ -257,5 +270,71 @@ describe("medal pace HUD copy", () => {
     assert.equal(medalPaceLabel(null), "OUT");
     assert.equal(formatPaceRemain(6_200), "6.2");
     assert.equal(formatPaceRemain(72_000), "1:12.0");
+  });
+});
+
+describe("steer response (TM snap, analog ease)", () => {
+  it("applies digital lock instantly and eases analog", () => {
+    assert.equal(steerFilter(0, 1, 1 / 60, false), 1);
+    const analog = steerFilter(0, 1, 1 / 60, true);
+    assert.ok(analog > 0.2 && analog < 0.45, `analog step ${analog}`);
+    assert.ok(steerBite(0.2) > steerBite(0.8));
+    assert.ok(steerBite(0.2) > 1.1);
+    assert.ok(steerBite(0.9) >= 1);
+  });
+});
+
+describe("slide commit / exit", () => {
+  it("latches a committed dirt slide until Slide is released", () => {
+    assert.equal(slideCommitted(true, 0.4, 14, false), true);
+    assert.equal(slideCommitted(true, 0.08, 14, true), true);
+    assert.equal(slideCommitted(true, 0.08, 14, false), false);
+    assert.equal(slideCommitted(false, 0.4, 14, true), false);
+    assert.ok(slideYawLimit(true, true) > slideYawLimit(false, true));
+    assert.ok(slideReleaseSnap(true, 0) > 6);
+    assert.equal(slideReleaseSnap(false, 0), 0);
+  });
+});
+
+describe("air line authority", () => {
+  it("settles yaw when not steering and pulls toward a lined drop", () => {
+    assert.equal(airYawSettle(0.4, 0.3), 0);
+    assert.ok(airYawSettle(0, 0.3) > 1);
+    assert.ok(airYawSettle(0, 0.9) > airYawSettle(0, 0.3));
+    assert.equal(airRibbonPull(0.4, -2, 0.4), 0);
+    assert.ok(airRibbonPull(3.2, -2, 0.4) > 4);
+    assert.equal(airRibbonPull(3.2, 4, 0.4), 0);
+  });
+});
+
+describe("ghost race split + CP flash", () => {
+  it("uses ghost clock at the same s (true TM split)", () => {
+    const frames = [
+      { t: 0, s: 0 },
+      { t: 1000, s: 20 },
+      { t: 2000, s: 40 },
+    ];
+    assert.equal(ghostTimeAtS(frames, 20, 200, true), 1000);
+    assert.ok(Math.abs((ghostTimeAtS(frames, 30, 200, true) ?? 0) - 1500) < 1);
+    assert.equal(ghostRaceSplitMs(1800, 1500), 300);
+    assert.equal(ghostRaceSplitMs(1200, 1500), -300);
+    assert.equal(ghostLead(80), "behind");
+    assert.equal(ghostLead(-80), "ahead");
+    assert.equal(ghostLead(10), "even");
+    const smoothed = ghostDeltaSmooth(0, 400, 0.08);
+    assert.ok(smoothed != null && smoothed > 0 && smoothed < 400);
+    assert.equal(cpFlashLabel("cp", 2), "CP 2");
+    assert.equal(cpFlashLabel("finish", 3), "FINISH");
+    assert.ok(cpFlashHoldMs() > 1000 && cpFlashHoldMs() < 1800);
+  });
+
+  it("wraps a closed-track ghost sample across the seam", () => {
+    const frames = [
+      { t: 4000, s: 190 },
+      { t: 4200, s: 198 },
+      { t: 4400, s: 4 },
+    ];
+    const t = ghostTimeAtS(frames, 0, 200, true);
+    assert.ok(t != null && t > 4200 && t < 4400, `seam t ${t}`);
   });
 });

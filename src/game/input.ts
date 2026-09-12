@@ -1,6 +1,7 @@
 import type { Actions, PadInfo } from "./types";
 import { padInfoFrom, pollPads, rumblePads } from "./gamepad";
 import { resolveSampleDrive } from "./auto-throttle";
+import { steerFilter } from "./feel";
 import { applySteerSettings } from "./settings";
 
 const GAME_CODES = new Set([
@@ -53,6 +54,8 @@ export class Input {
   };
   private surface: HTMLElement | null = null;
   private lastKeyStamp = -1;
+  private filtSteer = 0;
+  private lastSampleAt = 0;
   private onKeyDown: (e: KeyboardEvent) => void;
   private onKeyUp: (e: KeyboardEvent) => void;
   private onBlur: () => void;
@@ -217,6 +220,12 @@ export class Input {
       sensitivity: this.touchSteerSensitivity,
       invert: this.invertSteer,
     });
+    const now = performance.now();
+    const dt = this.lastSampleAt ? Math.min(0.05, (now - this.lastSampleAt) / 1000) : 1 / 60;
+    this.lastSampleAt = now;
+    const analog = Math.abs(this.touchSteer) > 0.02 || Boolean(gp && Math.abs(gp.steer) > 0.08);
+    steer = steerFilter(this.filtSteer, steer, dt, analog);
+    this.filtSteer = steer;
 
     const slideHeld =
       this.down("Space") ||

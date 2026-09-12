@@ -14,6 +14,7 @@ export type CarRig = {
   setBoostVisual: (amount: number) => void;
   setHeadlights: (on: boolean) => void;
   setOpacity: (opacity: number) => void;
+  setGhostRace: (splitMs: number | null, playerS: number, ghostS: number) => void;
   setTheme: (theme: ThemeId) => void;
   applyPose: (
     steer: number,
@@ -395,6 +396,20 @@ export function makeCar(ghost: boolean): CarRig {
         m.transparent = next < 0.99;
         m.needsUpdate = true;
       });
+    },
+    setGhostRace: (splitMs, _playerS, _ghostS) => {
+      if (!ghost) return;
+      const behind = splitMs != null && splitMs > 48;
+      const ahead = splitMs != null && splitMs < -48;
+      const hex = ahead ? 0x6ee8b8 : behind ? 0xff7a9a : 0x5ee8ff;
+      const glow = ahead ? 0.32 : behind ? 0.78 : 0.42;
+      for (const m of mats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (sm.emissive) {
+          sm.emissive.setHex(hex);
+          sm.emissiveIntensity = glow;
+        }
+      }
     },
     setTheme,
     applyPose,

@@ -150,6 +150,14 @@ export class Vfx {
     }
   }
 
+  emitCheckpoint(snap: CarSnap, finish: boolean) {
+    const n = Math.max(0, Math.round((finish ? 18 : 10) * this.sparkScale));
+    for (let i = 0; i < n; i++) this.spawn(this.sparks, this.sparkCap, snap, finish ? "boostSpark" : "spark");
+    for (let i = 0; i < Math.max(0, Math.round((finish ? 8 : 4) * this.smokeScale)); i++) {
+      this.spawn(this.trail, this.trailCap, snap, "turbo");
+    }
+  }
+
   private makeCloud(
     max: number,
     opts: { color: number; size: number; map: THREE.Texture; opacity: number; additive: boolean },
