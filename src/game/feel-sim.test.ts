@@ -99,6 +99,10 @@ describe("mobile feel sims", () => {
   });
 
   it("medal pace drops Author then Gold without rewriting finish medals", () => {
+    const grid = medalPace("circuit", 0);
+    assert.equal(grid.holding, "author");
+    assert.ok(grid.remain != null && grid.remain >= 50_000);
+
     const early = medalPace("circuit", 1_000);
     assert.equal(early.holding, "author");
     assert.ok(early.remain != null && early.remain > 40_000);

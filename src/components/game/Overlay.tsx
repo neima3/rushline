@@ -378,28 +378,28 @@ function Hud({
             <span className="hud-speed-unit">KM/H</span>
           </div>
         ) : null}
-        <div className="hud-meta mt-1.5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-muted">
-          <span className="flex items-center gap-1">
-            <Flag className="size-3" />
-            {lap}/{laps}
+        <div className="hud-pace mt-1.5 flex flex-col items-center gap-1">
+          <span
+            className={cn(
+              "hud-pace-chip tabular-nums tracking-wide",
+              medal ? "text-fg" : "text-subtle",
+            )}
+          >
+            {medalPaceLabel(medal)}
+            {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}
           </span>
-          <span>
-            CP {cp}/{cpTotal}
-          </span>
-          <span className="flex items-center gap-1.5">
+          <div className="hud-meta flex items-center gap-2.5 text-[11px] font-medium uppercase tracking-widest text-muted">
+            <span className="flex items-center gap-1">
+              <Flag className="size-3" />
+              {lap}/{laps}
+            </span>
+            <span>
+              CP {cp}/{cpTotal}
+            </span>
             <span className="hidden sm:flex">
               <MedalRow medal={medal} compact pace />
             </span>
-            <span
-              className={cn(
-                "hud-pace-chip tabular-nums tracking-wide",
-                medal ? "text-fg" : "text-subtle",
-              )}
-            >
-              {medalPaceLabel(medal)}
-              {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}
-            </span>
-          </span>
+          </div>
         </div>
         <div className="mt-1 flex gap-3 md:hidden">
           <Meter label="Boost" value={Math.min(1, boost / 1.25)} tone="ok" show={boost > 0.05} />
