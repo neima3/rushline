@@ -2,12 +2,21 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   CANYON_PLANT_S,
+  camBoostPull,
+  camFollowRate,
+  camFovTarget,
+  camFwdRate,
+  camLandDrop,
+  camLookAhead,
   curbSnap,
   driftSteerThreshold,
+  ghostSplitMs,
   headingAlign,
+  headingReturn,
   openingHeadingBleed,
   openingLandLock,
   plantLateral,
+  residualAlign,
   shapeTouchSteer,
   stayPlanted,
   steerCurve,
@@ -169,5 +178,44 @@ describe("track assist heading + plant + curb", () => {
     const helix = curbSnap({ n: 5.4, heading: -0.2, width: 11.5, trackId: "helix", s: 40, assist: "high" });
     assert.equal(helix.hit, false);
     assert.equal(helix.n, 5.4);
+  });
+});
+
+describe("residualAlign", () => {
+  it("straightens on Off and stays out of Medium/High headingAlign", () => {
+    assert.ok(residualAlign(0, false, "off") > 3);
+    assert.ok(residualAlign(0.15, false, "off") > 0.4);
+    assert.equal(residualAlign(0, false, "low"), 0);
+    assert.equal(residualAlign(0, false, "medium"), 0);
+    assert.equal(residualAlign(0, false, "high"), 0);
+    assert.equal(headingAlign(0, false, "off"), 0);
+    assert.ok(headingReturn(0, false, "off") > 3);
+    assert.equal(headingReturn(0, false, "medium"), headingAlign(0, false, "medium"));
+    assert.equal(headingReturn(0, false, "high"), headingAlign(0, false, "high"));
+  });
+});
+
+describe("camera feel helpers", () => {
+  it("settles yaw faster after steer release and punches boost/land", () => {
+    assert.ok(camFwdRate(0, 0.05, false) > camFwdRate(0.6, 0.3, false));
+    assert.ok(camFwdRate(0.2, 0.2, true) < camFwdRate(0, 0.05, false));
+    assert.ok(camFollowRate(false, false, 1) > camFollowRate(false, false, 0));
+    assert.equal(camFollowRate(false, true, 0), 14);
+    assert.ok(camLookAhead(30, 1, false) > camLookAhead(30, 0, false));
+    assert.ok(camLookAhead(20, 0, true) < camLookAhead(20, 0, false));
+    assert.ok(camFovTarget(58, 30, 1, 0) > camFovTarget(58, 30, 0, 0));
+    assert.ok(camFovTarget(58, 20, 0, 1) < camFovTarget(58, 20, 0, 0));
+    assert.ok(camBoostPull(1) > 0);
+    assert.equal(camBoostPull(0), 0);
+    assert.ok(camLandDrop(1) > 0.4);
+  });
+});
+
+describe("ghostSplitMs", () => {
+  it("reports ahead/behind from track gap", () => {
+    assert.ok(ghostSplitMs(40, 20, 20, 200, true) > 0);
+    assert.ok(ghostSplitMs(20, 40, 20, 200, true) < 0);
+    const wrap = ghostSplitMs(5, 190, 20, 200, true);
+    assert.ok(wrap > 0 && wrap < 2000, `wrap ${wrap}`);
   });
 });

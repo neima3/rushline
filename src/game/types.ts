@@ -97,6 +97,7 @@ export type CarSnap = {
   driftCharge: number;
   justTurbo: boolean;
   justLand: boolean;
+  justBoost: boolean;
   fx: number;
   fy: number;
   fz: number;
@@ -123,6 +124,8 @@ export type HudState = {
   heading: number;
   ghostS: number | null;
   ghostN: number | null;
+  ghostDelta: number | null;
+  medalRemain: number | null;
 };
 
 export type ResultsState = {

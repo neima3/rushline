@@ -5,7 +5,7 @@ import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
   curbSnap,
   driftSteerThreshold,
-  headingAlign,
+  headingReturn,
   openingHeadingBleed,
   openingLandLock,
   plantLateral,
@@ -327,7 +327,7 @@ export class CarSim {
     const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting, this.trackAssist);
     if (bleed) this.heading *= 1 - bleed * dt;
 
-    const align = headingAlign(steerAbs, drifting, this.trackAssist);
+    const align = headingReturn(steerAbs, drifting, this.trackAssist);
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
     const maxYaw = drifting ? 0.76 : slideHeld ? 0.48 : 0.33;
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
@@ -606,6 +606,7 @@ export class CarSim {
       driftCharge: this.driftCharge,
       justTurbo: this.justTurbo,
       justLand: this.justLand,
+      justBoost: this.justBoost,
       fx: this.fx,
       fy: this.fy,
       fz: this.fz,
@@ -651,6 +652,7 @@ export function lerpSnap(a: CarSnap, b: CarSnap, t: number): CarSnap {
     driftCharge: lerp(a.driftCharge, b.driftCharge, u),
     justTurbo: b.justTurbo,
     justLand: b.justLand,
+    justBoost: b.justBoost,
     fx: fx / fl,
     fy: fy / fl,
     fz: fz / fl,
