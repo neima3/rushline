@@ -595,7 +595,9 @@ export class World {
       this.disposables.push(...built.mats);
       this.textures.push(...built.textures);
     };
-    add(2.2, true);
+    // Spawn is s=6. The gantry sits ahead of the grid so chase cam reads
+    // the checker at lights-out (Trackmania start). Ground checker stays at 2.2.
+    add(11.2, true);
     for (const s of track.checkpoints) add(s, false);
   }
 

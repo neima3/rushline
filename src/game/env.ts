@@ -194,6 +194,7 @@ function buildStadium(
 
   addTrees(group, geos, mats, 36, ring + 8, ring + 70, 0x3f6b38);
   addBanners(track, group, geos, mats, 0xf4f4f2, 0x111318, 0xef5a24);
+  addNearStands(track, group, geos, mats);
 }
 
 function buildCanyon(
@@ -646,13 +647,13 @@ function addContrastBarriers(
   geos: THREE.BufferGeometry[],
   mats: THREE.Material[],
 ) {
-  const geo = new THREE.BoxGeometry(0.08, 0.72, 1.15);
+  const geo = new THREE.BoxGeometry(0.1, 0.92, 1.35);
   const light = new THREE.MeshStandardMaterial({
     color: theme === "night" ? 0x5ee8ff : theme === "canyon" ? 0xffc070 : 0xf4d24a,
-    roughness: 0.32,
-    metalness: 0.18,
-    emissive: theme === "night" ? 0x146880 : theme === "canyon" ? 0x4a2008 : 0x3a2a08,
-    emissiveIntensity: theme === "night" ? 0.7 : 0.18,
+    roughness: 0.28,
+    metalness: 0.16,
+    emissive: theme === "night" ? 0x146880 : theme === "canyon" ? 0x4a2008 : 0x6a4a08,
+    emissiveIntensity: theme === "night" ? 0.85 : 0.28,
   });
   const dark = new THREE.MeshStandardMaterial({
     color: 0x14161c,
@@ -683,9 +684,54 @@ function addContrastBarriers(
   }
   meshL.count = li;
   meshD.count = di;
+  meshL.instanceMatrix.needsUpdate = true;
+  meshD.instanceMatrix.needsUpdate = true;
   group.add(meshL, meshD);
   geos.push(geo);
   mats.push(light, dark);
+}
+
+function addNearStands(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const conc = new THREE.MeshStandardMaterial({ color: 0xa8a294, roughness: 0.78, metalness: 0.08 });
+  const seats = new THREE.MeshStandardMaterial({
+    color: 0x1e4c88,
+    roughness: 0.5,
+    metalness: 0.1,
+    emissive: 0x102038,
+    emissiveIntensity: 0.12,
+  });
+  const n = 12;
+  const bowl = new THREE.InstancedMesh(geo, conc, n);
+  const seat = new THREE.InstancedMesh(geo, seats, n);
+  bowl.castShadow = true;
+  bowl.receiveShadow = true;
+  for (let i = 0; i < n; i++) {
+    const sm = sampleAt(track, ((i + 0.5) / n) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 16;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + 4.2, sm.z + sm.rz * side * d);
+    _fwd.set(sm.tx, sm.ty, sm.tz);
+    _up.set(sm.ux, sm.uy, sm.uz);
+    _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
+    _dummy.scale.set(22, 8.4, 14);
+    _dummy.updateMatrix();
+    bowl.setMatrixAt(i, _dummy.matrix);
+    _dummy.position.set(sm.x + sm.rx * side * (d - 4), sm.y + 5.6, sm.z + sm.rz * side * (d - 4));
+    _dummy.scale.set(18, 5.2, 10);
+    _dummy.updateMatrix();
+    seat.setMatrixAt(i, _dummy.matrix);
+  }
+  bowl.instanceMatrix.needsUpdate = true;
+  seat.instanceMatrix.needsUpdate = true;
+  group.add(bowl, seat);
+  geos.push(geo);
+  mats.push(conc, seats);
 }
 
 function addTireStacks(

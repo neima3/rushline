@@ -30,12 +30,12 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
   const night = theme === "night";
   const h = finish ? 4.05 : 3.55;
   const w = sm.width * 0.5 + 0.42;
-  const postCol = finish ? GATE_LOOK.startPost : night ? GATE_LOOK.cpNight : GATE_LOOK.cpDay;
+  const postCol = finish ? (night ? 0xe8e4ff : GATE_LOOK.startPost) : night ? GATE_LOOK.cpNight : GATE_LOOK.cpDay;
   const emit = finish ? GATE_LOOK.startEmissive : night ? GATE_LOOK.cpEmissiveNight : GATE_LOOK.cpEmissiveDay;
   const mat = new THREE.MeshStandardMaterial({
     color: postCol,
     emissive: emit,
-    emissiveIntensity: finish ? 0.42 : night ? 1.15 : 0.85,
+    emissiveIntensity: finish ? (night ? 0.7 : 0.42) : night ? 1.15 : 0.85,
     roughness: 0.22,
     metalness: 0.55,
   });
@@ -70,41 +70,37 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
   rim.position.set(0, h - 0.14, 0.09);
   group.add(rim);
 
+  const plane = (width: number, height: number, material: THREE.Material, y: number, z = 0.05) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+    m.position.set(0, y, z);
+    group.add(m);
+  };
+
   if (finish) {
     const checker = makeCheckerTexture();
     checker.repeat.set(10, 2);
     textures.push(checker);
-    const banner = new THREE.Mesh(
-      new THREE.PlaneGeometry(w * 2 - 0.12, 0.92),
-      new THREE.MeshBasicMaterial({ map: checker, fog: true }),
-    );
-    banner.position.set(0, h - 0.58, 0.04);
-    group.add(banner);
-    const stripe = new THREE.Mesh(
-      new THREE.PlaneGeometry(w * 2 - 0.08, 0.14),
-      new THREE.MeshBasicMaterial({ color: 0xc4a574, fog: true }),
-    );
-    stripe.position.set(0, h - 0.16, 0.05);
-    group.add(stripe);
-    const plate = new THREE.Mesh(
-      new THREE.PlaneGeometry(w * 1.15, 0.22),
-      new THREE.MeshBasicMaterial({ color: 0x111113, fog: true }),
-    );
-    plate.position.set(0, h - 0.92, 0.05);
-    group.add(plate);
+    const bannerMat = new THREE.MeshBasicMaterial({ map: checker, fog: true, side: THREE.DoubleSide });
+    const goldMat = new THREE.MeshBasicMaterial({ color: 0xc4a574, fog: true, side: THREE.DoubleSide });
+    const plateMat = new THREE.MeshBasicMaterial({ color: 0x111113, fog: true, side: THREE.DoubleSide });
+    mats.push(bannerMat, goldMat, plateMat);
+    plane(w * 2 - 0.1, 1.05, bannerMat, h - 0.62, 0.04);
+    plane(w * 2 - 0.06, 0.16, goldMat, h - 0.14, 0.05);
+    plane(w * 1.2, 0.24, plateMat, h - 1.02, 0.05);
   } else {
-    const panel = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.35, 0.38),
-      new THREE.MeshBasicMaterial({ color: night ? 0x0c1020 : 0x111318, fog: true }),
-    );
-    panel.position.set(0, h - 0.42, 0.05);
-    group.add(panel);
-    const pin = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.12, 0.08),
-      new THREE.MeshBasicMaterial({ color: night ? 0x5ee8ff : 0xf4f4f2, fog: true }),
-    );
-    pin.position.set(0, h - 0.42, 0.06);
-    group.add(pin);
+    const panelMat = new THREE.MeshBasicMaterial({
+      color: night ? 0x0c1020 : 0x111318,
+      fog: true,
+      side: THREE.DoubleSide,
+    });
+    const pinMat = new THREE.MeshBasicMaterial({
+      color: night ? 0x5ee8ff : 0xf4f4f2,
+      fog: true,
+      side: THREE.DoubleSide,
+    });
+    mats.push(panelMat, pinMat);
+    plane(1.45, 0.42, panelMat, h - 0.42, 0.05);
+    plane(1.18, 0.1, pinMat, h - 0.42, 0.06);
   }
 
   group.position.set(sm.x, sm.y, sm.z);

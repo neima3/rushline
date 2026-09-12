@@ -180,6 +180,7 @@ export function makeCar(ghost: boolean): CarRig {
   add(mesh(new THREE.BoxGeometry(0.96, 0.16, 0.55), bodyMat)).position.set(0, 0.32, 0.92);
   add(mesh(new THREE.BoxGeometry(0.72, 0.12, 0.32), bodyMat)).position.set(0, 0.3, 1.12);
   add(mesh(new THREE.BoxGeometry(1.02, 0.18, 0.52), bodyMat)).position.set(0, 0.32, -0.88);
+  add(mesh(new THREE.BoxGeometry(1.06, 0.14, 0.4), bodyMat)).position.set(0, 0.4, -0.94);
   add(mesh(new THREE.BoxGeometry(0.94, 0.26, 0.82), glass)).position.set(0, 0.54, -0.06);
   add(mesh(new THREE.BoxGeometry(0.84, 0.08, 0.44), glass)).position.set(0, 0.61, 0.3);
   add(mesh(new THREE.BoxGeometry(0.2, 0.04, 1.88), gold)).position.set(0, 0.46, 0.04);
@@ -196,7 +197,7 @@ export function makeCar(ghost: boolean): CarRig {
   add(mesh(new THREE.BoxGeometry(1.14, 0.08, 1.48), carbon)).position.set(0, 0.2, 0);
   add(mesh(new THREE.BoxGeometry(1.2, 0.05, 0.36), carbon)).position.set(0, 0.2, 1.18);
   add(mesh(new THREE.BoxGeometry(1.16, 0.055, 0.3), carbon)).position.set(0, 0.23, 1.14);
-  add(mesh(new THREE.BoxGeometry(1.18, 0.065, 0.34), carbon)).position.set(0, 0.23, -1.1);
+  add(mesh(new THREE.BoxGeometry(1.12, 0.05, 0.28), carbon)).position.set(0, 0.21, -1.08);
   for (const x of [-0.58, 0.58]) {
     const skirt = add(mesh(new THREE.BoxGeometry(0.08, 0.12, 1.42), carbon));
     skirt.position.set(x, 0.22, 0);
@@ -214,8 +215,9 @@ export function makeCar(ghost: boolean): CarRig {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
   }
-  const wing = add(mesh(new THREE.BoxGeometry(1.28, 0.045, 0.24), bodyMat));
-  wing.position.set(0, 0.64, -1.06);
+  const wing = add(mesh(new THREE.BoxGeometry(1.32, 0.05, 0.26), bodyMat));
+  wing.position.set(0, 0.66, -1.06);
+  add(mesh(new THREE.BoxGeometry(1.28, 0.02, 0.08), gold)).position.set(0, 0.69, -1.06);
   for (const x of [-0.62, 0.62]) {
     const plate = add(mesh(new THREE.BoxGeometry(0.045, 0.2, 0.26), carbon));
     plate.position.set(x, 0.68, -1.06);
@@ -255,8 +257,11 @@ export function makeCar(ghost: boolean): CarRig {
     h.position.set(x, 0.32, 1.16);
     headlights.push(h);
   }
+  const bar = add(mesh(new THREE.BoxGeometry(0.92, 0.055, 0.05), tailMat));
+  bar.position.set(0, 0.4, -1.16);
+  taillights.push(bar);
   for (const x of [-0.36, 0.36]) {
-    const t = add(mesh(new THREE.BoxGeometry(0.28, 0.07, 0.06), tailMat));
+    const t = add(mesh(new THREE.BoxGeometry(0.28, 0.08, 0.06), tailMat));
     t.position.set(x, 0.34, -1.14);
     taillights.push(t);
   }
@@ -409,8 +414,8 @@ export function makeCar(ghost: boolean): CarRig {
       bm.map = tex;
       bm.needsUpdate = true;
     }
-    bm.emissive.setHex(night ? 0x1a2848 : 0x000000);
-    bm.emissiveIntensity = night ? 0.18 : 0;
+    bm.emissive.setHex(night ? 0x2a3a68 : 0x1a100c);
+    bm.emissiveIntensity = night ? 0.28 : 0.04;
     const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
     bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : 0xffe6cc);
     // Circuit High scene env stays 0.08 so asphalt does not wash. The car
