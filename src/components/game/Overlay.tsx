@@ -280,6 +280,7 @@ function Menu({
               <button
                 key={t.id}
                 type="button"
+                onMouseDown={keepPlayFocus}
                 onClick={() => onRace(t.id)}
                 className="flex overflow-hidden rounded-xl border border-border bg-surface text-left"
               >

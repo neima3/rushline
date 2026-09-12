@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getTrack, sampleAt } from "./track.ts";
+import { getTrack, nearestSample, sampleAt } from "./track.ts";
 import { CarSim, helixNearGate, helixRibbonOverhead, pickSafeRespawnS } from "./physics.ts";
 import { chaseSnapPlacement, clearChaseCamera } from "./scene.ts";
 
@@ -61,7 +61,7 @@ describe("leave-track respawn", () => {
     const helix = getTrack("helix");
     const cs = pickSafeRespawnS(circuit, -1, 8);
     const hs = pickSafeRespawnS(helix, -1, 8);
-    assert.ok(cs >= 6 && cs < 50, `circuit pre-CP s ${cs}`);
+    assert.ok(cs >= 12 && cs < 50, `circuit pre-CP s ${cs}`);
     assert.ok(hs >= 16, `helix pre-CP s ${hs}`);
     assert.ok(sampleAt(circuit, cs).uy > 0.9);
     assert.ok(sampleAt(helix, hs).uy > 0.9);
@@ -109,7 +109,7 @@ describe("leave-track respawn", () => {
     const circuit = getTrack("circuit");
     const pre = pickSafeRespawnS(circuit, -1, 8);
     const post = pickSafeRespawnS(circuit, 0, circuit.checkpoints[0]! + 8);
-    assert.ok(pre >= 6 && pre < 50, `circuit #9 pre-CP s ${pre}`);
+    assert.ok(pre >= 12 && pre < 50, `circuit #9 pre-CP s ${pre}`);
     assert.ok(post > 160 && post < 180, `circuit post-CP1 s ${post}`);
     assert.ok(sampleAt(circuit, pre).uy > 0.9);
     assert.ok(sampleAt(circuit, post).uy > 0.9);
@@ -138,6 +138,57 @@ describe("leave-track respawn", () => {
         assert.ok(car.py > -1, `circuit cp${lastCp} R${r} after cruise py ${car.py}`);
       }
     }
+  });
+
+  it("centers Circuit pre-CP1 R on the outbound ribbon, not the wrap", () => {
+    const circuit = getTrack("circuit");
+    const start = pickSafeRespawnS(circuit, -1, 8);
+    const startSm = sampleAt(circuit, start);
+    assert.ok(start >= 12 && start < 50, `start s ${start}`);
+    assert.ok(Math.abs(startSm.x) < 0.45, `start x ${startSm.x}`);
+    assert.ok(startSm.tz < -0.9, `start tz ${startSm.tz}`);
+
+    const mid = pickSafeRespawnS(circuit, -1, 140);
+    const midSm = sampleAt(circuit, mid);
+    assert.ok(mid > 120 && mid < 160, `mid-sector s ${mid}`);
+    assert.ok(midSm.uy > 0.9, `mid uy ${midSm.uy}`);
+    assert.ok(Math.abs(midSm.x) > 40, `expected first-curve x, got ${midSm.x}`);
+
+    const car = new CarSim();
+    car.reset(circuit);
+    car.s = 22;
+    car.n = -9;
+    car.lastCp = -1;
+    car.respawn(circuit);
+    assert.equal(car.n, 0);
+    assert.equal(car.heading, 0);
+    assert.ok(Math.abs(car.px) < 0.45, `px ${car.px}`);
+    assert.ok(car.fz < -0.9, `fz ${car.fz}`);
+    assert.ok(car.uy > 0.9, `uy ${car.uy}`);
+  });
+
+  it("does not pick the closing stretch from either shoulder near Circuit start", () => {
+    const circuit = getTrack("circuit");
+    const left = nearestSample(circuit, -10, 0.4, -8, 8);
+    const right = nearestSample(circuit, 10, 0.4, -8, 8);
+    assert.ok(left.tz < -0.85, `left tz=${left.tz} s=${left.s}`);
+    assert.ok(right.tz < -0.85, `right tz=${right.tz} s=${right.s}`);
+    assert.ok(left.s < 80 && right.s < 80, `wrap won left=${left.s} right=${right.s}`);
+  });
+
+  it("lets Helix recover-lock follow invert instead of gluing under the ribbon", () => {
+    const helix = getTrack("helix");
+    const invert = helix.samples.find((sm) => sm.s > 90 && sm.s < 130 && sm.uy < 0.2);
+    assert.ok(invert, "expected a loop invert sample");
+    const { helix: track, car } = leaveTrackAfterCp1();
+    car.respawn(track);
+    assert.ok(car.uy > 0.95);
+    car.s = invert!.s;
+    car.n = 0;
+    car.step(track, idle, 1 / 60);
+    const sm = sampleAt(track, car.s);
+    assert.ok(sm.uy < 0.5, `expected invert after one step uy=${sm.uy} s=${car.s}`);
+    assert.ok(car.uy < 0.85, `stuck world-up on invert uy=${car.uy} sample=${sm.uy} s=${car.s}`);
   });
 
   it("holds an upright on-ribbon pose after R plus physics steps", () => {

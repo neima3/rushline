@@ -2,6 +2,7 @@ import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from
 import { getTrack, medalFor, medalPace } from "./track";
 import { ghostSplitMs } from "./feel";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
+import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
@@ -240,7 +241,7 @@ export class Game {
     this.timeHold = 0;
     this.raceClockAt = 0;
     this.acc = 0;
-    this.countdown = 2.4;
+    this.countdown = COUNTDOWN_S;
     this.countdownAt = performance.now();
     this.pausedFrom = null;
     this.recording = [];
@@ -273,7 +274,9 @@ export class Game {
     if (this.phase !== "race" && this.phase !== "countdown") return;
     this.pausedFrom = this.phase;
     if (this.phase === "race") this.timeHold = this.time;
-    if (this.phase === "countdown") this.countdown = Math.max(0, 2.4 - (performance.now() - this.countdownAt) / 1000);
+    if (this.phase === "countdown") {
+      this.countdown = Math.max(0, countdownRemaining(this.countdownAt, performance.now()));
+    }
     this.phase = "paused";
     useGame.getState().setPhase("paused");
   }
@@ -285,7 +288,7 @@ export class Game {
     this.phase = next;
     this.lastT = performance.now();
     if (next === "race") this.raceClockAt = this.lastT;
-    if (next === "countdown") this.countdownAt = this.lastT - (2.4 - this.countdown) * 1000;
+    if (next === "countdown") this.countdownAt = countdownPausedAt(this.lastT, this.countdown);
     useGame.getState().setPhase(next);
     this.capturePlayFocus();
   }
@@ -356,13 +359,13 @@ export class Game {
       if (actions.restart && (this.phase === "race" || this.phase === "paused" || this.phase === "results")) {
         this.startRace(this.trackId);
       }
-      if (actions.respawn && this.phase === "race") this.applyRespawn();
+      if (actions.respawn && (this.phase === "race" || this.phase === "countdown")) this.applyRespawn();
     }
 
     const simulate = this.phase === "race" || this.phase === "countdown";
     if (this.phase === "countdown") {
       const prevC = Math.ceil(this.countdown);
-      this.countdown = 2.4 - (now - this.countdownAt) / 1000;
+      this.countdown = countdownRemaining(this.countdownAt, now);
       const nextC = Math.ceil(this.countdown);
       if (nextC < prevC && nextC >= 0) this.audio.countdown(nextC);
       if (this.countdown <= 0) {
@@ -426,7 +429,7 @@ export class Game {
         this.car.skipInterp = false;
       }
       if (this.phase === "race") {
-        this.time = this.timeHold + (now - this.raceClockAt);
+        this.time = wallClockMs(this.timeHold, this.raceClockAt, now);
         if (this.recording.length === 0 || this.time - this.recording[this.recording.length - 1]!.t > 40) {
           this.recording.push({ t: this.time, s: this.car.s, n: this.car.n, heading: this.car.heading });
         }
