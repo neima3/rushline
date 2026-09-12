@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import type { ThemeId } from "./types";
+import { SKY_LOOK } from "./presentation";
 
 const SKY_VERT = /* glsl */ `
 varying vec3 vDir;
@@ -13,7 +15,12 @@ const SKY_FRAG = /* glsl */ `
 uniform sampler2D map;
 uniform vec3 fogColor;
 uniform vec3 tint;
+uniform vec3 horizonColor;
+uniform vec3 zenithColor;
+uniform vec3 sunDir;
 uniform float hasMap;
+uniform float haze;
+uniform float sunGlow;
 varying vec3 vDir;
 
 #include <common>
@@ -38,8 +45,15 @@ void main() {
   if (hasMap > 0.5) {
     sky = decodeSRGB(texture2D(map, dirToEquirect(dir)).rgb);
   }
-  float w = smoothstep(-0.1, 0.28, dir.y);
-  gl_FragColor = vec4(mix(fogColor, sky * tint, w), 1.0);
+  float h = dir.y;
+  float hz = exp(-abs(h) * 5.4) * haze;
+  sky = mix(sky * tint, horizonColor, hz * 0.42);
+  float zen = smoothstep(0.12, 0.88, h);
+  sky = mix(sky, sky * zenithColor, zen * 0.22);
+  float sun = pow(max(dot(dir, sunDir), 0.0), 42.0) * sunGlow;
+  sky += sun * horizonColor;
+  float w = smoothstep(-0.1, 0.28, h);
+  gl_FragColor = vec4(mix(fogColor, sky, w), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -59,7 +73,12 @@ export class SkyDome {
         map: { value: null },
         fogColor: { value: new THREE.Color(fog) },
         tint: { value: new THREE.Color(tint) },
+        horizonColor: { value: new THREE.Color(0xc8dced) },
+        zenithColor: { value: new THREE.Color(0xe8f2fb) },
+        sunDir: { value: new THREE.Vector3(0.4, 0.8, 0.2).normalize() },
         hasMap: { value: 0 },
+        haze: { value: 0.22 },
+        sunGlow: { value: 0.07 },
       },
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
@@ -81,6 +100,15 @@ export class SkyDome {
 
   setTint(tint: number) {
     (this.mat.uniforms.tint!.value as THREE.Color).set(tint);
+  }
+
+  setTheme(theme: ThemeId, sunPos: [number, number, number]) {
+    const look = SKY_LOOK[theme];
+    (this.mat.uniforms.horizonColor!.value as THREE.Color).set(look.horizon);
+    (this.mat.uniforms.zenithColor!.value as THREE.Color).set(look.zenith);
+    this.mat.uniforms.haze!.value = look.haze;
+    this.mat.uniforms.sunGlow!.value = look.sunGlow;
+    (this.mat.uniforms.sunDir!.value as THREE.Vector3).set(...sunPos).normalize();
   }
 
   setMap(tex: THREE.Texture | null) {

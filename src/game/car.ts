@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ThemeId } from "./types";
 import { makeLiveryTexture } from "./textures";
+import { CAR_PAINT } from "./presentation";
 
 export type CarRig = {
   group: THREE.Group;
@@ -42,6 +43,7 @@ type MatOpts = {
   sheenRoughness?: number;
   sheenColor?: number;
   envMapIntensity?: number;
+  iridescence?: number;
 };
 
 export function makeCar(ghost: boolean): CarRig {
@@ -78,6 +80,9 @@ export function makeCar(ghost: boolean): CarRig {
             sheenRoughness: opts.sheenRoughness ?? 0.42,
             sheenColor: new THREE.Color(opts.sheenColor ?? 0xffe4c4),
             envMapIntensity: opts.envMapIntensity ?? 1,
+            iridescence: ghost ? 0 : (opts.iridescence ?? 0),
+            iridescenceIOR: 1.28,
+            iridescenceThicknessRange: [120, 380],
           })
         : new THREE.MeshStandardMaterial(base);
     mats.push(m);
@@ -89,18 +94,22 @@ export function makeCar(ghost: boolean): CarRig {
   const nightLivery = ghost ? null : makeLiveryTexture(true);
   const bodyMat = mat({
     color: 0xffffff,
-    roughness: 0.14,
-    metalness: 0.44,
-    clearcoat: 0.86,
-    clearcoatRoughness: 0.07,
-    sheen: 0.42,
-    sheenRoughness: 0.36,
+    roughness: CAR_PAINT.roughness,
+    metalness: CAR_PAINT.metalness,
+    clearcoat: CAR_PAINT.clearcoat,
+    clearcoatRoughness: CAR_PAINT.clearcoatRoughness,
+    sheen: CAR_PAINT.sheen,
+    sheenRoughness: CAR_PAINT.sheenRoughness,
     sheenColor: 0xffe6cc,
     envMapIntensity: 1.12,
+    iridescence: CAR_PAINT.iridescence,
   });
   if (dayLivery) {
-    (bodyMat as THREE.MeshStandardMaterial).map = dayLivery;
-    (bodyMat as THREE.MeshStandardMaterial).needsUpdate = true;
+    const bm = bodyMat as THREE.MeshPhysicalMaterial;
+    bm.map = dayLivery;
+    const rough = makePaintRoughness();
+    bm.roughnessMap = rough;
+    bm.needsUpdate = true;
   }
   const carbon = mat({
     color: 0x1a1a1e,
@@ -180,18 +189,36 @@ export function makeCar(ghost: boolean): CarRig {
     const flank = add(mesh(new THREE.BoxGeometry(0.05, 0.16, 1.15), bodyMat));
     flank.position.set(x, 0.34, -0.02);
   }
+  for (const x of [-0.42, 0.42]) {
+    const pillar = add(mesh(new THREE.BoxGeometry(0.045, 0.22, 0.05), carbon));
+    pillar.position.set(x, 0.52, 0.28);
+  }
   add(mesh(new THREE.BoxGeometry(1.14, 0.08, 1.48), carbon)).position.set(0, 0.2, 0);
+  add(mesh(new THREE.BoxGeometry(1.2, 0.05, 0.36), carbon)).position.set(0, 0.2, 1.18);
   add(mesh(new THREE.BoxGeometry(1.16, 0.055, 0.3), carbon)).position.set(0, 0.23, 1.14);
   add(mesh(new THREE.BoxGeometry(1.18, 0.065, 0.34), carbon)).position.set(0, 0.23, -1.1);
+  for (const x of [-0.58, 0.58]) {
+    const skirt = add(mesh(new THREE.BoxGeometry(0.08, 0.12, 1.42), carbon));
+    skirt.position.set(x, 0.22, 0);
+  }
+  for (const [x, z] of [
+    [-0.56, 0.68],
+    [0.56, 0.68],
+    [-0.56, -0.68],
+    [0.56, -0.68],
+  ] as const) {
+    const flare = add(mesh(new THREE.BoxGeometry(0.2, 0.13, 0.4), bodyMat));
+    flare.position.set(x, 0.36, z);
+  }
   for (const x of [-0.28, -0.1, 0.1, 0.28]) {
     const fin = add(mesh(new THREE.BoxGeometry(0.04, 0.1, 0.22), carbon));
     fin.position.set(x, 0.18, -1.14);
   }
-  const wing = add(mesh(new THREE.BoxGeometry(1.18, 0.04, 0.22), bodyMat));
-  wing.position.set(0, 0.62, -1.05);
-  for (const x of [-0.58, 0.58]) {
-    const plate = add(mesh(new THREE.BoxGeometry(0.04, 0.16, 0.24), carbon));
-    plate.position.set(x, 0.66, -1.05);
+  const wing = add(mesh(new THREE.BoxGeometry(1.28, 0.045, 0.24), bodyMat));
+  wing.position.set(0, 0.64, -1.06);
+  for (const x of [-0.62, 0.62]) {
+    const plate = add(mesh(new THREE.BoxGeometry(0.045, 0.2, 0.26), carbon));
+    plate.position.set(x, 0.68, -1.06);
   }
   for (const x of [-0.32, 0.32]) {
     const stay = add(mesh(new THREE.BoxGeometry(0.035, 0.22, 0.035), carbon));
@@ -263,6 +290,27 @@ export function makeCar(ghost: boolean): CarRig {
 
   group.add(body);
 
+  let contact: THREE.Mesh | null = null;
+  if (!ghost) {
+    const blobMat = new THREE.MeshBasicMaterial({
+      color: 0x05060a,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      fog: true,
+    });
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(0.92, 22), blobMat);
+    blob.rotation.x = -Math.PI / 2;
+    blob.position.y = 0.018;
+    blob.renderOrder = -2;
+    blob.castShadow = false;
+    blob.receiveShadow = false;
+    group.add(blob);
+    contact = blob;
+    mats.push(blobMat);
+    baseOpacity.push(blobMat.opacity);
+  }
+
   const tireGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.18, 14);
   tireGeo.rotateZ(Math.PI / 2);
   const rimGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.19, 12);
@@ -320,6 +368,11 @@ export function makeCar(ghost: boolean): CarRig {
     const sy = 1 - squat * 0.55;
     const sx = 1 + squat * 0.35 + boostJuice * 0.04;
     body.scale.set(sx, sy, 1 + squat * 0.12);
+    if (contact) {
+      const planted = airborne ? 0.05 : 0.3 - squat * 0.12;
+      (contact.material as THREE.MeshBasicMaterial).opacity = planted;
+      contact.scale.setScalar(airborne ? 0.72 : 1 + slide * 0.08);
+    }
   };
 
   const setBrakeLights = (on: boolean) => {
@@ -362,9 +415,10 @@ export function makeCar(ghost: boolean): CarRig {
     bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : 0xffe6cc);
     // Circuit High scene env stays 0.08 so asphalt does not wash. The car
     // multiplies that back up so clearcoat can still read the sky.
-    const env = night ? 1.3 : theme === "canyon" ? 1.22 : 3.45;
+    const env = night ? CAR_PAINT.envNight : theme === "canyon" ? CAR_PAINT.envCanyon : CAR_PAINT.envDay;
     bodyPhys.envMapIntensity = env;
-    bodyPhys.clearcoat = night ? 0.78 : 0.86;
+    bodyPhys.clearcoat = night ? 0.88 : CAR_PAINT.clearcoat;
+    bodyPhys.iridescence = night ? 0.22 : CAR_PAINT.iridescence;
     (glass as THREE.MeshPhysicalMaterial).envMapIntensity = env * 1.1;
     (gold as THREE.MeshPhysicalMaterial).envMapIntensity = env;
     (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
@@ -418,4 +472,27 @@ export function makeCar(ghost: boolean): CarRig {
 
 function mesh(geo: THREE.BufferGeometry, material: THREE.Material) {
   return new THREE.Mesh(geo, material);
+}
+
+function makePaintRoughness() {
+  const size = 64;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const n = 36 + ((x * 13 + y * 7) % 38) + Math.sin((x + y) * 0.35) * 8;
+      d[i] = d[i + 1] = d[i + 2] = Math.max(20, Math.min(90, n));
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  t.needsUpdate = true;
+  return t;
 }
