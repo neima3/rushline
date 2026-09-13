@@ -3,6 +3,7 @@ import { MEDAL_LABEL, resultsHeadline } from "@/game/flow";
 import { COPY } from "@/game/help";
 import { getTrackDef, medalPace } from "@/game/track";
 import type { Medal, ResultsState, TrackId } from "@/game/types";
+import { validationHint, validationLabel } from "@/game/validate";
 import { cn, formatDelta, formatTime } from "@/lib/utils";
 import { keepPlayFocus, MedalRow } from "./chrome";
 import { GhostShare } from "./GhostShare";
@@ -19,6 +20,7 @@ type Props = {
   onPhoto?: () => void;
   onRaceRival?: () => void;
   onUiClick?: () => void;
+  onHotseatNext?: () => void;
 };
 
 export function ResultsScreen({
@@ -33,11 +35,17 @@ export function ResultsScreen({
   onPhoto,
   onRaceRival,
   onUiClick,
+  onHotseatNext,
 }: Props) {
   const track = getTrackDef(results.trackId);
   const cup = results.cup;
+  const hotseat = results.hotseat;
   const pbDelta = results.prevBest == null ? null : results.time - results.prevBest;
-  const headline = cup ? cupHeadline(cup, results.medal) : resultsHeadline(results.medal, results.isPb);
+  const headline = cup
+    ? cupHeadline(cup, results.medal)
+    : hotseat
+      ? `P${hotseat.seat} · ${resultsHeadline(results.medal, results.isPb)}`
+      : resultsHeadline(results.medal, results.isPb);
   const nextChallengeName = cup?.nextTrackId ? getTrackDef(cup.nextTrackId).name : null;
   const targetAt = cup ? getTrackDef(results.trackId).medals[cup.target] : null;
 
@@ -53,7 +61,9 @@ export function ResultsScreen({
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
           {cup
             ? `${cup.cupName} · ${cup.eventIndex + 1}/${cup.eventTotal} · ${track.name}`
-            : track.name}
+            : hotseat
+              ? `Hotseat · P${hotseat.seat} · ${track.name}`
+              : track.name}
         </p>
         <h2 className="font-display text-4xl leading-none tracking-tight md:text-5xl">{headline}</h2>
         {cup && targetAt != null ? (
@@ -66,6 +76,7 @@ export function ResultsScreen({
         <p className="results-time mt-5 font-display text-6xl leading-none tracking-tight tabular-nums md:text-7xl">
           {formatTime(results.time)}
         </p>
+        <ValidationBadge validated={results.validated} laps={results.laps} />
 
         <div className="mt-4 flex flex-wrap gap-2">
           <CompareChip
@@ -90,22 +101,36 @@ export function ResultsScreen({
         </div>
 
         <MedalCelebrate medal={results.medal} />
-        <MedalBoard trackId={results.trackId} time={results.time} earned={results.medal} />
+        <MedalBoard
+          trackId={results.trackId}
+          time={results.time}
+          earned={results.medal}
+          medals={results.medals}
+        />
         <GhostTimes results={results} />
 
         <div className="mt-5">
           <GhostShare
             trackId={results.trackId}
             exportLastLabel="Export this run"
-            allowImport
-            allowRaceRival={!cup && Boolean(onRaceRival)}
+            allowImport={!hotseat}
+            allowRaceRival={!cup && !hotseat && Boolean(onRaceRival)}
             onRaceRival={onRaceRival}
             onUiClick={onUiClick}
           />
         </div>
 
         <div className="mt-6 flex flex-col gap-2">
-          {cup?.nextEventId && onNextChallenge ? (
+          {hotseat && !hotseat.complete && onHotseatNext ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onHotseatNext}
+              className="h-12 rounded-md bg-accent text-sm font-semibold text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98]"
+            >
+              P2, you're up
+            </button>
+          ) : cup?.nextEventId && onNextChallenge ? (
             <button
               type="button"
               onMouseDown={keepPlayFocus}
@@ -143,7 +168,16 @@ export function ResultsScreen({
               Retry
             </button>
           ) : null}
-          {onRetryLast ? (
+          {hotseat ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onRetry}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Retry P{hotseat.seat}
+            </button>
+          ) : onRetryLast ? (
             <button
               type="button"
               onMouseDown={keepPlayFocus}
@@ -153,7 +187,7 @@ export function ResultsScreen({
               Retry vs last run
             </button>
           ) : null}
-          {!cup ? (
+          {!cup && !hotseat ? (
             <button
               type="button"
               onMouseDown={keepPlayFocus}
@@ -162,7 +196,7 @@ export function ResultsScreen({
             >
               Next · {nextName}
             </button>
-          ) : onCup && !cup.campaignComplete ? (
+          ) : onCup && cup && !cup.campaignComplete ? (
             <button
               type="button"
               onMouseDown={keepPlayFocus}
@@ -192,6 +226,28 @@ export function ResultsScreen({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ValidationBadge({ validated, laps }: { validated: boolean; laps: number }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span
+        data-validation={validated ? "clean" : "rewound"}
+        title={validationHint(validated)}
+        className={cn(
+          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em]",
+          validated ? "border-ok/35 bg-ok/10 text-ok" : "border-border bg-bg/40 text-subtle",
+        )}
+      >
+        {validationLabel(validated)}
+      </span>
+      {laps > 1 ? (
+        <span className="inline-flex items-center rounded-full border border-border bg-bg/40 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
+          {laps} laps
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -254,9 +310,19 @@ function MedalCelebrate({ medal }: { medal: Medal | null }) {
   );
 }
 
-function MedalBoard({ trackId, time, earned }: { trackId: TrackId; time: number; earned: Medal | null }) {
-  const medals = getTrackDef(trackId).medals;
-  const pace = medalPace(trackId, time);
+function MedalBoard({
+  trackId,
+  time,
+  earned,
+  medals: raceMedals,
+}: {
+  trackId: TrackId;
+  time: number;
+  earned: Medal | null;
+  medals?: ResultsState["medals"];
+}) {
+  const medals = raceMedals ?? getTrackDef(trackId).medals;
+  const pace = medalPace(trackId, time, medals);
   const rows: { id: Medal; label: string; at: number }[] = [
     { id: "author", label: "Author", at: medals.author },
     { id: "gold", label: "Gold", at: medals.gold },
@@ -306,7 +372,9 @@ function GhostTimes({ results }: { results: ResultsState }) {
           ? "Imported rival is ready — next time trial uses that tape"
           : results.ghostSource === "author"
             ? "Author ghost is ready — medal-pace rival until you set a PB"
-            : "No ghost yet — this run is saved locally";
+            : results.ghostSource === "hotseat"
+              ? "Hotseat ghost — P2 races P1's tape"
+              : "No ghost yet — this run is saved locally";
   return (
     <div className="mt-3 space-y-2 text-sm">
       <p className="text-muted">

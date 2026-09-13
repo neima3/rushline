@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { COPY } from "@/game/help";
 import { useGame } from "@/game/store";
+import { STOCK_LAP_CHOICES, type StockLapsSetting } from "@/game/laps";
 import type { Quality, SteerPreset, TrackAssist } from "@/game/settings";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,36 @@ export function SettingsPanel({
         </header>
 
         <div data-allow-scroll className="min-h-0 flex-1 overflow-auto overscroll-contain px-5 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          <Section title="Race">
+            <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2">
+              <p className="text-sm font-medium text-fg">Stock laps</p>
+              <p className="mt-0.5 text-xs text-subtle">
+                Time trial and hotseat. Track keeps each circuit's authored count. Custom and Rush Cup stay on their own
+                laps. Medals scale when you change it.
+              </p>
+              <div className="mt-2 grid grid-cols-4 gap-1 rounded-lg bg-bg p-1">
+                {(["track", ...STOCK_LAP_CHOICES] as StockLapsSetting[]).map((laps) => (
+                  <button
+                    key={laps}
+                    type="button"
+                    aria-label={laps === "track" ? "Track default laps" : `${laps} laps`}
+                    aria-pressed={s.stockLaps === laps}
+                    onClick={() => {
+                      click();
+                      patch({ stockLaps: laps });
+                    }}
+                    className={cn(
+                      "h-12 rounded-md text-sm font-medium md:h-10",
+                      s.stockLaps === laps ? "bg-accent text-accent-fg" : "text-muted",
+                    )}
+                  >
+                    {laps === "track" ? "Track" : laps}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Section>
+
           <Section title="Graphics">
             <div className="grid grid-cols-3 gap-1 rounded-lg bg-bg-elevated p-1">
               {QUALITIES.map((q) => (

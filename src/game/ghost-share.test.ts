@@ -90,6 +90,7 @@ describe("ghost file encode/decode", () => {
     assert.equal(ghostHudTag("import"), "RIVAL");
     assert.equal(ghostHudTag("author"), "AUTH");
     assert.equal(ghostHudTag("pb"), "GHOST");
+    assert.equal(ghostHudTag("hotseat"), "P1");
   });
 
   it("accepts Red Mesa and Black Hollow keys from the seven-track campaign", () => {

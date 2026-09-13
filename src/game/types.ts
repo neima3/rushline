@@ -161,9 +161,22 @@ export type HudState = {
   surface: SurfaceKind;
 };
 
-export type GhostSource = "pb" | "last" | "import" | "author" | "none";
+export type GhostSource = "pb" | "last" | "import" | "author" | "hotseat" | "none";
 
 export type GhostPref = "auto" | "pb" | "last" | "import" | "author";
+
+export type PlayMode = "trial" | "cup" | "hotseat";
+
+export type HotseatSeat = 1 | 2;
+
+export type HotseatResults = {
+  seat: HotseatSeat;
+  complete: boolean;
+  p1: { time: number; medal: Medal | null; validated: boolean } | null;
+  p2: { time: number; medal: Medal | null; validated: boolean } | null;
+  winner: 1 | 2 | "tie" | null;
+  delta: number | null;
+};
 
 export type CupId = "gold" | "author";
 
@@ -198,7 +211,11 @@ export type ResultsState = {
   ghostDelta: number | null;
   hadGhost: boolean;
   nextTrackId: TrackId;
+  validated: boolean;
+  laps: number;
+  medals: { author: number; gold: number; silver: number; bronze: number };
   cup?: CupResult | null;
+  hotseat?: HotseatResults | null;
 };
 
 export type GhostFrame = {
