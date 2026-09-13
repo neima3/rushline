@@ -54,6 +54,26 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("maps LB+View as photo without also firing camera", () => {
+    setPadPoller(() => axes({ lb: true, view: true }));
+    const input = new Input();
+    const a = input.sample();
+    assert.equal(a.photo, true);
+    assert.equal(a.camera, false);
+    input.detach();
+  });
+
+  it("edges F as photo without toggling camera", () => {
+    const input = new Input();
+    input.setKeys(["KeyF"]);
+    const a = input.sample();
+    assert.equal(a.photo, true);
+    assert.equal(a.camera, false);
+    const again = input.sample();
+    assert.equal(again.photo, false);
+    input.detach();
+  });
+
   it("maps pad face / shoulder actions without requiring keys", () => {
     setPadPoller(() => axes({ y: true, start: true, rb: true, slide: true, throttle: 0.8 }));
     const input = new Input();

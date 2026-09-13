@@ -23,6 +23,7 @@ import {
 } from "./quality";
 import { camBoostPull, camFollowRate, camFovTarget, camFwdRate, camLandDrop, camLookAhead } from "./feel";
 import { sampleGhost } from "./ghost";
+import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, isGlContextLost, preferMsaa } from "./webgl";
 
 const _up = new THREE.Vector3();
@@ -474,6 +475,10 @@ export class World {
     return this.glLost;
   }
 
+  get canvas() {
+    return this.renderer.domElement;
+  }
+
   getGraphics() {
     const fog = this.scene.fog as THREE.Fog;
     return {
@@ -898,6 +903,46 @@ export class World {
       this.fill2.target.position.set(snap.px, snap.py, snap.pz);
       this.fill2.position.set(snap.px - 20, snap.py + 32, snap.pz - 12);
     }
+  }
+
+  applyPhotoCamera(
+    target: { px: number; py: number; pz: number; fx: number; fy: number; fz: number },
+    orbit: PhotoOrbit,
+  ) {
+    const pose = photoOrbitPose(
+      { x: target.px, y: target.py, z: target.pz },
+      { x: target.fx, y: target.fy, z: target.fz },
+      orbit,
+      this.camDistance,
+    );
+    this.trauma = 0;
+    this.camHold = 0;
+    this.camPos.set(pose.cam.x, pose.cam.y, pose.cam.z);
+    this.lookPos.set(pose.look.x, pose.look.y, pose.look.z);
+    this.camera.position.copy(this.camPos);
+    this.camera.up.copy(_worldUp);
+    this.camUp.copy(_worldUp);
+    this.camera.lookAt(this.lookPos);
+    const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
+    this.camera.fov = portrait ? this.camFov + 1 : this.camFov;
+    this.camera.updateProjectionMatrix();
+    this.sun.target.position.set(target.px, target.py, target.pz);
+    this.sun.position.set(target.px + 60, target.py + 95, target.pz + 36);
+    this.sun.shadow.camera.updateProjectionMatrix();
+    if (this.fill.intensity > 0) {
+      this.fill.target.position.set(target.px, target.py, target.pz);
+      this.fill.position.set(target.px + 10, target.py - 36, target.pz + 16);
+    }
+    if (this.fill2.intensity > 0) {
+      this.fill2.target.position.set(target.px, target.py, target.pz);
+      this.fill2.position.set(target.px - 20, target.py + 32, target.pz - 12);
+    }
+  }
+
+  async captureStill(): Promise<Blob | null> {
+    if (this.glLost || isGlContextLost(this.renderer.getContext())) return null;
+    this.render();
+    return canvasToPngBlob(this.renderer.domElement);
   }
 
   addTrauma(v: number) {

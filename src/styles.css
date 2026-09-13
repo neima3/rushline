@@ -583,6 +583,28 @@ body {
   }
 }
 
+.photo-shutter {
+  background: rgba(244, 244, 242, 0.82);
+  animation: photo-shutter-fade 180ms ease-out both;
+}
+
+@keyframes photo-shutter-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.photo-tray {
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.88), rgba(8, 10, 16, 0.82));
+}
+
+.photo-scrub {
+  touch-action: pan-x;
+}
+
 .first-run-card {
   background: linear-gradient(180deg, rgba(16, 18, 26, 0.9), rgba(8, 10, 16, 0.86));
 }

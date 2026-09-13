@@ -134,6 +134,11 @@ type GameStore = {
   settings: Settings;
   settingsOpen: boolean;
   fps: number;
+  photoMode: boolean;
+  photoCapturing: boolean;
+  photoGhost: boolean;
+  photoScrub: number;
+  photoFollowGhost: boolean;
   setPhase: (p: Phase) => void;
   setTrack: (id: TrackId) => void;
   setHud: (h: Partial<HudState>) => void;
@@ -151,6 +156,11 @@ type GameStore = {
   setQuality: (q: Quality) => void;
   resetSettings: (touch: boolean) => void;
   setFps: (n: number) => void;
+  setPhotoMode: (v: boolean) => void;
+  setPhotoCapturing: (v: boolean) => void;
+  setPhotoGhost: (v: boolean) => void;
+  setPhotoScrub: (v: number) => void;
+  setPhotoFollowGhost: (v: boolean) => void;
   refreshBest: () => void;
 };
 
@@ -174,6 +184,11 @@ export const useGame = create<GameStore>((set) => ({
   settings: bootSettings,
   settingsOpen: false,
   fps: 0,
+  photoMode: false,
+  photoCapturing: false,
+  photoGhost: false,
+  photoScrub: 1,
+  photoFollowGhost: false,
   setPhase: (phase) => set({ phase }),
   setTrack: (trackId) => set({ trackId }),
   setHud: (h) => set((s) => ({ hud: { ...s.hud, ...h } })),
@@ -211,6 +226,11 @@ export const useGame = create<GameStore>((set) => ({
       return { settings, autoThrottle: settings.autoThrottle };
     }),
   setFps: (fps) => set({ fps }),
+  setPhotoMode: (photoMode) => set({ photoMode, photoCapturing: false }),
+  setPhotoCapturing: (photoCapturing) => set({ photoCapturing }),
+  setPhotoGhost: (photoGhost) => set({ photoGhost }),
+  setPhotoScrub: (photoScrub) => set({ photoScrub: Math.max(0, Math.min(1, photoScrub)) }),
+  setPhotoFollowGhost: (photoFollowGhost) => set({ photoFollowGhost }),
   refreshBest: () => {
     const save = readSave();
     const last = readLastSave();

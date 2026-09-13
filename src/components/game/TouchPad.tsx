@@ -15,9 +15,11 @@ type Props = {
 export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: Props) {
   const phase = useGame((s) => s.phase);
   const touch = useGame((s) => s.touch);
+  const photoMode = useGame((s) => s.photoMode);
   const racing = phase === "race" || phase === "countdown";
   // Never gate on padActive — a phantom gamepad unmounts Accel and zeros throttle.
-  const visible = racing;
+  // Photo mode hides the pads so orbit drag and Capture stay clean.
+  const visible = racing && !photoMode;
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

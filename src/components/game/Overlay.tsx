@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import { Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
+import { Camera, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
 import { loadHints } from "@/game/flow";
 import { padRaceHint } from "@/game/gamepad";
@@ -13,6 +13,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
 import { FirstRunHint } from "./overlay/FirstRunHint";
 import { MenuScreen } from "./overlay/MenuScreen";
+import { PhotoScreen } from "./overlay/PhotoScreen";
 import { ResultsScreen } from "./overlay/ResultsScreen";
 import { keepPlayFocus, MedalRow, Modal } from "./overlay/chrome";
 
@@ -39,8 +40,10 @@ export function Overlay({ gameRef }: Props) {
   const fps = useGame((s) => s.fps);
   const touch = useGame((s) => s.touch);
   const trackId = useGame((s) => s.trackId);
+  const photoMode = useGame((s) => s.photoMode);
   const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
+  const hideHud = photoMode;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
@@ -101,7 +104,7 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {phase === "countdown" || phase === "race" || phase === "paused" ? (
+      {!hideHud && (phase === "countdown" || phase === "race" || phase === "paused") ? (
         <Hud
           time={hud.time}
           speed={hud.speed}
@@ -128,7 +131,7 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {phase === "race" || phase === "countdown" ? (
+      {!hideHud && (phase === "race" || phase === "countdown") ? (
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
             type="button"
@@ -159,6 +162,18 @@ export function Overlay({ gameRef }: Props) {
               className="play-control hud-chip flex size-11 items-center justify-center rounded-md"
               onMouseDown={keepPlayFocus}
               onClick={() => {
+                g()?.uiClick();
+                g()?.enterPhoto();
+              }}
+              aria-label="Photo mode"
+            >
+              <Camera className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="play-control hud-chip flex size-11 items-center justify-center rounded-md"
+              onMouseDown={keepPlayFocus}
+              onClick={() => {
                 const next = !muted;
                 g()?.setMuted(next);
                 if (!next) g()?.uiClick();
@@ -171,7 +186,7 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {phase === "paused" && !settingsOpen ? (
+      {!hideHud && phase === "paused" && !settingsOpen ? (
         <Modal
           title="Paused"
           subtitle={TRACK_DEFS[trackId].name}
@@ -190,6 +205,13 @@ export function Overlay({ gameRef }: Props) {
               onClick: () => {
                 g()?.uiClick();
                 g()?.resume();
+              },
+            },
+            {
+              label: "Photo",
+              onClick: () => {
+                g()?.uiClick();
+                g()?.enterPhoto();
               },
             },
             {
@@ -217,7 +239,7 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {phase === "results" && results ? (
+      {!hideHud && phase === "results" && results ? (
         <ResultsScreen
           results={results}
           nextName={TRACK_DEFS[results.nextTrackId].name}
@@ -241,16 +263,37 @@ export function Overlay({ gameRef }: Props) {
             g()?.uiClick();
             g()?.menu();
           }}
+          onPhoto={() => {
+            g()?.uiClick();
+            g()?.enterPhoto();
+          }}
         />
       ) : null}
 
-      {settings.showFps && (phase === "race" || phase === "countdown" || phase === "paused") ? (
+      {photoMode ? (
+        <PhotoScreen
+          touch={touch}
+          onNudge={(dyaw, dpitch, dzoom) => g()?.nudgePhoto(dyaw, dpitch, dzoom)}
+          onCapture={() => {
+            g()?.uiClick();
+            void g()?.capturePhoto();
+          }}
+          onClose={() => {
+            g()?.uiClick();
+            g()?.exitPhoto();
+          }}
+          onScrub={(u) => g()?.setPhotoScrub(u)}
+          onFollowGhost={(v) => g()?.setPhotoFollowGhost(v)}
+        />
+      ) : null}
+
+      {!hideHud && settings.showFps && (phase === "race" || phase === "countdown" || phase === "paused") ? (
         <p className="absolute top-[max(0.95rem,env(safe-area-inset-top))] left-[max(4.6rem,calc(env(safe-area-inset-left)+3.8rem))] text-xs tabular-nums text-muted sm:left-[max(7.1rem,calc(env(safe-area-inset-left)+6.2rem))]">
           {fps} fps
         </p>
       ) : null}
 
-      {settings.showMinimap && (phase === "race" || phase === "countdown" || phase === "paused") ? (
+      {!hideHud && settings.showMinimap && (phase === "race" || phase === "countdown" || phase === "paused") ? (
         <div className="absolute bottom-[max(2.6rem,env(safe-area-inset-bottom))] left-[max(0.85rem,env(safe-area-inset-left))] hidden md:block">
           <Minimap
             trackId={trackId}
@@ -263,7 +306,7 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {settingsOpen ? (
+      {settingsOpen && !photoMode ? (
         <SettingsPanel
           touch={touch}
           onClose={() => setSettingsOpen(false)}
@@ -272,19 +315,19 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {phase === "race" || phase === "countdown" ? (
+      {!hideHud && (phase === "race" || phase === "countdown") ? (
         <FirstRunHint touch={touch} padActive={pad.active} onDismiss={() => setHintGone(true)} />
       ) : null}
 
-      {phase === "race" && hintGone ? (
+      {!hideHud && phase === "race" && hintGone ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
           {pad.connected
             ? padRaceHint(pad.xbox)
-            : "WASD steer and throttle · Space slide · R respawn · C camera · Esc pause"}
+            : "WASD steer and throttle · Space slide · R respawn · C camera · F photo · Esc pause"}
         </p>
       ) : null}
 
-      {padBanner ? <PadBanner text={padBanner} /> : null}
+      {!hideHud && padBanner ? <PadBanner text={padBanner} /> : null}
     </div>
   );
 }

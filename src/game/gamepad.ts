@@ -35,6 +35,7 @@ export const PAD_MAP = {
   respawn: "Y / Triangle",
   pause: "Menu / Start / Options",
   camera: "View / Share / RB",
+  photo: "LB + View",
 } as const;
 
 const XBOX_RE = /xbox|xinput|microsoft|360|series/i;
