@@ -274,6 +274,70 @@ describe("mobile feel sims", () => {
   });
 });
 
+describe("surface feel on track", () => {
+  it("tags Circuit plastic, White Pass ice, Yard tech, and Ridge dirt after the paved start", () => {
+    const circuit = getTrack("circuit");
+    const summit = getTrack("summit");
+    const yard = getTrack("yard");
+    const canyon = getTrack("canyon");
+    const helix = getTrack("helix");
+    assert.equal(sampleAt(circuit, 40).surface, "plastic");
+    assert.equal(sampleAt(summit, 80).surface, "ice");
+    assert.equal(sampleAt(yard, 80).surface, "tech");
+    assert.equal(sampleAt(helix, 80).surface, "tech");
+    assert.equal(sampleAt(canyon, 20).surface, "plastic");
+    assert.equal(sampleAt(canyon, 90).surface, "dirt");
+  });
+
+  it("ice brakes softer than Circuit plastic from the same speed", () => {
+    const summit = getTrack("summit");
+    const circuit = getTrack("circuit");
+    const ice = new CarSim();
+    ice.reset(summit);
+    ice.s = 36;
+    ice.n = 0;
+    ice.speed = 24;
+    ice.heading = 0;
+    const plas = new CarSim();
+    plas.reset(circuit);
+    plas.s = 36;
+    plas.n = 0;
+    plas.speed = 24;
+    plas.heading = 0;
+    for (let i = 0; i < 28; i++) {
+      ice.step(summit, { ...idle, brake: 1 }, 1 / 60);
+      plas.step(circuit, { ...idle, brake: 1 }, 1 / 60);
+    }
+    assert.equal(ice.surface, "ice");
+    assert.equal(plas.surface, "plastic");
+    assert.ok(ice.speed > plas.speed + 1.4, `ice ${ice.speed} vs plastic ${plas.speed}`);
+    assert.equal(ice.airborne, false);
+    assert.equal(plas.airborne, false);
+  });
+
+  it("ice yaws more than tech for the same steer pulse", () => {
+    const summit = getTrack("summit");
+    const yard = getTrack("yard");
+    const ice = new CarSim();
+    ice.reset(summit);
+    ice.s = 36;
+    ice.n = 0;
+    ice.speed = 20;
+    ice.heading = 0;
+    const tech = new CarSim();
+    tech.reset(yard);
+    tech.s = 36;
+    tech.n = 0;
+    tech.speed = 20;
+    tech.heading = 0;
+    for (let i = 0; i < 20; i++) {
+      ice.step(summit, { ...cruise, steer: 0.55 }, 1 / 60);
+      tech.step(yard, { ...cruise, steer: 0.55 }, 1 / 60);
+    }
+    assert.ok(Math.abs(ice.heading) > Math.abs(tech.heading) * 1.12, `ice ${ice.heading} vs tech ${tech.heading}`);
+  });
+});
+
 describe("snap reuse", () => {
   it("writes into the same CarSnap object", () => {
     const circuit = getTrack("circuit");

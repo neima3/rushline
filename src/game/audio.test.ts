@@ -8,6 +8,7 @@ import {
   medalNotes,
   musicDuck,
   muteFromSearch,
+  scrapeCue,
   scrapeMix,
 } from "./audio.ts";
 
@@ -92,6 +93,20 @@ describe("scrapeMix", () => {
     assert.equal(air.gain, 0);
     assert.equal(menu.gain, 0);
     assert.ok(drift.freq > grip.freq);
+  });
+
+  it("gives ice a higher hiss and dirt a lower rumble than plastic", () => {
+    const input = { speed: 22, slide: 0.8, airborne: false, racing: true } as const;
+    const plastic = scrapeMix({ ...input, surface: "plastic" });
+    const ice = scrapeMix({ ...input, surface: "ice" });
+    const dirt = scrapeMix({ ...input, surface: "dirt" });
+    const tech = scrapeMix({ ...input, surface: "tech" });
+    assert.ok(ice.freq > plastic.freq, `ice ${ice.freq} vs plastic ${plastic.freq}`);
+    assert.ok(dirt.freq < plastic.freq, `dirt ${dirt.freq} vs plastic ${plastic.freq}`);
+    assert.ok(tech.freq > plastic.freq && tech.freq < ice.freq);
+    assert.ok(ice.gain > 0 && dirt.gain > 0);
+    assert.ok(scrapeCue("ice").trip < scrapeCue("plastic").trip);
+    assert.ok(scrapeCue("dirt").freq < scrapeCue("tech").freq);
   });
 });
 

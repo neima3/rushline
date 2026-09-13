@@ -15,6 +15,7 @@ describe("rewind sim restore", () => {
     car.speed = 24;
     car.lastCp = 0;
     car.lap = 2;
+    car.surface = "ice";
     const snap = car.captureSim();
 
     car.s = 240;
@@ -31,6 +32,7 @@ describe("rewind sim restore", () => {
     assert.equal(car.speed, 24);
     assert.equal(car.lastCp, 0);
     assert.equal(car.lap, 2);
+    assert.equal(car.surface, "ice");
     assert.equal(car.captureSim().recoverLock, snap.recoverLock);
     assert.equal(car.trackAssist, "off");
     assert.equal(car.justFinish, false);

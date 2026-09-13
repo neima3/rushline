@@ -1,4 +1,4 @@
-import type { Medal, Phase } from "./types";
+import type { Medal, Phase, SurfaceKind } from "./types";
 
 export type EngineInput = {
   speed: number;
@@ -26,6 +26,7 @@ export type ScrapeInput = {
   slide: number;
   airborne: boolean;
   racing: boolean;
+  surface?: SurfaceKind;
 };
 
 export type ScrapeMix = {
@@ -109,15 +110,29 @@ export function engineMix(input: EngineInput): EngineMix {
   };
 }
 
+export function scrapeCue(surface: SurfaceKind = "plastic"): { gain: number; freq: number; cutoff: number; trip: number } {
+  switch (surface) {
+    case "dirt":
+      return { gain: 1.18, freq: 0.58, cutoff: 0.66, trip: 0.22 };
+    case "ice":
+      return { gain: 0.7, freq: 1.62, cutoff: 1.48, trip: 0.14 };
+    case "tech":
+      return { gain: 1.08, freq: 1.22, cutoff: 1.16, trip: 0.26 };
+    default:
+      return { gain: 1, freq: 1, cutoff: 1, trip: 0.28 };
+  }
+}
+
 export function scrapeMix(input: ScrapeInput): ScrapeMix {
   const speedAbs = Math.abs(input.speed);
   const slide = clamp01(input.slide);
-  const live = input.racing && !input.airborne && slide > 0.28 && speedAbs > 6;
-  const gain = live ? (slide - 0.16) * 0.075 * clamp01(speedAbs / 26) : 0;
+  const cue = scrapeCue(input.surface ?? "plastic");
+  const live = input.racing && !input.airborne && slide > cue.trip && speedAbs > (input.surface === "ice" ? 4 : 6);
+  const gain = live ? (slide - cue.trip * 0.55) * 0.075 * cue.gain * clamp01(speedAbs / 26) : 0;
   return {
-    gain: Math.min(0.085, Math.max(0, gain)),
-    freq: 88 + speedAbs * 6.2 + slide * 120,
-    cutoff: 460 + speedAbs * 24 + slide * 220,
+    gain: Math.min(0.09, Math.max(0, gain)),
+    freq: (88 + speedAbs * 6.2 + slide * 120) * cue.freq,
+    cutoff: (460 + speedAbs * 24 + slide * 220) * cue.cutoff,
   };
 }
 
@@ -456,7 +471,15 @@ export class GameAudio {
     this.musicOsc.push(lfo);
   }
 
-  setEngine(speed: number, throttle: number, boost: number, airborne: boolean, slide = 0, racing = true) {
+  setEngine(
+    speed: number,
+    throttle: number,
+    boost: number,
+    airborne: boolean,
+    slide = 0,
+    racing = true,
+    surface: SurfaceKind = "plastic",
+  ) {
     if (!this.ctx || !this.osc || !this.osc2 || !this.engine || !this.engineFilter) return;
     const t = this.ctx.currentTime;
     const mix = engineMix({ speed, throttle, boost, airborne, racing });
@@ -470,7 +493,7 @@ export class GameAudio {
     this.whine?.frequency.setTargetAtTime(mix.whineHz, t, 0.08);
     this.whineGain?.gain.setTargetAtTime(this.muted ? 0 : mix.whine, t, 0.06);
     if (this.scrape && this.scrapeGain && this.scrapeFilter) {
-      const skid = scrapeMix({ speed, slide, airborne, racing });
+      const skid = scrapeMix({ speed, slide, airborne, racing, surface });
       this.scrapeGain.gain.setTargetAtTime(this.muted ? 0 : skid.gain, t, 0.045);
       this.scrape.frequency.setTargetAtTime(skid.freq, t, 0.07);
       this.scrapeFilter.frequency.setTargetAtTime(skid.cutoff, t, 0.07);

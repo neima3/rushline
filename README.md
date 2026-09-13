@@ -18,13 +18,15 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 
 | Track | Vibe | Length | Signature |
 | --- | --- | --- | --- |
-| **Green Circuit** | Stadium day | ~1064 m | Banked stadium oval, boost pads, tight chicane · 2 laps |
-| **Ridge Drop** | Canyon dusk | ~1213 m | Long downhill, jump, cliff walls |
-| **Night Helix** | Neon city | ~727 m | Full loop, sticky-track helix, night lights |
-| **White Pass** | Alpine morning | ~948 m | Switchbacks, packed ice, long descent |
-| **Arc Yard** | Industrial twilight | ~952 m | Tight dock cuts, gantry climb, freight drop |
+| **Green Circuit** | Stadium plastic | ~1064 m | Banked stadium oval, boost pads, tight chicane · 2 laps |
+| **Ridge Drop** | Canyon dirt | ~1213 m | Paved start, dirt canyon, downhill jump |
+| **Night Helix** | Night tech | ~727 m | Full loop, sticky metal helix, night lights |
+| **White Pass** | Alpine ice | ~948 m | Switchbacks, packed ice, long descent |
+| **Arc Yard** | Works tech | ~952 m | Metal docks, gantry climb, freight drop |
 
 Each track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost.
+
+**Surfaces** change how the car grips. Plastic (Circuit) is the stadium baseline — slide-friendly but readable. Dirt (Ridge) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
 A personal-best ghost is saved with the time. If that ghost is missing or too thin, the last finished run is used instead. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 

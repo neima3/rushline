@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { TrackAssist } from "./settings";
-import type { Actions, BuiltTrack, CarSnap } from "./types";
+import type { Actions, BuiltTrack, CarSnap, SurfaceKind } from "./types";
 import type { RewindCar } from "./rewind";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
@@ -12,6 +12,7 @@ import {
   boostPunchWindow,
   canLandWindow,
   curbSnap,
+  defaultSurface,
   headingReturn,
   landLockTime,
   landSpeedKeep,
@@ -26,6 +27,7 @@ import {
   stayPlanted,
   steerBite,
   steerCurve,
+  surfaceFeel,
 } from "./feel.ts";
 
 const ACCEL = 28;
@@ -93,6 +95,7 @@ export class CarSim {
   justLand = false;
   skipInterp = true;
   justRespawn = false;
+  surface: SurfaceKind = "plastic";
   /** Medium matches the shipped phone racing-line assists. */
   trackAssist: TrackAssist = "medium";
   private wasSlide = false;
@@ -128,6 +131,7 @@ export class CarSim {
     this.justTurbo = false;
     this.justLand = false;
     this.justRespawn = false;
+    this.surface = defaultSurface(track.def.id);
     this.skipInterp = true;
     this.wasSlide = false;
     this.slideLatched = false;
@@ -317,16 +321,19 @@ export class CarSim {
   }
 
   private stepGround(track: BuiltTrack, actions: Actions, dt: number) {
-    if (actions.throttle > 0) this.speed += ACCEL * actions.throttle * dt;
+    const here = sampleAt(track, this.s);
+    this.surface = here.surface ?? defaultSurface(track.def.id);
+    const feel = surfaceFeel(this.surface);
+    if (actions.throttle > 0) this.speed += ACCEL * feel.accel * actions.throttle * dt;
     if (actions.brake > 0) {
-      if (this.speed > 0.4) this.speed -= BRAKE * actions.brake * dt;
-      else this.speed -= REVERSE * actions.brake * dt;
+      if (this.speed > 0.4) this.speed -= BRAKE * feel.brake * actions.brake * dt;
+      else this.speed -= REVERSE * feel.brake * actions.brake * dt;
     }
     const max = this.boost > 0 ? MAX_BOOST : MAX_SPEED;
     if (this.speed > max) this.speed += (max - this.speed) * Math.min(1, 7.5 * dt);
     if (this.speed < -MAX_REV) this.speed = -MAX_REV;
 
-    const drag = actions.throttle > 0.1 ? DRAG : COAST;
+    const drag = (actions.throttle > 0.1 ? DRAG : COAST) * feel.drag;
     this.speed *= 1 - drag * dt;
     if (Math.abs(this.speed) < 0.12 && actions.throttle < 0.05 && actions.brake < 0.05) this.speed = 0;
 
@@ -338,7 +345,7 @@ export class CarSim {
     const steer = steerCurve(actions.steer);
     const steerAbs = Math.abs(steer);
     const slideHeld = actions.slide >= 0.2;
-    const drifting = slideCommitted(slideHeld, steerAbs, speedAbs, this.slideLatched);
+    const drifting = slideCommitted(slideHeld, steerAbs, speedAbs, this.slideLatched, feel.slideEntry);
     this.slideLatched = drifting;
 
     if (this.wasSlide && !slideHeld) {
@@ -354,7 +361,7 @@ export class CarSim {
     this.wasSlide = slideHeld;
 
     this.slideAmt += ((slideHeld ? 1 : 0) - this.slideAmt) * Math.min(1, (slideHeld ? 16 : 10) * dt);
-    let turn = (drifting ? DRIFT_TURN : TURN) * spdF * speedSteer;
+    let turn = (drifting ? DRIFT_TURN : TURN) * spdF * speedSteer * feel.turn;
     if (slideHeld && !drifting) turn *= 1.08;
     if (drifting) turn *= 1 + this.driftCharge * 0.05;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
@@ -364,9 +371,9 @@ export class CarSim {
     const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting, this.trackAssist);
     if (bleed) this.heading *= 1 - bleed * dt;
 
-    const align = headingReturn(steerAbs, drifting, this.trackAssist);
+    const align = headingReturn(steerAbs, drifting, this.trackAssist) * feel.grip;
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
-    const maxYaw = slideYawLimit(drifting, slideHeld);
+    const maxYaw = slideYawLimit(drifting, slideHeld, feel.yaw);
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     this.s += this.speed * Math.cos(this.heading) * dt;
@@ -382,6 +389,7 @@ export class CarSim {
     }
 
     const sm = sampleAt(track, this.s);
+    this.surface = sm.surface ?? this.surface;
     const snapped = curbSnap({
       n: this.n,
       heading: this.heading,
@@ -507,6 +515,7 @@ export class CarSim {
     this.pz += this.vz * dt;
 
     const near = nearestSample(track, this.px, this.py, this.pz, this.s);
+    this.surface = near.surface ?? this.surface;
     const relx = this.px - near.x;
     const rely = this.py - near.y;
     const relz = this.pz - near.z;
@@ -709,6 +718,7 @@ export class CarSim {
       airBlend: this.airBlend,
       recoverLock: this.recoverLock,
       boostPunch: this.boostPunch,
+      surface: this.surface,
     };
   }
 
@@ -750,6 +760,7 @@ export class CarSim {
     this.airBlend = state.airBlend;
     this.recoverLock = state.recoverLock;
     this.boostPunch = state.boostPunch;
+    this.surface = state.surface;
     this.justBoost = false;
     this.justCp = false;
     this.justLap = false;
@@ -784,6 +795,7 @@ export class CarSim {
     dst.justTurbo = this.justTurbo || this.pulseTurbo;
     dst.justLand = this.justLand || this.pulseLand;
     dst.justBoost = this.justBoost || this.pulseBoost;
+    dst.surface = this.surface;
     dst.fx = this.fx;
     dst.fy = this.fy;
     dst.fz = this.fz;
@@ -815,6 +827,7 @@ export function emptySnap(): CarSnap {
     justTurbo: false,
     justLand: false,
     justBoost: false,
+    surface: "plastic",
     fx: 0,
     fy: 0,
     fz: 1,
@@ -844,6 +857,7 @@ export function copySnap(dst: CarSnap, src: CarSnap): CarSnap {
   dst.justTurbo = src.justTurbo;
   dst.justLand = src.justLand;
   dst.justBoost = src.justBoost;
+  dst.surface = src.surface;
   dst.fx = src.fx;
   dst.fy = src.fy;
   dst.fz = src.fz;
@@ -889,6 +903,7 @@ export function lerpSnap(a: CarSnap, b: CarSnap, t: number, out?: CarSnap): CarS
   dst.justTurbo = b.justTurbo;
   dst.justLand = b.justLand;
   dst.justBoost = b.justBoost;
+  dst.surface = b.surface;
   dst.fx = fx / fl;
   dst.fy = fy / fl;
   dst.fz = fz / fl;

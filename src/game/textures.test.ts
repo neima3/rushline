@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ASPHALT_BASE, ROAD_TINT, roadCrown } from "./look.ts";
+import { ASPHALT_BASE, ROAD_TINT, roadCrown, roadSurfaceTint, SURFACE_ARCHETYPE, themeDefaultSurface } from "./look.ts";
 
 describe("track look tokens", () => {
   it("keeps Circuit asphalt midtones charcoal under High day lights", () => {
@@ -37,5 +37,21 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.works.r < ROAD_TINT.night.b);
     const crown = roadCrown("works");
     assert.ok(crown.edge > crown.mid);
+  });
+
+  it("keeps Circuit plastic on the stadium tint and pulls mixed surfaces toward their archetype", () => {
+    assert.equal(themeDefaultSurface("stadium"), "plastic");
+    assert.equal(themeDefaultSurface("canyon"), "dirt");
+    assert.equal(themeDefaultSurface("alpine"), "ice");
+    assert.equal(themeDefaultSurface("works"), "tech");
+    const plastic = roadSurfaceTint("stadium", "plastic");
+    assert.equal(plastic.r, ROAD_TINT.stadium.r);
+    assert.equal(plastic.g, ROAD_TINT.stadium.g);
+    const dirtOnCanyon = roadSurfaceTint("canyon", "dirt");
+    assert.equal(dirtOnCanyon.r, ROAD_TINT.canyon.r);
+    const icePatch = roadSurfaceTint("stadium", "ice");
+    assert.ok(icePatch.b > plastic.b, "ice on Circuit should read cooler");
+    assert.ok(SURFACE_ARCHETYPE.dirt.r > SURFACE_ARCHETYPE.dirt.b);
+    assert.ok(SURFACE_ARCHETYPE.ice.b > SURFACE_ARCHETYPE.ice.r);
   });
 });

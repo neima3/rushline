@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import type { BuiltTrack, Medal, Sample, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
-import { ROAD_TINT, roadCrown } from "./look";
+import type { BuiltTrack, Medal, Sample, SurfaceKind, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
+import { defaultSurface } from "./feel.ts";
+import { roadCrown, roadSurfaceTint, surfaceBand, surfaceDashColor, surfaceShowsDash } from "./look";
 import { makeAsphaltRoughness, makeAsphaltTexture, makeCheckerTexture } from "./textures";
 import type { TextureBudget } from "./quality";
 
@@ -22,6 +23,7 @@ const _hintSample: Sample = {
   s: 0,
   boost: false,
   checkpoint: false,
+  surface: "plastic",
 };
 
 function wrapPi(a: number) {
@@ -47,6 +49,7 @@ class PathBuilder {
   yaw = 0;
   width = 12;
   bank = 0;
+  surface: SurfaceKind | undefined;
   nodes: TrackNode[] = [];
 
   constructor() {
@@ -60,6 +63,7 @@ class PathBuilder {
       z: this.z,
       width: this.width,
       bank: this.bank,
+      surface: extra?.surface ?? this.surface,
       ...extra,
     });
   }
@@ -69,9 +73,16 @@ class PathBuilder {
     return this;
   }
 
+  setSurface(kind: SurfaceKind) {
+    this.surface = kind;
+    const last = this.nodes[this.nodes.length - 1];
+    if (last && this.nodes.length === 1) last.surface = kind;
+    return this;
+  }
+
   straight(
     dist: number,
-    opts: { climb?: number; width?: number; bank?: number; boost?: boolean; checkpoint?: boolean } = {},
+    opts: { climb?: number; width?: number; bank?: number; boost?: boolean; checkpoint?: boolean; surface?: SurfaceKind } = {},
   ) {
     const steps = Math.max(2, Math.ceil(Math.abs(dist) / 8));
     const fx = -Math.sin(this.yaw);
@@ -85,9 +96,11 @@ class PathBuilder {
       this.y = y0 + dy * t;
       if (opts.width != null) this.width = opts.width;
       if (opts.bank != null) this.bank = opts.bank;
+      if (opts.surface != null) this.surface = opts.surface;
       this.capture({
         boost: Boolean(opts.boost) && i === Math.max(1, Math.floor(steps * 0.45)),
         checkpoint: Boolean(opts.checkpoint) && i === steps,
+        surface: this.surface,
       });
     }
     if (opts.bank != null && !opts.bank) this.bank = 0;
@@ -97,7 +110,7 @@ class PathBuilder {
   curve(
     angle: number,
     radius: number,
-    opts: { bank?: number; climb?: number; checkpoint?: boolean; boost?: boolean; width?: number } = {},
+    opts: { bank?: number; climb?: number; checkpoint?: boolean; boost?: boolean; width?: number; surface?: SurfaceKind } = {},
   ) {
     const sign = Math.sign(angle) || 1;
     const abs = Math.abs(angle);
@@ -113,6 +126,7 @@ class PathBuilder {
     const startYaw = this.yaw;
     const bankIn = opts.bank ?? 0.32;
     if (opts.width != null) this.width = opts.width;
+    if (opts.surface != null) this.surface = opts.surface;
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
       const a = startYaw + angle * t;
@@ -192,8 +206,16 @@ function nodeAt(nodes: TrackNode[], i: number, closed: boolean) {
 }
 
 export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = false, stabilizeFlats = false): Sample[] {
-  const pts: { x: number; y: number; z: number; width: number; bank: number; boost: boolean; checkpoint: boolean }[] =
-    [];
+  const pts: {
+    x: number;
+    y: number;
+    z: number;
+    width: number;
+    bank: number;
+    boost: boolean;
+    checkpoint: boolean;
+    surface?: SurfaceKind;
+  }[] = [];
   const n = nodes.length;
   const segs = closed ? n : n - 1;
   for (let i = 0; i < segs; i++) {
@@ -213,6 +235,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
         bank: lerp(p1.bank, p2.bank, t),
         boost: Boolean(p1.boost) && s === 0,
         checkpoint: Boolean(p1.checkpoint) && s === 0,
+        surface: p1.surface ?? p2.surface,
       });
     }
   }
@@ -226,6 +249,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
       bank: last.bank,
       boost: Boolean(last.boost),
       checkpoint: Boolean(last.checkpoint),
+      surface: last.surface,
     });
   }
 
@@ -409,6 +433,7 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
       s: arc,
       boost: p.boost,
       checkpoint: p.checkpoint,
+      surface: p.surface ?? "plastic",
     });
   }
 
@@ -416,7 +441,12 @@ export function rasterize(nodes: TrackNode[], closed: boolean, stabilizeUp = fal
 }
 
 export function compileTrack(def: TrackDef): BuiltTrack {
-  const samples = rasterize(def.nodes, def.closed, def.id !== "helix", def.id === "helix");
+  const fallback = def.defaultSurface ?? defaultSurface(def.id);
+  const nodes = def.nodes.map((n) => (n.surface ? n : { ...n, surface: fallback }));
+  const samples = rasterize(nodes, def.closed, def.id !== "helix", def.id === "helix");
+  for (const sm of samples) {
+    if (!sm.surface) sm.surface = fallback;
+  }
   const length = samples[samples.length - 1]?.s ?? 1;
   const checkpoints: number[] = [];
   const boosts: number[] = [];
@@ -444,6 +474,7 @@ function writeEmptySample(dst: Sample): Sample {
   dst.s = 0;
   dst.boost = false;
   dst.checkpoint = false;
+  dst.surface = "plastic";
   return dst;
 }
 
@@ -521,6 +552,7 @@ export function sampleAt(track: BuiltTrack, s: number, out?: Sample): Sample {
   dst.s = ss;
   dst.boost = a.boost || b.boost;
   dst.checkpoint = false;
+  dst.surface = t < 0.5 ? a.surface : b.surface;
   return dst;
 }
 
@@ -674,7 +706,6 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     pushTri(pos, nrm, col, uv, ax, ay, az, dx, dy, dz, cx, cy, cz, nx, ny, nz, color, [u0, 0, u1, 1, u1, 0]);
   };
 
-  const tint = ROAD_TINT[theme];
   const dummy = new THREE.Object3D();
   const postMats: THREE.Matrix4[] = [];
 
@@ -699,8 +730,18 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     const u0 = a.s * 0.08;
     const u1 = b.s * 0.08;
     const crown = roadCrown(theme);
-    const colL = { r: tint.r * crown.edge, g: tint.g * crown.edge, b: tint.b * crown.edge };
-    const colM = { r: tint.r * crown.mid, g: tint.g * crown.mid, b: tint.b * crown.mid };
+    const tint = roadSurfaceTint(theme, a.surface);
+    const band = surfaceBand(a.surface, a.s);
+    const colL = {
+      r: Math.max(0.04, tint.r * crown.edge + band),
+      g: Math.max(0.04, tint.g * crown.edge + band * 0.9),
+      b: Math.max(0.04, tint.b * crown.edge + band * 1.1),
+    };
+    const colM = {
+      r: Math.max(0.04, tint.r * crown.mid + band * 0.7),
+      g: Math.max(0.04, tint.g * crown.mid + band * 0.65),
+      b: Math.max(0.04, tint.b * crown.mid + band * 0.85),
+    };
     const amx = (alx + arx) * 0.5;
     const amy = (aly + ary) * 0.5;
     const amz = (alz + arz) * 0.5;
@@ -860,8 +901,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       }
     }
 
-    const dashOn = Math.floor(a.s / 4.4) % 2 === 0;
-    if (dashOn && !a.boost) {
+    const dashOn = Math.floor(a.s / (a.surface === "ice" ? 3.2 : 4.4)) % 2 === 0;
+    if (dashOn && !a.boost && surfaceShowsDash(a.surface)) {
       const hw = 0.09;
       const ly0x = a.x - a.rx * hw + a.ux * 0.03;
       const ly0y = a.y - a.ry * hw + a.uy * 0.03;
@@ -875,7 +916,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       const ly3x = b.x + b.rx * hw + b.ux * 0.03;
       const ly3y = b.y + b.ry * hw + b.uy * 0.03;
       const ly3z = b.z + b.rz * hw + b.uz * 0.03;
-      const white = { r: 0.95, g: 0.95, b: 0.92 };
+      const white = surfaceDashColor(a.surface);
       strip(markPos, markNrm, markCol, markUv, ly0x, ly0y, ly0z, ly1x, ly1y, ly1z, ly2x, ly2y, ly2z, ly3x, ly3y, ly3z, a.ux, a.uy, a.uz, white, u0, u1);
     }
 
@@ -1067,6 +1108,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
 function circuitNodes() {
   return new PathBuilder()
     .setWidth(12.5)
+    .setSurface("plastic")
     .straight(70)
     .curve(-Math.PI * 0.5, 34)
     .straight(42, { checkpoint: true })
@@ -1091,7 +1133,9 @@ function circuitNodes() {
 function canyonNodes() {
   return new PathBuilder()
     .setWidth(12)
+    .setSurface("plastic")
     .straight(48)
+    .setSurface("dirt")
     .curve(-Math.PI * 0.55, 36)
     .straight(34, { climb: 14, checkpoint: true })
     .curve(Math.PI * 0.85, 26, { bank: 0.48, climb: 6 })
@@ -1114,6 +1158,7 @@ function canyonNodes() {
 function helixNodes() {
   return new PathBuilder()
     .setWidth(11.5)
+    .setSurface("tech")
     .straight(44, { boost: true })
     .loop(12.5, 11)
     .straight(22, { checkpoint: true })
@@ -1133,6 +1178,7 @@ function helixNodes() {
 function summitNodes() {
   return new PathBuilder()
     .setWidth(12)
+    .setSurface("ice")
     .straight(58)
     .curve(-Math.PI * 0.42, 30)
     .straight(26, { checkpoint: true })
@@ -1155,6 +1201,7 @@ function summitNodes() {
 function yardNodes() {
   return new PathBuilder()
     .setWidth(12.2)
+    .setSurface("tech")
     .straight(64)
     .curve(-Math.PI * 0.46, 30)
     .straight(30, { checkpoint: true })
@@ -1179,34 +1226,37 @@ export const TRACK_DEFS: Record<TrackId, TrackDef> = {
   circuit: {
     id: "circuit",
     name: "Green Circuit",
-    blurb: "Stadium flow. Two laps, one jump.",
+    blurb: "Stadium plastic. Two laps, one jump.",
     env: "stadium",
     laps: 2,
     closed: true,
     thumb: "/textures/thumb-circuit.jpg",
     medals: { author: 50_000, gold: 56_000, silver: 64_000, bronze: 78_000 },
+    defaultSurface: "plastic",
     nodes: circuitNodes(),
   },
   canyon: {
     id: "canyon",
     name: "Ridge Drop",
-    blurb: "A long descent, then a committed jump.",
+    blurb: "Paved start, then dirt. A long descent and a committed jump.",
     env: "canyon",
     laps: 1,
     closed: true,
     thumb: "/textures/thumb-canyon.jpg",
     medals: { author: 30_500, gold: 35_000, silver: 41_000, bronze: 52_000 },
+    defaultSurface: "dirt",
     nodes: canyonNodes(),
   },
   helix: {
     id: "helix",
     name: "Night Helix",
-    blurb: "Loop, corkscrew, keep the speed.",
+    blurb: "Night tech. Loop, corkscrew, keep the speed.",
     env: "night",
     laps: 1,
     closed: true,
     thumb: "/textures/thumb-helix.jpg",
     medals: { author: 27_500, gold: 32_000, silver: 38_000, bronze: 50_000 },
+    defaultSurface: "tech",
     nodes: helixNodes(),
   },
   summit: {
@@ -1218,17 +1268,19 @@ export const TRACK_DEFS: Record<TrackId, TrackDef> = {
     closed: true,
     thumb: "/textures/thumb-summit.svg",
     medals: { author: 30_000, gold: 35_000, silver: 42_000, bronze: 52_000 },
+    defaultSurface: "ice",
     nodes: summitNodes(),
   },
   yard: {
     id: "yard",
     name: "Arc Yard",
-    blurb: "Twilight docks. Tight cuts, then a gantry drop.",
+    blurb: "Metal docks. Tight cuts, then a gantry drop.",
     env: "works",
     laps: 1,
     closed: true,
     thumb: "/textures/thumb-yard.svg",
     medals: { author: 31_000, gold: 36_000, silver: 43_000, bronze: 54_000 },
+    defaultSurface: "tech",
     nodes: yardNodes(),
   },
 };

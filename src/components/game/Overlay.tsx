@@ -6,10 +6,10 @@ import { continueEvent, cupContinueLabel, getCupEvent } from "@/game/cup";
 import { loadHints } from "@/game/flow";
 import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
-import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
+import { formatPaceRemain, medalPaceLabel, SURFACE_LABEL } from "@/game/feel";
 import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
-import type { Medal, TrackId } from "@/game/types";
+import type { Medal, SurfaceKind, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
@@ -185,6 +185,7 @@ export function Overlay({ gameRef }: Props) {
           n={hud.n}
           showSpeed={settings.showSpeed}
           showMinimap={settings.showMinimap}
+          surface={hud.surface}
           cupLabel={cupEvent ? `CUP ${cupEvent.index + 1}/5 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}` : null}
           rewinding={hud.rewinding}
           rewindRemainMs={hud.rewindRemainMs}
@@ -466,6 +467,7 @@ function Hud({
   n,
   showSpeed,
   showMinimap,
+  surface,
   cupLabel,
   rewinding,
   rewindRemainMs,
@@ -492,6 +494,7 @@ function Hud({
   n: number;
   showSpeed: boolean;
   showMinimap: boolean;
+  surface: SurfaceKind;
   cupLabel?: string | null;
   rewinding?: boolean;
   rewindRemainMs?: number;
@@ -554,6 +557,20 @@ function Hud({
         ) : null}
         <div className="hud-pace mt-1.5 flex flex-col items-center gap-1">
           {cupLabel ? <span className="hud-pace-chip text-muted">{cupLabel}</span> : null}
+          <span
+            className={cn(
+              "hud-pace-chip uppercase tracking-[0.14em]",
+              surface === "ice"
+                ? "text-medal-silver"
+                : surface === "dirt"
+                  ? "text-medal-bronze"
+                  : surface === "tech"
+                    ? "text-ok"
+                    : "text-muted",
+            )}
+          >
+            {SURFACE_LABEL[surface]}
+          </span>
           <span className={cn("hud-pace-chip tabular-nums tracking-wide", medal ? "text-fg" : "text-subtle")}>
             {medalPaceLabel(medal)}
             {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}

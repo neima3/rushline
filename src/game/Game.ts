@@ -504,6 +504,7 @@ export class Game {
       wrongWay: false,
       rewinding: false,
       rewindRemainMs: 0,
+      surface: this.car.surface,
     });
     this.audio.unlock();
     this.audio.setScene("countdown");
@@ -736,7 +737,15 @@ export class Game {
     }
     this.audio.setScene(this.photoMode ? "paused" : this.phase);
     const racing = !this.photoMode && (this.phase === "race" || this.phase === "countdown");
-    this.audio.setEngine(vis.speed, this.photoMode ? 0 : actions.throttle, vis.boost, vis.airborne, vis.slide, racing);
+    this.audio.setEngine(
+      vis.speed,
+      this.photoMode ? 0 : actions.throttle,
+      vis.boost,
+      vis.airborne,
+      vis.slide,
+      racing,
+      vis.surface,
+    );
     if (!this.world.contextLost) this.world.render();
 
     this.frames++;
@@ -792,6 +801,7 @@ export class Game {
         cpFlash: flash,
         rewinding: this.rewinding,
         rewindRemainMs: this.rewinding ? Math.max(0, this.time - this.rewind.oldestT()) : this.rewind.spanMs(),
+        surface: vis.surface,
       });
     }
   };

@@ -1,4 +1,4 @@
-import type { GhostFrame } from "./types";
+import type { GhostFrame, SurfaceKind } from "./types";
 
 /** Desktop tape: ~8s at ~30 Hz. */
 export const REWIND_WINDOW_MS = 8000;
@@ -59,6 +59,7 @@ export type RewindCar = {
   airBlend: number;
   recoverLock: number;
   boostPunch: number;
+  surface: SurfaceKind;
 };
 
 export type RewindFrame = {
