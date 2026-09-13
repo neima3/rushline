@@ -1,3 +1,4 @@
+import { cupHeadline } from "@/game/cup";
 import { MEDAL_LABEL, resultsHeadline } from "@/game/flow";
 import { medalPace, TRACK_DEFS } from "@/game/track";
 import type { Medal, ResultsState, TrackId } from "@/game/types";
@@ -10,14 +11,29 @@ type Props = {
   onRetry: () => void;
   onRetryLast?: () => void;
   onNext: () => void;
+  onNextChallenge?: () => void;
+  onCup?: () => void;
   onMenu: () => void;
   onPhoto?: () => void;
 };
 
-export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext, onMenu, onPhoto }: Props) {
+export function ResultsScreen({
+  results,
+  nextName,
+  onRetry,
+  onRetryLast,
+  onNext,
+  onNextChallenge,
+  onCup,
+  onMenu,
+  onPhoto,
+}: Props) {
   const track = TRACK_DEFS[results.trackId];
+  const cup = results.cup;
   const pbDelta = results.prevBest == null ? null : results.time - results.prevBest;
-  const headline = resultsHeadline(results.medal, results.isPb);
+  const headline = cup ? cupHeadline(cup, results.medal) : resultsHeadline(results.medal, results.isPb);
+  const nextChallengeName = cup?.nextTrackId ? TRACK_DEFS[cup.nextTrackId].name : null;
+  const targetAt = cup ? TRACK_DEFS[results.trackId].medals[cup.target] : null;
 
   return (
     <div
@@ -25,8 +41,18 @@ export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext,
       className="pointer-events-auto absolute inset-0 flex items-end justify-center bg-gradient-to-t from-bg via-bg/80 to-bg/35 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] md:items-center"
     >
       <div className="hud-chrome hud-pause-card overlay-enter results-card w-full max-w-md overflow-hidden p-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">{track.name}</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
+          {cup
+            ? `${cup.cupName} · ${cup.eventIndex + 1}/${cup.eventTotal} · ${track.name}`
+            : track.name}
+        </p>
         <h2 className="font-display text-4xl leading-none tracking-tight md:text-5xl">{headline}</h2>
+        {cup && targetAt != null ? (
+          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-subtle">
+            Target {cup.target === "author" ? "Author" : "Gold"} {formatTime(targetAt)}
+            {cup.cleared ? " · cleared" : " · missed"}
+          </p>
+        ) : null}
 
         <p className="results-time mt-5 font-display text-6xl leading-none tracking-tight tabular-nums md:text-7xl">
           {formatTime(results.time)}
@@ -59,14 +85,44 @@ export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext,
         <GhostTimes results={results} />
 
         <div className="mt-6 flex flex-col gap-2">
-          <button
-            type="button"
-            onMouseDown={keepPlayFocus}
-            onClick={onRetry}
-            className="h-12 rounded-md bg-accent text-sm font-semibold text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98]"
-          >
-            Retry
-          </button>
+          {cup?.nextEventId && onNextChallenge ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onNextChallenge}
+              className="h-12 rounded-md bg-accent text-sm font-semibold text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98]"
+            >
+              Next challenge · {nextChallengeName ?? "Cup"}
+            </button>
+          ) : cup?.campaignComplete && onCup ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onCup}
+              className="h-12 rounded-md bg-accent text-sm font-semibold text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98]"
+            >
+              Cup complete
+            </button>
+          ) : (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onRetry}
+              className="h-12 rounded-md bg-accent text-sm font-semibold text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98]"
+            >
+              Retry
+            </button>
+          )}
+          {cup?.nextEventId || cup?.campaignComplete ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onRetry}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Retry
+            </button>
+          ) : null}
           {onRetryLast ? (
             <button
               type="button"
@@ -77,14 +133,25 @@ export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext,
               Retry vs last run
             </button>
           ) : null}
-          <button
-            type="button"
-            onMouseDown={keepPlayFocus}
-            onClick={onNext}
-            className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
-          >
-            Next · {nextName}
-          </button>
+          {!cup ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onNext}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Next · {nextName}
+            </button>
+          ) : onCup && !cup.campaignComplete ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onCup}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Cup
+            </button>
+          ) : null}
           {onPhoto ? (
             <button
               type="button"

@@ -40,7 +40,22 @@ import {
   stillFilename,
   type PhotoOrbit,
 } from "./photo";
-import { applyRunCommit, readLastSave, readSave, TRACK_ORDER, useGame } from "./store";
+import {
+  applyCupCommit,
+  applyRunCommit,
+  readCupProgress,
+  readLastSave,
+  readSave,
+  TRACK_ORDER,
+  useGame,
+} from "./store";
+import {
+  allCupEvents,
+  continueEvent,
+  CUP_EVENTS,
+  getCupEvent,
+  isEventUnlocked,
+} from "./cup";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
 
@@ -169,6 +184,7 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
     useGame.getState().setReady(true);
     useGame.getState().refreshBest();
+    useGame.getState().refreshCup();
   }
 
   private syncSettings(s: Settings) {
@@ -346,6 +362,41 @@ export class Game {
       cp: 0,
       time: 0,
     });
+  }
+
+  beginTrial(id?: TrackId, pref: GhostPref = "auto") {
+    useGame.getState().setCupSession(null);
+    this.startRace(id, pref);
+  }
+
+  beginCup(eventId: string) {
+    const event = getCupEvent(eventId);
+    if (!event) return;
+    const progress = readCupProgress();
+    if (!isEventUnlocked(progress, event)) return;
+    useGame.getState().setCupSession(event.id);
+    useGame.getState().setCupFocus(event.id);
+    this.startRace(event.trackId);
+  }
+
+  openCup() {
+    this.clearPhoto();
+    const progress = readCupProgress();
+    const focus = getCupEvent(useGame.getState().cupFocusId);
+    const next = continueEvent(progress) ?? focus ?? CUP_EVENTS.gold[0]!;
+    useGame.getState().refreshCup();
+    useGame.getState().setCupFocus(next.id);
+    this.load(next.trackId);
+    this.phase = "cup";
+    this.audio.setScene("cup");
+    this.countdown = -1;
+    this.acc = 0;
+    this.car.reset(this.track);
+    this.curr = this.car.snap();
+    this.prev = this.car.snap();
+    this.world.snapCamera(this.curr, this.camera);
+    useGame.getState().setPhase("cup");
+    useGame.getState().setHud({ countdown: null });
   }
 
   startRace(id?: TrackId, pref: GhostPref = "auto") {
@@ -676,14 +727,17 @@ export class Game {
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     useGame.getState().refreshBest();
+    const cupEvent = getCupEvent(useGame.getState().cupEventId);
+    const cup = cupEvent ? applyCupCommit(cupEvent, time, medal) : null;
+    if (cup) useGame.getState().refreshCup();
     this.audio.setScene("results");
     this.audio.finish(medal);
     this.world.addTrauma(0.4);
     this.input.rumble("finish");
     this.phase = "results";
     useGame.getState().setPhase("results");
-    useGame.getState().setResults(
-      buildResults({
+    useGame.getState().setResults({
+      ...buildResults({
         time,
         trackId: this.trackId,
         prevBest,
@@ -694,7 +748,8 @@ export class Game {
         lastTime: commit.lastTime,
         recents: commit.recents,
       }),
-    );
+      cup,
+    });
   }
 
   setTouchSteer(v: number) {
@@ -853,7 +908,7 @@ export class Game {
     if (this.phase === "menu") {
       if (actions.confirm) {
         this.audio.click();
-        this.startRace(this.trackId);
+        this.beginTrial(this.trackId);
       }
       return;
     }
@@ -876,13 +931,35 @@ export class Game {
       }
       if (actions.confirm) {
         this.audio.click();
-        this.startRace(this.trackId);
+        this.beginTrial(this.trackId);
       }
       if (yEdge) {
         this.audio.click();
         const i = TRACK_ORDER.indexOf(this.trackId);
         const next = TRACK_ORDER[(i + y + TRACK_ORDER.length) % TRACK_ORDER.length]!;
         this.load(next);
+      }
+      return;
+    }
+    if (this.phase === "cup") {
+      if (actions.back) {
+        this.audio.click();
+        this.menu();
+      }
+      if (actions.confirm) {
+        const id = useGame.getState().cupFocusId;
+        if (getCupEvent(id) && isEventUnlocked(readCupProgress(), getCupEvent(id)!)) {
+          this.audio.click();
+          this.beginCup(id);
+        }
+      }
+      if (yEdge) {
+        this.audio.click();
+        const list = allCupEvents();
+        const i = Math.max(0, list.findIndex((e) => e.id === useGame.getState().cupFocusId));
+        const next = list[(i + y + list.length) % list.length]!;
+        useGame.getState().setCupFocus(next.id);
+        this.load(next.trackId);
       }
       return;
     }
@@ -897,12 +974,15 @@ export class Game {
       return;
     }
     if (this.phase === "results") {
+      const results = useGame.getState().results;
       if (actions.confirm) {
         this.audio.click();
-        this.startRace(this.trackId);
+        if (results?.cup?.nextEventId) this.beginCup(results.cup.nextEventId);
+        else this.startRace(this.trackId);
       } else if (actions.back) {
         this.audio.click();
-        this.menu();
+        if (results?.cup) this.openCup();
+        else this.menu();
       }
     }
   }

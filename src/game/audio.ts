@@ -61,6 +61,7 @@ export function musicDuck(phase: Phase): number {
   if (phase === "countdown") return 0.22;
   if (phase === "paused") return 0.38;
   if (phase === "results") return 0.52;
+  if (phase === "cup" || phase === "garage") return 1;
   return 1;
 }
 

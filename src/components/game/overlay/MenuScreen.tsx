@@ -18,6 +18,8 @@ type Props = {
   pad: { connected: boolean; xbox: boolean; active: boolean };
   onStart: () => void;
   onTracks: () => void;
+  onCup: () => void;
+  cupLabel: string;
   onBack: () => void;
   onRace: (id: TrackId) => void;
   onMute: () => void;
@@ -38,6 +40,8 @@ export function MenuScreen({
   pad,
   onStart,
   onTracks,
+  onCup,
+  cupLabel,
   onBack,
   onRace,
   onMute,
@@ -91,6 +95,14 @@ export function MenuScreen({
             </button>
             <button
               type="button"
+              onClick={onCup}
+              className="flex h-14 flex-col items-start justify-center rounded-lg border border-border bg-surface px-5 text-left text-fg transition-colors hover:bg-bg-elevated"
+            >
+              <span className="text-sm font-medium">Cup</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{cupLabel}</span>
+            </button>
+            <button
+              type="button"
               onClick={onTracks}
               className="h-12 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-fg transition-colors hover:bg-bg-elevated"
             >
@@ -132,7 +144,7 @@ export function MenuScreen({
               </button>
             </div>
             <p className="mt-1 hidden text-xs text-subtle md:block">
-              WASD steer · Space slide · Esc pause · Garage for liveries · Settings for graphics
+              WASD steer · Space slide · Esc pause · Cup for medals · Garage for liveries
             </p>
           </div>
         ) : (
