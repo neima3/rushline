@@ -24,7 +24,8 @@ import {
   type QualityProfile,
   type QualityTier,
 } from "./quality";
-import { camBoostPull, camFollowRate, camFovTarget, camFwdRate, camLandDrop, camLookAhead } from "./feel";
+import { camBoostPull, camFovTarget, camFwdRate, camLandDrop } from "./feel";
+import { camLiveFollow, camLiveLook, camSnapOffsets, isChaseCam, isCloseCam } from "./camera";
 import { sampleGhost } from "./ghost";
 import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
@@ -100,21 +101,23 @@ export function chaseSnapPlacement(
   _snapUp.crossVectors(_snapFwd, _snapRight).normalize();
 
   const portrait = aspect > 0 && aspect < 0.72;
-  const hood = mode === "hood";
-  let lift = hood ? (portrait ? 1.4 : 1.18) : portrait ? (helixSnap ? 4.35 : 3.7) : helixSnap ? 3.8 : 2.55;
-  let dist = hood ? 0.52 : ((helixSnap ? 4.6 : 6.8) + (portrait ? 0.35 : 0)) * chaseDistance;
+  const close = isCloseCam(mode);
+  const off = camSnapOffsets(mode, helixSnap, portrait, chaseDistance);
+  let lift = off.lift;
+  let dist = off.dist;
   // Helix only: pre-CP R sits near the start. A 7m chase pull-back walks
   // through the finish seam and reads as under-geo at night.
-  if (helixSnap && !hood && snap.s < dist + 6) {
+  if (helixSnap && isChaseCam(mode) && snap.s < dist + 6) {
     dist = Math.min(dist, Math.max(2.6, snap.s * 0.4));
     lift += 1.4;
   }
+  const minY = close ? (mode === "cockpit" ? 0.55 : 1.05) : helixSnap ? 2.4 : 1.8;
   _snapCam.set(
     snap.px - _snapFwd.x * dist + _snapUp.x * lift,
-    Math.max(snap.py + (hood ? 1.05 : helixSnap ? 2.4 : 1.8), snap.py - _snapFwd.y * dist + _snapUp.y * lift),
+    Math.max(snap.py + minY, snap.py - _snapFwd.y * dist + _snapUp.y * lift),
     snap.pz - _snapFwd.z * dist + _snapUp.z * lift,
   );
-  _snapLook.set(snap.px + _snapFwd.x * 12, snap.py + 0.7, snap.pz + _snapFwd.z * 12);
+  _snapLook.set(snap.px + _snapFwd.x * off.look, snap.py + off.lookY, snap.pz + _snapFwd.z * off.look);
   return { cam: _snapCam, look: _snapLook };
 }
 
@@ -126,7 +129,13 @@ export function clearChaseCamera(
 ) {
   const helix = track?.def.id === "helix";
   const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
-  const minAboveCar = (mode === "hood" ? 0.95 : 2.05) + steep * (helix ? 0.25 : 1.15);
+  const close = isCloseCam(mode);
+  // Cabin rides with the car — do not yank it onto the chase world-Y floor.
+  if (mode === "cockpit") {
+    camPos.y = Math.max(camPos.y, snap.py + 0.48);
+    return;
+  }
+  const minAboveCar = (close ? 0.95 : 2.05) + steep * (helix ? 0.25 : 1.15);
   camPos.y = Math.max(camPos.y, snap.py + minAboveCar);
   if (!track) return;
 
@@ -150,7 +159,7 @@ export function clearChaseCamera(
   };
 
   const road = sampleAt(track, snap.s, _roadSample);
-  const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
+  const roadFloor = (close ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
   liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
 
   const near = helix
@@ -163,14 +172,14 @@ export function clearChaseCamera(
         window: 36,
       })
     : nearestSample(track, camPos.x, camPos.y, camPos.z, snap.s);
-  const nearFloor = mode === "hood" ? 0.9 : 1.75;
+  const nearFloor = close ? 0.9 : 1.75;
   liftAlong(near.ux, near.uy, near.uz, near.x, near.y, near.z, nearFloor);
 
   camPos.y = Math.max(
     camPos.y,
     snap.py + minAboveCar,
-    road.y + (helix ? 2.6 : mode === "hood" ? 1.15 : 1.7),
-    near.y + (helix && near.uy < 0.7 ? 0 : helix ? 2.2 : mode === "hood" ? 0.95 : 1.45),
+    road.y + (helix ? 2.6 : close ? 1.15 : 1.7),
+    near.y + (helix && near.uy < 0.7 ? 0 : helix ? 2.2 : close ? 0.95 : 1.45),
   );
   if (helix && near.y > snap.py + 2.2 && near.uy > 0.7) {
     const horiz = Math.hypot(camPos.x - near.x, camPos.z - near.z);
@@ -179,7 +188,7 @@ export function clearChaseCamera(
   // Helix Night only: world-Y floor wins over any inverted-normal push so
   // R cannot leave the chase cam under the ribbon looking up at chevrons.
   if (helix) {
-    camPos.y = Math.max(camPos.y, snap.py + (mode === "hood" ? 1.05 : 2.6), road.y + 2.6);
+    camPos.y = Math.max(camPos.y, snap.py + (close ? 1.05 : 2.6), road.y + (close ? 1.2 : 2.6));
   }
 }
 
@@ -652,12 +661,17 @@ export class World {
     this.camPos.copy(pose.cam);
     this.lookPos.copy(pose.look);
     this.keepCameraClear(snap, this.builtTrack, mode);
+    this.setDriverView(mode);
     this.camera.position.copy(this.camPos);
     this.camera.up.copy(_worldUp);
-    if (helixSnap) this.camUp.copy(_worldUp);
+    if (helixSnap && mode !== "cockpit") this.camUp.copy(_worldUp);
     this.camera.lookAt(this.lookPos);
-    this.camera.fov = portrait ? this.camFov + 2 : this.camFov;
+    this.camera.fov = portrait ? this.camFov + (mode === "cockpit" ? 4 : 2) : this.camFov + (mode === "cockpit" ? 3 : 0);
     this.camera.updateProjectionMatrix();
+  }
+
+  private setDriverView(mode: CameraMode) {
+    this.car.group.visible = mode !== "cockpit";
   }
 
   private keepCameraClear(snap: CarSnap, track: BuiltTrack | null, mode: CameraMode) {
@@ -807,9 +821,11 @@ export class World {
       this.camera.lookAt(this.lookPos);
       this.camera.fov += (this.camFov - 2 - this.camera.fov) * (1 - Math.exp(-3 * dt));
       this.camera.updateProjectionMatrix();
+      this.car.group.visible = true;
       return;
     }
 
+    this.setDriverView(mode);
     this.camHold = Math.max(0, this.camHold - dt);
     if (this.camHold > 0) {
       this.camera.position.copy(this.camPos);
@@ -822,12 +838,12 @@ export class World {
     _fwd.set(snap.fx, snap.fy, snap.fz);
     if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
     else _fwd.normalize();
-    if (mode !== "hood") {
+    if (isChaseCam(mode)) {
       _fwd.y *= helix ? 0.12 : 0.03;
       if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
       if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
       else _fwd.normalize();
-    } else if (!helix || snap.uy > 0.55) {
+    } else if (mode === "hood" && (!helix || snap.uy > 0.55)) {
       _fwd.y = 0;
       if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, 0, snap.fz);
       if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1);
@@ -838,11 +854,14 @@ export class World {
     else _up.normalize();
 
     const upDot = THREE.MathUtils.clamp(_up.dot(_worldUp), -1, 1);
+    const close = isCloseCam(mode);
     const rollAmt = helix
-      ? mode === "hood"
+      ? close
         ? snap.airborne
-          ? 0.06
-          : 0.1
+          ? 0.08
+          : mode === "cockpit"
+            ? 0.28
+            : 0.1
         : snap.airborne
           ? 0.04
           : snap.uy > 0.55
@@ -878,23 +897,45 @@ export class World {
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const landDrop = camLandDrop(this.landJuice);
     const boostPull = camBoostPull(snap.boost);
-    if (mode === "hood") {
+    if (mode === "cockpit") {
+      const back = 0.14;
+      const lift = 0.66 + steep * 0.08;
+      _desired.set(
+        snap.px - _fwd.x * back + _up.x * lift,
+        snap.py - _fwd.y * back + _up.y * lift,
+        snap.pz - _fwd.z * back + _up.z * lift,
+      );
+      const lookDist = camLiveLook(mode, spd, snap.boost, snap.airborne);
+      _look.set(
+        snap.px + _fwd.x * lookDist,
+        snap.py + _fwd.y * lookDist + 0.16 - landDrop * 0.2,
+        snap.pz + _fwd.z * lookDist,
+      );
+    } else if (mode === "hood") {
       const back = 0.42 + (!helix ? steep * 0.55 : 0);
       const lift = 1.2 + steep * (helix ? 0.35 : 0.95);
       _desired.set(snap.px - _fwd.x * back, snap.py + lift, snap.pz - _fwd.z * back);
       _look.set(snap.px + _fwd.x * 16, snap.py + 0.38 + steep * 0.15 - landDrop, snap.pz + _fwd.z * 16);
     } else {
+      const far = mode === "far";
       const dist =
         (6.5 +
-          spd * 0.02 +
+          spd * (far ? 0.034 : 0.02) +
           (snap.airborne ? 1.15 : 0) +
           (helix ? -steep * 0.5 : steep * 1.2) +
           boostPull +
           (portrait ? 0.4 : 0) +
           snap.slide * 0.35) *
-        this.camDistance;
+        this.camDistance *
+        (far ? 1.58 : 1);
       const height =
-        2.3 + spd * 0.01 + (snap.airborne ? 1.2 : 0) + steep * (helix ? 1.5 : 2.8) + (portrait ? 0.5 : 0) + landDrop * 0.35;
+        2.3 +
+        spd * 0.01 +
+        (snap.airborne ? 1.2 : 0) +
+        steep * (helix ? 1.5 : 2.8) +
+        (portrait ? 0.5 : 0) +
+        landDrop * 0.35 +
+        (far ? 1.35 : 0);
       const lean = -snap.heading * (snap.airborne ? 0.16 : helix ? 0.28 : 0.22 + snap.slide * 0.12);
       // Flats (including every R recovery) use world-up like Circuit. Only ride
       // helix cam-up through a real invert — otherwise chase dives under-geo.
@@ -907,14 +948,14 @@ export class World {
         snap.py - (helixInvert ? this.camFwd.y * dist : 0) + upy * height,
         snap.pz - this.camFwd.z * dist + upz * height + _right.z * lean,
       );
-      const lookDist = camLookAhead(spd, snap.boost, snap.airborne);
+      const lookDist = camLiveLook(mode, spd, snap.boost, snap.airborne);
       _look.set(
         snap.px + this.camFwd.x * lookDist,
         snap.py + 0.55 - (snap.airborne ? 0.7 : 0) + (!helix ? steep * 0.25 : 0) - landDrop,
         snap.pz + this.camFwd.z * lookDist,
       );
     }
-    const follow = camFollowRate(snap.airborne, mode === "hood", snap.boost);
+    const follow = camLiveFollow(mode, snap.airborne, snap.boost);
     const k = 1 - Math.exp(-follow * dt);
     this.camPos.lerp(_desired, k);
     this.lookPos.lerp(_look, k);
@@ -926,15 +967,17 @@ export class World {
     this.camera.position.x += shake * Math.sin(this.clockT * 37) * 0.14;
     this.camera.position.y += shake * Math.cos(this.clockT * 29) * 0.1;
     this.camera.up.lerp(this.camUp, 1 - Math.exp(-7 * dt));
-    if (!helix && this.camera.up.y < 0.82) {
-      this.camera.up.lerp(_worldUp, 0.85);
-      this.camUp.lerp(_worldUp, 0.85);
-    } else if (helix && snap.uy > 0.55) {
-      this.camera.up.lerp(_worldUp, 0.75);
-      this.camUp.lerp(_worldUp, 0.75);
-    } else if (this.camera.up.y < 0.55) {
-      this.camera.up.lerp(_worldUp, 0.65);
-      this.camUp.lerp(_worldUp, 0.65);
+    if (mode !== "cockpit") {
+      if (!helix && this.camera.up.y < 0.82) {
+        this.camera.up.lerp(_worldUp, 0.85);
+        this.camUp.lerp(_worldUp, 0.85);
+      } else if (helix && snap.uy > 0.55) {
+        this.camera.up.lerp(_worldUp, 0.75);
+        this.camUp.lerp(_worldUp, 0.75);
+      } else if (this.camera.up.y < 0.55) {
+        this.camera.up.lerp(_worldUp, 0.65);
+        this.camUp.lerp(_worldUp, 0.65);
+      }
     }
     this.camera.lookAt(this.lookPos);
 
@@ -965,6 +1008,7 @@ export class World {
     );
     this.trauma = 0;
     this.camHold = 0;
+    this.car.group.visible = true;
     this.camPos.set(pose.cam.x, pose.cam.y, pose.cam.z);
     this.lookPos.set(pose.look.x, pose.look.y, pose.look.z);
     this.camera.position.copy(this.camPos);

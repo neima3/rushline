@@ -87,12 +87,13 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
-  it("maps LB+Y as rewind without firing respawn", () => {
+  it("maps LB+Y as rewind without firing respawn or restart", () => {
     setPadPoller(() => axes({ lb: true, y: true }));
     const input = new Input();
     const a = input.sample();
     assert.equal(a.rewind, true);
     assert.equal(a.respawn, false);
+    assert.equal(a.restart, false);
     input.detach();
   });
 
@@ -102,6 +103,42 @@ describe("keyboard stays live with a resting pad", () => {
     const a = input.sample();
     assert.equal(a.respawn, true);
     assert.equal(a.rewind, false);
+    input.detach();
+  });
+
+  it("edges Delete as a full restart without firing last-CP respawn", () => {
+    const input = new Input();
+    input.setKeys(["Delete"]);
+    const a = input.sample();
+    assert.equal(a.restart, true);
+    assert.equal(a.respawn, false);
+    const again = input.sample();
+    assert.equal(again.restart, false);
+    input.detach();
+  });
+
+  it("does not treat Enter as a mid-race restart", () => {
+    const input = new Input();
+    input.setKeys(["Enter"]);
+    const a = input.sample();
+    assert.equal(a.restart, false);
+    assert.equal(a.confirm, true);
+    input.detach();
+  });
+
+  it("fires restart after holding R past the threshold", () => {
+    const input = new Input();
+    let t = 1000;
+    input.nowMs = () => t;
+    input.holdRestartMs = 50;
+    input.setKeys(["KeyR"]);
+    const tap = input.sample();
+    assert.equal(tap.respawn, true);
+    assert.equal(tap.restart, false);
+    t = 1060;
+    const held = input.sample();
+    assert.equal(held.respawn, false);
+    assert.equal(held.restart, true);
     input.detach();
   });
 

@@ -7,6 +7,16 @@ export type Quality = "low" | "medium" | "high";
 export const TRACK_ASSIST_LEVELS = ["off", "low", "medium", "high"] as const;
 export type TrackAssist = (typeof TRACK_ASSIST_LEVELS)[number];
 
+export const STEER_PRESETS = ["slow", "normal", "fast"] as const;
+export type SteerPreset = (typeof STEER_PRESETS)[number];
+
+/** Keyboard + pad only. Does not rewrite Track Assist scales. */
+export function steerPresetScale(preset: SteerPreset): number {
+  if (preset === "slow") return 0.72;
+  if (preset === "fast") return 1.22;
+  return 1;
+}
+
 export type Settings = {
   quality: Quality;
   shadows: boolean;
@@ -20,6 +30,7 @@ export type Settings = {
   fov: number;
   cameraShake: number;
   touchSteerSensitivity: number;
+  steerPreset: SteerPreset;
   trackAssist: TrackAssist;
   autoThrottle: boolean;
   invertSteer: boolean;
@@ -115,6 +126,7 @@ export function defaultSettings(touch = false): Settings {
     fov: 58,
     cameraShake: 1,
     touchSteerSensitivity: 1,
+    steerPreset: "normal",
     trackAssist: touch ? "medium" : "off",
     autoThrottle: touch,
     invertSteer: false,
@@ -153,6 +165,10 @@ export function isTrackAssist(v: unknown): v is TrackAssist {
   return v === "off" || v === "low" || v === "medium" || v === "high";
 }
 
+export function isSteerPreset(v: unknown): v is SteerPreset {
+  return v === "slow" || v === "normal" || v === "fast";
+}
+
 export function parseSettings(raw: unknown, touch = false): Settings {
   const base = defaultSettings(touch);
   if (!raw || typeof raw !== "object") return base;
@@ -171,6 +187,7 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     fov: num(o.fov, base.fov, 50, 78),
     cameraShake: num(o.cameraShake, base.cameraShake, 0, 1.5),
     touchSteerSensitivity: num(o.touchSteerSensitivity, base.touchSteerSensitivity, 0.45, 2),
+    steerPreset: isSteerPreset(o.steerPreset) ? o.steerPreset : base.steerPreset,
     trackAssist: isTrackAssist(o.trackAssist) ? o.trackAssist : base.trackAssist,
     autoThrottle: bool(o.autoThrottle, base.autoThrottle),
     invertSteer: bool(o.invertSteer, base.invertSteer),
@@ -228,9 +245,10 @@ export function applySteerSettings(
   keyboardSteer: number,
   padSteer: number,
   touchSteer: number,
-  opts: { sensitivity: number; invert: boolean },
+  opts: { sensitivity: number; invert: boolean; preset?: SteerPreset },
 ): number {
-  let steer = keyboardSteer + padSteer + touchSteer * opts.sensitivity;
+  const preset = steerPresetScale(opts.preset ?? "normal");
+  let steer = (keyboardSteer + padSteer) * preset + touchSteer * opts.sensitivity;
   steer = Math.max(-1, Math.min(1, steer));
   return opts.invert ? -steer : steer;
 }

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { COPY } from "@/game/help";
 import { useGame } from "@/game/store";
-import type { Quality, TrackAssist } from "@/game/settings";
+import type { Quality, SteerPreset, TrackAssist } from "@/game/settings";
 import { cn } from "@/lib/utils";
 
 const QUALITIES: { id: Quality; label: string }[] = [
@@ -15,6 +15,12 @@ const ASSISTS: { id: TrackAssist; label: string; name: string }[] = [
   { id: "low", label: "Low", name: "Low" },
   { id: "medium", label: "Med", name: "Medium" },
   { id: "high", label: "High", name: "High" },
+];
+
+const STEER_PRESETS: { id: SteerPreset; label: string }[] = [
+  { id: "slow", label: "Slow" },
+  { id: "normal", label: "Normal" },
+  { id: "fast", label: "Fast" },
 ];
 
 export function SettingsPanel({
@@ -163,6 +169,31 @@ export function SettingsPanel({
           </Section>
 
           <Section title="Controls">
+            <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2">
+              <p className="text-sm font-medium text-fg">Steering</p>
+              <p className="mt-0.5 text-xs text-subtle">
+                Keyboard and pad only. Touch uses the slider. Track Assist scales stay put.
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg bg-bg p-1">
+                {STEER_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    aria-pressed={s.steerPreset === p.id}
+                    onClick={() => {
+                      click();
+                      patch({ steerPreset: p.id });
+                    }}
+                    className={cn(
+                      "h-12 rounded-md text-sm font-medium md:h-10",
+                      s.steerPreset === p.id ? "bg-accent text-accent-fg" : "text-muted",
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Slider
               label="Touch steer"
               value={(s.touchSteerSensitivity - 0.45) / 1.55}

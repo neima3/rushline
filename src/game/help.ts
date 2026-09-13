@@ -13,9 +13,10 @@ export const RACE_CONTROL_ROWS: ControlRow[] = [
   { id: "throttle", action: "Accelerate", keys: "W or ↑", pad: PAD_MAP.throttle },
   { id: "brake", action: "Brake / reverse", keys: "S or ↓", pad: PAD_MAP.brake },
   { id: "slide", action: "Slide", keys: "Space or Shift", pad: PAD_MAP.slide },
-  { id: "respawn", action: "Respawn", keys: "R", pad: PAD_MAP.respawn },
+  { id: "respawn", action: "Respawn (last CP)", keys: "R", pad: PAD_MAP.respawn },
+  { id: "restart", action: "Restart run", keys: "Hold R or Delete", pad: PAD_MAP.restart },
   { id: "rewind", action: "Rewind", keys: "Hold Backspace", pad: PAD_MAP.rewind },
-  { id: "camera", action: "Camera", keys: "C", pad: PAD_MAP.camera },
+  { id: "camera", action: "Cycle camera", keys: "C", pad: PAD_MAP.camera },
   { id: "photo", action: "Photo mode", keys: "F", pad: PAD_MAP.photo },
   { id: "pause", action: "Pause", keys: "Esc or P", pad: PAD_MAP.pause },
 ];
@@ -37,11 +38,11 @@ export const PHOTO_CONTROL_ROWS: ControlRow[] = [
 export const COPY = {
   productEyebrow: "Precision time trial",
   tagline: "Every checkpoint. Stay on the plastic. Beat the medals — or run Rush Cup.",
-  padIdle: "Connect a controller — RT accel, LT brake, Y respawn, LB+Y rewind, RB camera",
+  padIdle: "Connect a controller — RT accel, LT brake, Y last CP, hold Y restart, LB+Y rewind, RB camera",
   menuHint: "WASD to drive · Space to slide · Backspace rewind · Esc to pause · Help for the full sheet",
   garageBlurb: "Choose a livery. Paint stays on the car across every track.",
   cupBlurb: "A five-track medal campaign. Clear Gold, then Author. Progress stays on this device.",
-  settingsBlurb: "Graphics, audio, camera, Track Assist, and Rewind. Changes apply immediately.",
+  settingsBlurb: "Graphics, audio, camera, steering, Track Assist, and Rewind. Changes apply immediately.",
   garageTitle: "Garage",
   cupEyebrow: "Campaign",
   selectEyebrow: "Select circuit",
@@ -56,7 +57,7 @@ export const COPY = {
   touchItems: [
     "Left pad steers. Sensitivity and invert live in Settings.",
     "Right cluster is Accel, Brake, and Slide. Brake wins if both are held.",
-    "Respawn sits above the drive cluster. Pause is top-left.",
+    "Respawn sits above the drive cluster — tap for last checkpoint, hold to restart the run. Pause is top-left.",
     "If Rewind is on, hold the Rewind button next to Respawn — a tap will not jump back.",
     "Auto-throttle is on by default on touch. Track Assist can pin you to the racing line.",
     "Photo mode hides the pads so orbit drag and Capture stay clean.",
@@ -69,8 +70,10 @@ export const COPY = {
   playNotes: [
     "Time trial — any track, any medal, personal-best ghost.",
     "Rush Cup — Gold on all five, then Author. Next challenge unlocks in order.",
+    "R (or Y) returns you to the last checkpoint. Hold R / Y, or press Delete, to restart the whole run.",
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
-    "Garage paint is cosmetic only. Audio mix is under Settings.",
+    "C cycles Chase → Far → Hood → Cabin. All four stay usable at speed.",
+    "Garage paint is cosmetic only. Steering Slow/Normal/Fast and audio mix live under Settings.",
     "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
   ],
   noMedal: "No medal this run. Bronze is the next target.",
@@ -81,7 +84,7 @@ export const COPY = {
 export function raceHint(kind: "keyboard" | "xbox" | "play"): string {
   if (kind === "xbox") return padRaceHint(true);
   if (kind === "play") return padRaceHint(false);
-  return "WASD to drive · Space to slide · R to respawn · Hold Backspace to rewind · C camera · F photo · Esc to pause";
+  return "WASD to drive · Space to slide · R last CP · hold R restart · Hold Backspace rewind · C camera · F photo · Esc to pause";
 }
 
 export function firstRunBody(input: { touch: boolean; padActive: boolean }): string {

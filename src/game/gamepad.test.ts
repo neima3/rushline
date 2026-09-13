@@ -116,6 +116,8 @@ describe("pad presence + copy", () => {
     assert.match(padRaceHint(false), /R2 accel/);
     assert.match(padConnectCopy(info), /connected/);
     assert.equal(PAD_MAP.camera.includes("RB"), true);
+    assert.match(PAD_MAP.restart, /Hold Y/);
+    assert.match(padRaceHint(true), /last CP/);
     assert.equal(padInfoFrom(null, false).connected, false);
   });
 });

@@ -4,12 +4,13 @@ import { Camera, CircleHelp, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX }
 import type { Game } from "@/game/Game";
 import { continueEvent, cupContinueLabel, getCupEvent } from "@/game/cup";
 import { loadHints } from "@/game/flow";
+import { cameraLabel } from "@/game/camera";
 import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel, SURFACE_LABEL } from "@/game/feel";
 import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
-import type { Medal, SurfaceKind, TrackId } from "@/game/types";
+import type { CameraMode, Medal, SurfaceKind, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
@@ -192,6 +193,13 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
+      {!hideHud && camera === "cockpit" && (phase === "race" || phase === "countdown") ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[22%] bg-gradient-to-t from-black/70 via-black/25 to-transparent"
+        />
+      ) : null}
+
       {!hideHud && (phase === "race" || phase === "countdown") ? (
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
@@ -210,11 +218,11 @@ export function Overlay({ gameRef }: Props) {
           <div className="flex items-center gap-2">
             {pad.connected ? <PadChip xbox={pad.xbox} /> : null}
             <GhostChip
-              label={camera === "hood" ? "Hood" : "Chase"}
+              label={cameraLabel(camera)}
               camera={camera}
               onClick={() => {
                 g()?.uiClick();
-                g()?.setCamera(camera === "chase" ? "hood" : "chase");
+                g()?.cycleCamera();
               }}
               className="hud-chip"
             />
@@ -729,7 +737,7 @@ function GhostChip({
   className,
 }: {
   label: string;
-  camera: "chase" | "hood";
+  camera: CameraMode;
   onClick: () => void;
   className?: string;
 }) {

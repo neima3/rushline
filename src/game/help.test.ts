@@ -20,6 +20,7 @@ describe("help control sheet", () => {
     assert.equal(byId.brake?.pad, PAD_MAP.brake);
     assert.equal(byId.slide?.pad, PAD_MAP.slide);
     assert.equal(byId.respawn?.pad, PAD_MAP.respawn);
+    assert.equal(byId.restart?.pad, PAD_MAP.restart);
     assert.equal(byId.rewind?.pad, PAD_MAP.rewind);
     assert.equal(byId.camera?.pad, PAD_MAP.camera);
     assert.equal(byId.photo?.pad, PAD_MAP.photo);
@@ -29,8 +30,11 @@ describe("help control sheet", () => {
     assert.match(byId.brake!.keys, /S/);
     assert.match(byId.slide!.keys, /Space/);
     assert.equal(byId.respawn!.keys, "R");
+    assert.match(byId.restart!.keys, /Delete/);
+    assert.match(byId.respawn!.action, /last CP/);
     assert.match(byId.rewind!.keys, /Backspace/);
     assert.equal(byId.camera!.keys, "C");
+    assert.match(byId.camera!.action, /Cycle/);
     assert.equal(byId.photo!.keys, "F");
     assert.match(byId.pause!.keys, /Esc/);
   });
@@ -41,6 +45,7 @@ describe("help control sheet", () => {
     assert.ok(COPY.touchItems.some((line) => /Rewind/.test(line)));
     assert.ok(COPY.playNotes.some((line) => /rewind/i.test(line)));
     assert.ok(COPY.touchItems.some((line) => /Left pad/.test(line)));
+    assert.ok(COPY.touchItems.some((line) => /hold to restart/.test(line)));
     assert.ok(COPY.photoNotes.some((line) => /PNG/.test(line)));
     assert.match(COPY.tagline, /Rush Cup/);
     assert.match(COPY.cupBlurb, /Gold/);
@@ -50,7 +55,12 @@ describe("help control sheet", () => {
   it("keeps runtime hint strings aligned with the sheet", () => {
     assert.match(raceHint("keyboard"), /Backspace/);
     assert.match(raceHint("keyboard"), /WASD/);
+    assert.match(raceHint("keyboard"), /last CP/);
+    assert.match(raceHint("keyboard"), /hold R restart/);
+    assert.match(COPY.playNotes.join(" "), /last checkpoint/);
+    assert.match(COPY.playNotes.join(" "), /Chase/);
     assert.match(raceHint("xbox"), /LB\+Y rewind/);
+    assert.match(raceHint("xbox"), /last CP/);
     assert.match(raceHint("play"), /L1\+△ rewind/);
     assert.match(firstRunBody({ touch: true, padActive: false }), /Left pad/);
     assert.match(firstRunBody({ touch: false, padActive: true }), /Help/);

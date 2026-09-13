@@ -14,6 +14,8 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 
 **Rewind** — hold **Backspace** or **LB + Y** to scrub the last few seconds of the run. The race clock and ghost compare walk backward with you. Rewind is allowed in time trial and Rush Cup; it does not wipe a standing personal best — only a finish after rewind can replace it. Toggle **Enable Rewind** in Settings (on by default on desktop).
 
+**R** (or **Y**) returns you to the last checkpoint — Trackmania-style. Hold **R** / **Y**, or press **Delete**, to restart the whole run from lights-out. **C** cycles Chase → Far → Hood → Cabin; all four stay usable at speed. Settings has a Slow / Normal / Fast steering preset for keyboard and pad (Track Assist scales are unchanged).
+
 ## Tracks
 
 | Track | Vibe | Length | Signature |
@@ -58,9 +60,10 @@ Web Audio engine note, tire scrape, countdown / medal stingers, and a ducked men
 | Accelerate | W or ↑ | RT / R2 / A |
 | Brake / reverse | S or ↓ | LT / L2 / B |
 | Slide | Space or Shift | LB / L1 / X |
-| Respawn | R | Y / Triangle |
+| Respawn (last checkpoint) | R | Y / Triangle |
+| Restart run | Hold R or Delete | Hold Y / Triangle |
 | Rewind | Hold Backspace | LB + Y |
-| Camera | C | View / Share / RB |
+| Cycle camera (Chase → Far → Hood → Cabin) | C | View / Share / RB |
 | Photo mode | F | LB + View |
 | Pause | Esc or P | Menu / Start / Options |
 
@@ -72,7 +75,7 @@ Stick and triggers use an inner deadzone (16% stick, 8% trigger) so a resting pa
 
 - **Left pad** — steer (sensitivity and invert live in Settings)
 - **Right cluster** — accel / brake / slide; brake wins if both are held
-- **Respawn** above the cluster; **Pause** top-left
+- **Respawn** above the cluster — tap for last checkpoint, hold to restart; **Pause** top-left
 - If **Enable Rewind** is on, hold the Rewind button next to Respawn (a tap does nothing)
 - Auto-throttle is on by default on touch; Track Assist can pin you to the racing line
 - Photo mode hides the pads so orbit drag and Capture stay clean

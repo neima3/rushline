@@ -11,9 +11,10 @@ type Props = {
   onSlide: (v: 0 | 1) => void;
   onRespawn: () => void;
   onRewind: (v: number) => void;
+  onRestart?: () => void;
 };
 
-export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onRewind }: Props) {
+export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onRewind, onRestart }: Props) {
   const phase = useGame((s) => s.phase);
   const touch = useGame((s) => s.touch);
   const photoMode = useGame((s) => s.photoMode);
@@ -124,7 +125,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
           ) : null}
           <button
             type="button"
-            aria-label="Respawn"
+            aria-label="Respawn — tap last checkpoint, hold to restart"
             data-play-control="1"
             className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
             onContextMenu={(e) => e.preventDefault()}
@@ -132,6 +133,15 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
               e.preventDefault();
               e.stopPropagation();
               onRespawn();
+              if (!onRestart) return;
+              const hold = window.setTimeout(() => onRestart(), 550);
+              const clear = () => {
+                window.clearTimeout(hold);
+                window.removeEventListener("pointerup", clear);
+                window.removeEventListener("pointercancel", clear);
+              };
+              window.addEventListener("pointerup", clear);
+              window.addEventListener("pointercancel", clear);
             }}
           >
             <RotateCcw className="size-5" strokeWidth={1.75} />
