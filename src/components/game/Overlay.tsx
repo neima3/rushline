@@ -108,12 +108,14 @@ export function Overlay({ gameRef }: Props) {
           onTracks={() => {
             g()?.uiClick();
             useGame.getState().setPlayMode("trial");
-            g()?.setPhase("select");
+            if (g()) g()!.setPhase("select");
+            else useGame.getState().setPhase("select");
           }}
           onHotseat={() => {
             g()?.uiClick();
             useGame.getState().setPlayMode("hotseat");
-            g()?.setPhase("select");
+            if (g()) g()!.setPhase("select");
+            else useGame.getState().setPhase("select");
           }}
           hotseatSelect={playMode === "hotseat"}
           onGarage={() => {

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Car, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Users, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
-import { resolveRaceLaps } from "@/game/laps";
-import { allTrackDefs, getTrackDef, medalFor } from "@/game/track";
+import { resolveRaceLaps, scaleMedals } from "@/game/laps";
+import { allTrackDefs, getTrackDef, medalFromTimes } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
 import { COPY } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
@@ -191,7 +191,14 @@ export function MenuScreen({
             {allTrackDefs().map((t, i) => {
               const pb = best[t.id];
               const last = lastTimes[t.id];
-              const medal = medalFor(t.id, pb ?? Number.POSITIVE_INFINITY);
+              const raceLaps = resolveRaceLaps({
+                trackId: t.id,
+                authored: t.laps,
+                setting: stockLaps,
+                playMode: hotseatSelect ? "hotseat" : "trial",
+              });
+              const raceMedals = scaleMedals(t.medals, t.laps, raceLaps);
+              const medal = medalFromTimes(raceMedals, pb ?? Number.POSITIVE_INFINITY);
               const selected = t.id === trackId;
               const body = (
                 <>
@@ -212,16 +219,7 @@ export function MenuScreen({
                       ) : null}
                     </span>
                     <span className="mt-1 text-[11px] uppercase tracking-[0.16em] text-subtle">
-                      {TRACK_ENV_LABEL[t.env]} ·{" "}
-                      {(() => {
-                        const laps = resolveRaceLaps({
-                          trackId: t.id,
-                          authored: t.laps,
-                          setting: stockLaps,
-                          playMode: hotseatSelect ? "hotseat" : "trial",
-                        });
-                        return `${laps} ${laps === 1 ? "lap" : "laps"}`;
-                      })()}
+                      {TRACK_ENV_LABEL[t.env]} · {raceLaps} {raceLaps === 1 ? "lap" : "laps"}
                     </span>
                     <span className="mt-1 text-xs text-muted">{t.blurb}</span>
                     <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">
@@ -239,7 +237,7 @@ export function MenuScreen({
                           Author ghost {formatTime(t.medals.author)}
                         </span>
                       ) : null}
-                      <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
+                      <TrackMedalTimes trackId={t.id} recents={recents[t.id]} medals={raceMedals} />
                     </span>
                     {t.id === "custom" ? (
                       <span className="mt-2 flex flex-wrap gap-2">
@@ -396,8 +394,16 @@ function TrackGhostShare({
   );
 }
 
-function TrackMedalTimes({ trackId, recents }: { trackId: TrackId; recents?: number[] }) {
-  const medals = getTrackDef(trackId).medals;
+function TrackMedalTimes({
+  trackId,
+  recents,
+  medals: raceMedals,
+}: {
+  trackId: TrackId;
+  recents?: number[];
+  medals?: { author: number; gold: number; silver: number; bronze: number };
+}) {
+  const medals = raceMedals ?? getTrackDef(trackId).medals;
   return (
     <span className="flex flex-wrap gap-x-2 text-[10px] uppercase tracking-widest text-subtle">
       <span>A {formatTime(medals.author)}</span>

@@ -196,7 +196,7 @@ export function ResultsScreen({
             >
               Next · {nextName}
             </button>
-          ) : onCup && !cup.campaignComplete ? (
+          ) : onCup && cup && !cup.campaignComplete ? (
             <button
               type="button"
               onMouseDown={keepPlayFocus}
