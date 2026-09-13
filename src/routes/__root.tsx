@@ -1,11 +1,13 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { AppErrorComponent } from "@/lib/error-component";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "RUSHLINE";
 
 export const Route = createRootRoute({
+  errorComponent: AppErrorComponent,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -15,6 +17,7 @@ export const Route = createRootRoute({
       },
       { title: APP_NAME },
       { name: "theme-color", content: "#09090b" },
+      { name: "color-scheme", content: "dark" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
@@ -25,6 +28,8 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
@@ -35,11 +40,16 @@ export const Route = createRootRoute({
     ],
   }),
   component: () => (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+    <html
+      lang="en"
+      className="antialiased"
+      style={{ backgroundColor: "#09090b", colorScheme: "dark" }}
+      suppressHydrationWarning
+    >
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body style={{ backgroundColor: "#09090b", color: "#f4f4f2" }}>
         <PreviewHostBridge />
         <AuthProvider>
           <Outlet />

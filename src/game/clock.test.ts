@@ -10,6 +10,15 @@ describe("race clock", () => {
     assert.equal(wallClockMs(0, 0, 50_000), 0);
   });
 
+  it("hidden-tab resume does not skip the race clock", () => {
+    const go = 1_000;
+    const hiddenAt = 4_000;
+    const hold = wallClockMs(0, go, hiddenAt);
+    const shown = 20_000;
+    assert.equal(hold, 3_000);
+    assert.equal(wallClockMs(hold, shown, shown + 100), hold + 100);
+  });
+
   it("ticks countdown from Start without waiting for a later stamp", () => {
     const start = 4_000;
     assert.ok(countdownRemaining(start, start) > 2);

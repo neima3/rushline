@@ -22,6 +22,7 @@ import {
   type QualityTier,
 } from "./quality";
 import { camBoostPull, camFollowRate, camFovTarget, camFwdRate, camLandDrop, camLookAhead } from "./feel";
+import { bindContextLoss, clampDrawingPixelRatio, isGlContextLost, preferMsaa } from "./webgl";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -240,18 +241,40 @@ export class World {
   private boostJuice = 0;
   private wasAir = false;
   private prevBoost = 0;
+  private glLost = false;
+  private unbindContext: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
+    const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: preferMsaa(window.devicePixelRatio || 1, coarse),
       powerPreference: "high-performance",
       alpha: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
+      failIfMajorPerformanceCaveat: false,
     });
     this.viewW = canvas.clientWidth || 800;
     this.viewH = canvas.clientHeight || 600;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.pixelRatioCap));
+    this.renderer.setPixelRatio(
+      clampDrawingPixelRatio(window.devicePixelRatio || 1, this.quality.pixelRatioCap, this.viewW, this.viewH),
+    );
     this.renderer.setSize(this.viewW, this.viewH, false);
+    this.unbindContext = bindContextLoss(canvas, {
+      onLost: () => {
+        this.glLost = true;
+      },
+      onRestored: () => {
+        this.glLost = false;
+        this.resize(this.viewW, this.viewH);
+        try {
+          this.applyEnvironmentMap();
+        } catch {
+          /* restore is best-effort */
+        }
+      },
+    });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -424,6 +447,10 @@ export class World {
     return this.quality.pixelRatioCap;
   }
 
+  get contextLost() {
+    return this.glLost;
+  }
+
   getGraphics() {
     const fog = this.scene.fog as THREE.Fog;
     return {
@@ -445,7 +472,7 @@ export class World {
     if (w < 1 || h < 1) return;
     this.viewW = w;
     this.viewH = h;
-    const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
+    const dpr = clampDrawingPixelRatio(window.devicePixelRatio || 1, this.dprCap, w, h);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -859,8 +886,13 @@ export class World {
   }
 
   render() {
+    if (this.glLost || isGlContextLost(this.renderer.getContext())) return;
     if (this.sky) this.sky.mesh.position.copy(this.camera.position);
-    this.post.render();
+    try {
+      this.post.render();
+    } catch {
+      this.glLost = true;
+    }
   }
 
   private applyThemeLights(theme: ThemeId) {
@@ -946,6 +978,8 @@ export class World {
   }
 
   dispose() {
+    this.unbindContext?.();
+    this.unbindContext = null;
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
     this.vfx.dispose();

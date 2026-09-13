@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Game } from "@/game/Game";
 import { loadSettings } from "@/game/settings";
 import { useGame } from "@/game/store";
+import { GameErrorBoundary } from "./GameErrorBoundary";
 import { Overlay } from "./Overlay";
 import { TouchPad } from "./TouchPad";
 
@@ -15,9 +16,17 @@ function applyTouchDefaults() {
   useGame.getState().setTouch(true);
 }
 
+function bootMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  return "WebGL failed to start. Try another browser or turn off extra GPU flags.";
+}
+
 export function Rushline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const ready = useGame((s) => s.ready);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [bootGen, setBootGen] = useState(0);
 
   useLayoutEffect(() => {
     useGame.getState().hydrateSettings(loadSettings());
@@ -30,12 +39,24 @@ export function Rushline() {
     let disposed = false;
     let game: Game | null = null;
     applyTouchDefaults();
-    void import("@/game/Game").then(({ Game }) => {
-      if (disposed || !canvasRef.current) return;
-      game = new Game(canvasRef.current);
-      gameRef.current = game;
-      if (isTouchPlay()) game.setTouch(true);
-    });
+    setBootError(null);
+    useGame.getState().setReady(false);
+
+    void import("@/game/Game")
+      .then(({ Game }) => {
+        if (disposed || !canvasRef.current) return;
+        try {
+          game = new Game(canvasRef.current);
+        } catch (err) {
+          setBootError(bootMessage(err));
+          return;
+        }
+        gameRef.current = game;
+        if (isTouchPlay()) game.setTouch(true);
+      })
+      .catch((err: unknown) => {
+        if (!disposed) setBootError(bootMessage(err));
+      });
 
     const syncTouch = () => {
       if (isTouchPlay()) gameRef.current?.setTouch(true);
@@ -66,7 +87,7 @@ export function Rushline() {
       game?.dispose();
       gameRef.current = null;
     };
-  }, []);
+  }, [bootGen]);
 
   const onSteer = useCallback((v: number) => gameRef.current?.setTouchSteer(v), []);
   const onThrottle = useCallback((v: number) => gameRef.current?.setTouchThrottle(v), []);
@@ -85,14 +106,44 @@ export function Rushline() {
           gameRef.current?.capturePlayFocus();
         }}
       />
-      <Overlay gameRef={gameRef} />
-      <TouchPad
-        onSteer={onSteer}
-        onThrottle={onThrottle}
-        onBrake={onBrake}
-        onSlide={onSlide}
-        onRespawn={onRespawn}
-      />
+      {!ready && !bootError ? <BootScreen /> : null}
+      {bootError ? (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+          <p className="font-display text-4xl tracking-tight">Can't start 3D</p>
+          <p className="max-w-sm text-sm text-muted">{bootError}</p>
+          <button
+            type="button"
+            className="h-11 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg"
+            onClick={() => setBootGen((n) => n + 1)}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+      <GameErrorBoundary>
+        <Overlay gameRef={gameRef} />
+        <TouchPad
+          onSteer={onSteer}
+          onThrottle={onThrottle}
+          onBrake={onBrake}
+          onSlide={onSlide}
+          onRespawn={onRespawn}
+        />
+      </GameErrorBoundary>
     </main>
+  );
+}
+
+function BootScreen() {
+  return (
+    <div
+      className="rushline-boot pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg px-6 text-center"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</p>
+      <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Loading circuit</p>
+      <span className="rushline-boot-bar" aria-hidden />
+    </div>
   );
 }
