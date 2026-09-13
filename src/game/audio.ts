@@ -189,13 +189,28 @@ export class GameAudio {
 
   unlock = () => {
     if (this.unlocked && this.ctx?.state === "running") return;
-    if (!this.ctx) this.buildGraph();
-    if (this.ctx?.state === "suspended") void this.ctx.resume();
-    this.unlocked = true;
-    this.tickUnlock();
+    try {
+      if (!this.ctx) this.buildBuses();
+      if (this.ctx?.state === "suspended") void this.ctx.resume();
+      this.unlocked = true;
+      this.tickUnlock();
+      if (!this.osc) {
+        const build = () => {
+          try {
+            if (this.ctx && !this.osc) this.buildVoices();
+          } catch {
+            /* headless / no output device */
+          }
+        };
+        if (typeof requestAnimationFrame === "function") requestAnimationFrame(build);
+        else queueMicrotask(build);
+      }
+    } catch {
+      this.unlocked = false;
+    }
   };
 
-  private buildGraph() {
+  private buildBuses() {
     const AC =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -213,7 +228,11 @@ export class GameAudio {
     this.engine.connect(this.sfx);
     this.music.connect(this.master);
     this.master.connect(ctx.destination);
+  }
 
+  private buildVoices() {
+    if (!this.ctx || !this.engine || !this.sfx || this.osc) return;
+    const ctx = this.ctx;
     this.noiseBuf = makePinkBuffer(ctx);
 
     this.osc = ctx.createOscillator();
@@ -367,6 +386,16 @@ export class GameAudio {
   setMuted(m: boolean) {
     this.muted = m;
     this.syncGains();
+  }
+
+  getState() {
+    return {
+      muted: this.muted,
+      unlocked: this.unlocked,
+      running: this.ctx?.state === "running",
+      scene: this.scene,
+      duck: this.duck,
+    };
   }
 
   private startMusic() {

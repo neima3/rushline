@@ -229,6 +229,10 @@ export class Game {
     this.audio.click();
   }
 
+  getAudioState() {
+    return this.audio.getState();
+  }
+
   applySettings(s: Settings | GraphicsKnobs) {
     this.world.applySettings(s);
     useGame.getState().setQuality(s.quality);
