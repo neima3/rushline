@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ThemeId } from "./types";
 import { ASPHALT_BASE } from "./look";
+import { liveryDef, type LiveryId } from "./livery";
 
 export { ASPHALT_BASE, ROAD_TINT, roadCrown } from "./look";
 
@@ -94,24 +95,68 @@ export function makeAsphaltRoughness(theme: ThemeId): THREE.CanvasTexture {
   return t;
 }
 
-export function makeLiveryTexture(night: boolean): THREE.CanvasTexture {
+export function makeLiveryTexture(id: LiveryId, night = false): THREE.CanvasTexture {
+  const livery = liveryDef(id);
+  const isNight = night;
   const size = 128;
   const { c, ctx } = canvas(size);
-  ctx.fillStyle = night ? "#6b4ea8" : "#f4f1ea";
+  ctx.fillStyle = livery.base;
   ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = night ? "#3de8ff" : "#ef5a24";
-  ctx.save();
-  ctx.transform(1, 0, -0.78, 1, 0, 0);
-  for (let i = -size; i < size * 2; i += 28) {
-    ctx.fillRect(i, -16, 15, size + 32);
+
+  if (livery.pattern === "chevron") {
+    ctx.fillStyle = livery.stripe;
+    ctx.save();
+    ctx.transform(1, 0, -0.78, 1, 0, 0);
+    for (let i = -size; i < size * 2; i += 28) ctx.fillRect(i, -16, 15, size + 32);
+    ctx.restore();
+  } else if (livery.pattern === "slash") {
+    ctx.fillStyle = livery.stripe;
+    ctx.save();
+    ctx.transform(1, 0, -1.05, 1, 0, 0);
+    for (let i = -size; i < size * 2; i += 36) ctx.fillRect(i, -16, 10, size + 32);
+    ctx.restore();
+  } else if (livery.pattern === "band") {
+    ctx.fillStyle = livery.stripe;
+    ctx.fillRect(0, size * 0.34, size, size * 0.22);
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(0, size * 0.18, size, 6);
+    ctx.fillRect(0, size * 0.6, size, 6);
+    ctx.globalAlpha = 1;
+  } else if (livery.pattern === "frost") {
+    ctx.fillStyle = livery.stripe;
+    ctx.fillRect(0, size * 0.16, size, 10);
+    ctx.fillRect(0, size * 0.46, size, 18);
+    ctx.fillRect(0, size * 0.78, size, 8);
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(0, size * 0.3, size, 4);
+    ctx.globalAlpha = 1;
+  } else if (livery.pattern === "pinstripe") {
+    ctx.fillStyle = livery.stripe;
+    ctx.save();
+    ctx.transform(1, 0, -0.22, 1, 0, 0);
+    for (let i = -size; i < size * 2; i += 18) ctx.fillRect(i, -16, 2, size + 32);
+    ctx.restore();
+    ctx.fillRect(0, size * 0.48, size, 3);
+  } else {
+    ctx.fillStyle = livery.stripe;
+    ctx.save();
+    ctx.transform(1, 0, -0.95, 1, 0, 0);
+    for (let i = -size; i < size * 2; i += 22) ctx.fillRect(i, -16, 11, size + 32);
+    ctx.restore();
   }
-  ctx.restore();
-  ctx.globalAlpha = 0.22;
-  ctx.fillStyle = night ? "#12182a" : "#1a1a1e";
+
+  ctx.globalAlpha = isNight ? 0.3 : 0.22;
+  ctx.fillStyle = livery.shade;
   ctx.fillRect(0, size * 0.72, size, size * 0.28);
   ctx.globalAlpha = 1;
+  if (isNight) {
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#0a1018";
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalAlpha = 1;
+  }
   const gloss = ctx.createLinearGradient(0, 0, 0, size);
-  gloss.addColorStop(0, night ? "rgba(180,230,255,0.18)" : "rgba(255,255,255,0.16)");
+  gloss.addColorStop(0, isNight ? "rgba(180,230,255,0.18)" : "rgba(255,255,255,0.16)");
   gloss.addColorStop(0.35, "rgba(255,255,255,0)");
   gloss.addColorStop(1, "rgba(0,0,0,0.08)");
   ctx.fillStyle = gloss;

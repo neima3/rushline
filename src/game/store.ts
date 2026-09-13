@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DEFAULT_LIVERY, type LiveryId } from "./livery";
 import {
   applyQuality,
   defaultSettings,
@@ -95,6 +96,12 @@ export function readLastSave(): LastSave {
   return lastCache;
 }
 
+function persistLiverySave(livery: LiveryId) {
+  writeSave((save) => {
+    save.livery = livery;
+  });
+}
+
 export function writeSave(mutator: (s: SaveData) => void) {
   const s = readSave();
   mutator(s);
@@ -154,6 +161,7 @@ type GameStore = {
   hydrateSettings: (s: Settings) => void;
   patchSettings: (p: Partial<Settings>) => void;
   setQuality: (q: Quality) => void;
+  setLivery: (id: LiveryId) => void;
   resetSettings: (touch: boolean) => void;
   setFps: (n: number) => void;
   setPhotoMode: (v: boolean) => void;
@@ -211,6 +219,7 @@ export const useGame = create<GameStore>((set) => ({
     set((s) => {
       const settings = { ...s.settings, ...p };
       persistSettings(settings);
+      if (p.livery) persistLiverySave(settings.livery);
       return { settings, autoThrottle: settings.autoThrottle };
     }),
   setQuality: (q) =>
@@ -219,10 +228,18 @@ export const useGame = create<GameStore>((set) => ({
       persistSettings(settings);
       return { settings, autoThrottle: settings.autoThrottle };
     }),
-  resetSettings: (touch) =>
-    set(() => {
-      const settings = defaultSettings(touch);
+  setLivery: (livery) =>
+    set((s) => {
+      const settings = { ...s.settings, livery };
       persistSettings(settings);
+      persistLiverySave(livery);
+      return { settings };
+    }),
+  resetSettings: (touch) =>
+    set((s) => {
+      const settings = { ...defaultSettings(touch), livery: s.settings.livery ?? DEFAULT_LIVERY };
+      persistSettings(settings);
+      persistLiverySave(settings.livery);
       return { settings, autoThrottle: settings.autoThrottle };
     }),
   setFps: (fps) => set({ fps }),

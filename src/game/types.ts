@@ -1,8 +1,14 @@
+import type { LiveryId } from "./livery";
+
 export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
-export type Phase = "menu" | "select" | "countdown" | "race" | "paused" | "results";
+export type Phase = "menu" | "select" | "garage" | "countdown" | "race" | "paused" | "results";
+
+export function isLobbyPhase(phase: Phase): boolean {
+  return phase === "menu" || phase === "select" || phase === "garage";
+}
 
 export type CameraMode = "chase" | "hood";
 
@@ -164,4 +170,5 @@ export type SaveData = {
   version: 1;
   best: Partial<Record<TrackId, number>>;
   ghosts: Partial<Record<TrackId, GhostFrame[]>>;
+  livery?: LiveryId;
 };

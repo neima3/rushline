@@ -1,4 +1,5 @@
 import { compactFrames, ghostQuality, sanitizeFrames } from "./ghost";
+import { parseLivery } from "./livery";
 import type { GhostFrame, GhostSource, SaveData, TrackId } from "./types";
 
 export const SAVE_KEY = "rushline-v1";
@@ -68,7 +69,8 @@ export function parseSave(raw: string | null | undefined): SaveData {
     for (const [id, time] of Object.entries(parsed.best ?? {})) {
       if (typeof time === "number" && Number.isFinite(time) && time > 0) best[id as TrackId] = time;
     }
-    return { version: 1, best, ghosts };
+    const livery = parseLivery(parsed.livery);
+    return livery ? { version: 1, best, ghosts, livery } : { version: 1, best, ghosts };
   } catch {
     return emptySave();
   }
@@ -151,7 +153,13 @@ export function commitRun(
         if (writeJson(io, SAVE_KEY, tight)) {
           save.ghosts[trackId] = tight.ghosts[trackId];
         } else {
-          const bestOnly = { version: 1 as const, best: { ...parseSave(io.getItem(SAVE_KEY)).best, [trackId]: time }, ghosts: parseSave(io.getItem(SAVE_KEY)).ghosts };
+          const prev = parseSave(io.getItem(SAVE_KEY));
+          const bestOnly = {
+            version: 1 as const,
+            best: { ...prev.best, [trackId]: time },
+            ghosts: prev.ghosts,
+            ...(save.livery ? { livery: save.livery } : prev.livery ? { livery: prev.livery } : {}),
+          };
           savedGhost = false;
           savedBest = writeJson(io, SAVE_KEY, bestOnly);
           if (savedBest) {

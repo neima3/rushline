@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { ThemeId } from "./types";
+import { DEFAULT_LIVERY, liveryDef, type LiveryId } from "./livery";
 import { makeLiveryTexture } from "./textures";
 import { CAR_PAINT } from "./presentation";
 
@@ -17,6 +18,8 @@ export type CarRig = {
   setOpacity: (opacity: number) => void;
   setGhostRace: (splitMs: number | null, playerS: number, ghostS: number) => void;
   setTheme: (theme: ThemeId) => void;
+  setLivery: (id: LiveryId) => void;
+  disposeMaps: () => void;
   applyPose: (
     steer: number,
     speed: number,
@@ -90,8 +93,10 @@ export function makeCar(ghost: boolean): CarRig {
     return m;
   };
 
-  const dayLivery = ghost ? null : makeLiveryTexture(false);
-  const nightLivery = ghost ? null : makeLiveryTexture(true);
+  let liveryId: LiveryId = DEFAULT_LIVERY;
+  let theme: ThemeId = "stadium";
+  let dayLivery = ghost ? null : makeLiveryTexture(liveryId, false);
+  let nightLivery = ghost ? null : makeLiveryTexture(liveryId, true);
   const bodyMat = mat({
     color: 0xffffff,
     roughness: CAR_PAINT.roughness,
@@ -405,9 +410,20 @@ export function makeCar(ghost: boolean): CarRig {
     if (cabinGlow) cabinGlow.intensity = on ? 0.85 : 0.4;
   };
 
-  const setTheme = (theme: ThemeId) => {
-    if (ghost) return;
+  const paintLivery = (id: LiveryId) => {
+    const def = liveryDef(id);
     const night = theme === "night";
+    (accent as THREE.MeshStandardMaterial).color.setHex(night ? def.accentNight : def.accent);
+    (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? def.accentEmissiveNight : def.accentEmissive);
+    (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;
+    (gold as THREE.MeshStandardMaterial).color.setHex(def.gold);
+    (rim as THREE.MeshStandardMaterial).color.setHex(night ? def.rimNight : def.rim);
+  };
+
+  const setTheme = (next: ThemeId) => {
+    theme = next;
+    if (ghost) return;
+    const night = next === "night";
     const bm = bodyMat as THREE.MeshStandardMaterial;
     const tex = night ? nightLivery : dayLivery;
     if (tex) {
@@ -417,12 +433,13 @@ export function makeCar(ghost: boolean): CarRig {
     bm.emissive.setHex(night ? 0x2a3a68 : 0x1a100c);
     bm.emissiveIntensity = night ? 0.28 : 0.04;
     const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
+    const def = liveryDef(liveryId);
     bodyPhys.sheenColor.setHex(
-      night ? 0x9ad8ff : theme === "alpine" ? 0xd8e8f8 : theme === "works" ? 0xffd0b0 : 0xffe6cc,
+      night ? 0x9ad8ff : next === "alpine" ? 0xd8e8f8 : next === "works" ? 0xffd0b0 : def.sheen,
     );
     // Circuit High scene env stays 0.08 so asphalt does not wash. The car
     // multiplies that back up so clearcoat can still read the sky.
-    const env = night ? CAR_PAINT.envNight : theme === "canyon" ? CAR_PAINT.envCanyon : CAR_PAINT.envDay;
+    const env = night ? CAR_PAINT.envNight : next === "canyon" ? CAR_PAINT.envCanyon : CAR_PAINT.envDay;
     bodyPhys.envMapIntensity = env;
     bodyPhys.clearcoat = night ? 0.88 : CAR_PAINT.clearcoat;
     bodyPhys.iridescence = night ? 0.22 : CAR_PAINT.iridescence;
@@ -431,11 +448,32 @@ export function makeCar(ghost: boolean): CarRig {
     (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
     (rim as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.85;
     (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : 0x1a1a1e);
-    (accent as THREE.MeshStandardMaterial).color.setHex(night ? 0x3de8ff : 0xef5a24);
-    (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? 0x146880 : 0x4a1808);
-    (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;
-    (rim as THREE.MeshStandardMaterial).color.setHex(night ? 0x8a78c0 : 0xd0d4dc);
+    paintLivery(liveryId);
     if (boostLight) boostLight.color.setHex(night ? 0x4ef0ff : 0xff7a2a);
+  };
+
+  const setLivery = (id: LiveryId) => {
+    if (ghost) return;
+    if (id === liveryId && dayLivery && nightLivery) {
+      paintLivery(id);
+      return;
+    }
+    liveryId = id;
+    dayLivery?.dispose();
+    nightLivery?.dispose();
+    dayLivery = makeLiveryTexture(id, false);
+    nightLivery = makeLiveryTexture(id, true);
+    setTheme(theme);
+  };
+
+  const disposeMaps = () => {
+    dayLivery?.dispose();
+    nightLivery?.dispose();
+    dayLivery = null;
+    nightLivery = null;
+    const bm = bodyMat as THREE.MeshPhysicalMaterial;
+    bm.roughnessMap?.dispose();
+    bm.roughnessMap = null;
   };
 
   return {
@@ -473,6 +511,8 @@ export function makeCar(ghost: boolean): CarRig {
       }
     },
     setTheme,
+    setLivery,
+    disposeMaps,
     applyPose,
   };
 }

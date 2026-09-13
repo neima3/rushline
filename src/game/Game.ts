@@ -1,4 +1,14 @@
-import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, GhostPref, Phase, TrackId } from "./types";
+import { nextLivery } from "./livery";
+import {
+  isLobbyPhase,
+  type BuiltTrack,
+  type CameraMode,
+  type CarSnap,
+  type GhostFrame,
+  type GhostPref,
+  type Phase,
+  type TrackId,
+} from "./types";
 import { getTrack, medalFor, medalPace, sampleAt } from "./track";
 import {
   cpFlashHoldMs,
@@ -119,7 +129,7 @@ export class Game {
         this.photoOrbit = defaultPhotoOrbit();
         return;
       }
-      if (this.phase === "menu" || this.phase === "select") return;
+      if (isLobbyPhase(this.phase)) return;
       this.setCamera(this.camera === "chase" ? "hood" : "chase");
     };
     this.input.onPhotoHotkey = () => {
@@ -163,6 +173,7 @@ export class Game {
 
   private syncSettings(s: Settings) {
     this.world.applySettings(s);
+    this.world.setLivery(s.livery);
     this.audio.setQuality(s.quality);
     this.audio.applyVolumes(s.master, s.sfx, s.music);
     this.input.touchSteerSensitivity = s.touchSteerSensitivity;
@@ -565,7 +576,7 @@ export class Game {
         const frame = { t: this.time, s: this.car.s, n: this.car.n, heading: this.car.heading };
         if (shouldRecord(this.recording[this.recording.length - 1], frame)) this.recording.push(frame);
       }
-    } else if (this.phase === "menu" || this.phase === "select") {
+    } else if (isLobbyPhase(this.phase)) {
       this.attractS += dt * 22;
       if (this.attractS > this.track.length) this.attractS -= this.track.length;
     }
@@ -577,7 +588,7 @@ export class Game {
     const ghostTime = this.photoGhostTime() ?? this.time;
     this.world.applyGhost(this.track, this.ghost, ghostTime, this.car.s, this.ghostSmooth);
     this.world.stepParticles(this.photoMode ? 0 : dt);
-    const attract = !this.photoMode && (this.phase === "menu" || this.phase === "select");
+    const attract = !this.photoMode && isLobbyPhase(this.phase);
     if (this.photoMode) {
       this.world.applyPhotoCamera(this.photoLookTarget(vis), this.photoOrbit);
     } else {
@@ -843,6 +854,18 @@ export class Game {
       if (actions.confirm) {
         this.audio.click();
         this.startRace(this.trackId);
+      }
+      return;
+    }
+    if (this.phase === "garage") {
+      if (actions.back || actions.confirm) {
+        this.audio.click();
+        this.setPhase("menu");
+      }
+      if (yEdge) {
+        this.audio.click();
+        const cur = useGame.getState().settings.livery;
+        useGame.getState().setLivery(nextLivery(cur, y));
       }
       return;
     }

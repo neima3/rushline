@@ -1,3 +1,6 @@
+import { DEFAULT_LIVERY, liveryId, parseLivery, type LiveryId } from "./livery";
+import { parseSave, SAVE_KEY } from "./persist";
+
 export const SETTINGS_KEY = "rushline-settings-v1";
 
 export type Quality = "low" | "medium" | "high";
@@ -24,6 +27,7 @@ export type Settings = {
   showSpeed: boolean;
   showMinimap: boolean;
   ghostOpacity: number;
+  livery: LiveryId;
 };
 
 export type QualityProfile = {
@@ -105,6 +109,7 @@ export function defaultSettings(touch = false): Settings {
     showSpeed: true,
     showMinimap: true,
     ghostOpacity: 0.46,
+    livery: DEFAULT_LIVERY,
   };
 }
 
@@ -159,6 +164,7 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     showSpeed: bool(o.showSpeed, base.showSpeed),
     showMinimap: bool(o.showMinimap, base.showMinimap),
     ghostOpacity: num(o.ghostOpacity, base.ghostOpacity, 0, 1),
+    livery: liveryId(o.livery, base.livery),
   };
 }
 
@@ -168,12 +174,36 @@ export function loadSettings(touch = isTouchDevice()): Settings {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
     if (!raw) {
       const fresh = defaultSettings(touch);
+      const fromSave = readSaveLivery();
+      if (fromSave) fresh.livery = fromSave;
       persistSettings(fresh);
       return fresh;
     }
-    return parseSettings(JSON.parse(raw), touch);
+    const parsed = parseSettings(JSON.parse(raw), touch);
+    if (!hasOwnLivery(raw)) {
+      const fromSave = readSaveLivery();
+      if (fromSave) parsed.livery = fromSave;
+    }
+    return parsed;
   } catch {
     return defaultSettings(touch);
+  }
+}
+
+function readSaveLivery() {
+  try {
+    return parseLivery(parseSave(window.localStorage.getItem(SAVE_KEY)).livery);
+  } catch {
+    return undefined;
+  }
+}
+
+function hasOwnLivery(raw: string): boolean {
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    return o != null && typeof o === "object" && "livery" in o;
+  } catch {
+    return false;
   }
 }
 
