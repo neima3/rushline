@@ -1,5 +1,5 @@
 import type { Actions, PadInfo } from "./types";
-import { padInfoFrom, pollPads, rumblePads } from "./gamepad";
+import { padInfoFrom, padInUse, pollPads, rumblePads, type PadHotPlug } from "./gamepad";
 import { resolveSampleDrive } from "./auto-throttle";
 import { steerFilter } from "./feel";
 import { applySteerSettings } from "./settings";
@@ -42,6 +42,7 @@ export class Input {
   private lastPadUse = 0;
   onPauseHotkey: (() => void) | null = null;
   onCameraHotkey: (() => void) | null = null;
+  onPadChange: ((info: PadInfo, reason: PadHotPlug) => void) | null = null;
   private queued = { pause: false, camera: false, respawn: false };
   private brakeLatchUntil = 0;
   private edgePrev = {
@@ -59,7 +60,7 @@ export class Input {
   private onKeyDown: (e: KeyboardEvent) => void;
   private onKeyUp: (e: KeyboardEvent) => void;
   private onBlur: () => void;
-  private onPad: () => void;
+  private onPad: (e?: Event) => void;
   private onPointer: (e: PointerEvent) => void;
 
   constructor() {
@@ -94,8 +95,11 @@ export class Input {
       this.keys.delete(e.code);
     };
     this.onBlur = () => this.keys.clear();
-    this.onPad = () => {
+    this.onPad = (e?: Event) => {
       void navigator.getGamepads?.();
+      const reason: PadHotPlug =
+        e?.type === "gamepadconnected" ? "connect" : e?.type === "gamepaddisconnected" ? "disconnect" : "poll";
+      this.refreshPad(reason);
     };
     this.onPointer = (e: PointerEvent) => {
       const t = e.target;
@@ -105,8 +109,9 @@ export class Input {
   }
 
   attach(surface?: HTMLElement) {
-    const opts = { capture: true };
     this.surface = surface ?? null;
+    if (typeof window === "undefined") return;
+    const opts = { capture: true };
     // One window listener only — canvas + document copies of the same handler
     // toggle pause/camera twice when the play surface is focused.
     window.addEventListener("keydown", this.onKeyDown, opts);
@@ -119,6 +124,10 @@ export class Input {
   }
 
   detach() {
+    if (typeof window === "undefined") {
+      this.surface = null;
+      return;
+    }
     const opts = { capture: true };
     window.removeEventListener("keydown", this.onKeyDown, opts);
     window.removeEventListener("keyup", this.onKeyUp, opts);
@@ -148,15 +157,28 @@ export class Input {
     rumblePads(kind);
   }
 
+  refreshPad(reason: PadHotPlug = "poll") {
+    const gp = pollPads();
+    if (gp && padInUse(gp)) this.lastPadUse = performance.now();
+    if (reason === "connect" && gp) this.lastPadUse = performance.now();
+    const active = gp != null && (reason === "connect" || performance.now() - this.lastPadUse < 2500);
+    const next = padInfoFrom(gp, active);
+    const changed = next.connected !== this.pad.connected || next.id !== this.pad.id || next.active !== this.pad.active;
+    this.pad = next;
+    if (changed || reason === "connect" || reason === "disconnect") {
+      this.onPadChange?.(next, reason);
+    }
+  }
+
   private down(code: string) {
     if (this.injected?.includes(code)) return true;
     return this.keys.has(code);
   }
 
   sample(): Actions {
-    let steer = 0;
-    if (this.down("KeyA") || this.down("ArrowLeft")) steer += 1;
-    if (this.down("KeyD") || this.down("ArrowRight")) steer -= 1;
+    let kbSteer = 0;
+    if (this.down("KeyA") || this.down("ArrowLeft")) kbSteer += 1;
+    if (this.down("KeyD") || this.down("ArrowRight")) kbSteer -= 1;
 
     let throttle = 0;
     let brake = 0;
@@ -169,25 +191,11 @@ export class Input {
     let menuY = 0;
     if (this.down("ArrowUp") || this.down("KeyW")) menuY -= 1;
     if (this.down("ArrowDown") || this.down("KeyS")) menuY += 1;
+    let padSteer = 0;
 
     if (gp) {
-      const used =
-        Math.abs(gp.steer) > 0.08 ||
-        gp.throttle > 0.08 ||
-        gp.brake > 0.08 ||
-        gp.slide ||
-        gp.a ||
-        gp.b ||
-        gp.x ||
-        gp.y ||
-        gp.start ||
-        gp.view ||
-        gp.lb ||
-        gp.rb ||
-        gp.dpadX !== 0 ||
-        gp.dpadY !== 0;
-      if (used) this.lastPadUse = performance.now();
-      steer += gp.steer;
+      if (padInUse(gp)) this.lastPadUse = performance.now();
+      padSteer = gp.steer;
       throttle = Math.max(throttle, gp.throttle);
       if (gp.a) throttle = Math.max(throttle, 1);
       brake = Math.max(brake, gp.brake);
@@ -197,7 +205,7 @@ export class Input {
       if (gp.dpadY) menuY = gp.dpadY;
     }
 
-    const active = gp != null && performance.now() - this.lastPadUse < 2500;
+    const active = gp != null && performance.now() - this.lastPadUse < 4000;
     this.pad = padInfoFrom(gp, active);
 
     const drive = resolveSampleDrive({
@@ -216,7 +224,7 @@ export class Input {
     throttle = drive.throttle;
     brake = drive.brake;
 
-    steer = applySteerSettings(steer, 0, this.touchSteer, {
+    let steer = applySteerSettings(kbSteer, padSteer, this.touchSteer, {
       sensitivity: this.touchSteerSensitivity,
       invert: this.invertSteer,
     });

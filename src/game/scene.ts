@@ -22,6 +22,7 @@ import {
   type QualityTier,
 } from "./quality";
 import { camBoostPull, camFollowRate, camFovTarget, camFwdRate, camLandDrop, camLookAhead } from "./feel";
+import { sampleGhost } from "./ghost";
 import { bindContextLoss, clampDrawingPixelRatio, isGlContextLost, preferMsaa } from "./webgl";
 
 const _up = new THREE.Vector3();
@@ -671,20 +672,15 @@ export class World {
   }
 
   applyGhost(track: BuiltTrack, frames: GhostFrame[] | null, time: number, playerS = 0, splitMs: number | null = null) {
-    if (!frames || frames.length < 2 || this.ghostOpacity <= 0.01) {
+    const pose = sampleGhost(frames, time, track.length, track.def.closed);
+    if (!pose || this.ghostOpacity <= 0.01) {
       this.ghost.group.visible = false;
       return;
     }
     this.ghost.group.visible = true;
-    let i = 0;
-    while (i < frames.length - 1 && frames[i + 1]!.t < time) i++;
-    const a = frames[i]!;
-    const b = frames[Math.min(frames.length - 1, i + 1)]!;
-    const span = b.t - a.t || 1;
-    const t = Math.max(0, Math.min(1, (time - a.t) / span));
-    const s = a.s + (b.s - a.s) * t;
-    const n = a.n + (b.n - a.n) * t;
-    const heading = a.heading + (b.heading - a.heading) * t;
+    const s = pose.s;
+    const n = pose.n;
+    const heading = pose.heading;
     const sm = sampleAt(track, s);
     const ch = Math.cos(heading);
     const sh = Math.sin(heading);

@@ -1,4 +1,4 @@
-import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Phase, TrackId } from "./types";
+import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, GhostPref, Phase, TrackId } from "./types";
 import { getTrack, medalFor, medalPace } from "./track";
 import {
   cpFlashHoldMs,
@@ -9,13 +9,15 @@ import {
   ghostSplitMs,
   ghostTimeAtS,
 } from "./feel";
+import { pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
+import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio } from "./audio";
-import { readSave, TRACK_ORDER, useGame, writeSave } from "./store";
+import { applyRunCommit, readLastSave, readSave, TRACK_ORDER, useGame } from "./store";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
 
@@ -57,6 +59,8 @@ export class Game {
   private attractS = 0;
   private recording: GhostFrame[] = [];
   private ghost: GhostFrame[] | null = null;
+  private ghostSource: "pb" | "last" | "none" = "none";
+  private ghostPref: GhostPref = "auto";
   private ghostSmooth: number | null = null;
   private cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null = null;
   private cpFlashUntil = 0;
@@ -98,7 +102,8 @@ export class Game {
     };
     this.audio.attach();
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    this.ghost = readSave().ghosts.circuit ?? null;
+    this.bindPad();
+    this.applyGhostChoice("circuit");
 
     this.ro = new ResizeObserver(() => this.fit());
     this.ro.observe(canvas.parentElement || canvas);
@@ -136,6 +141,23 @@ export class Game {
     this.input.invertSteer = s.invertSteer;
     this.input.autoThrottle = s.autoThrottle;
     this.car.trackAssist = s.trackAssist;
+  }
+
+  private bindPad() {
+    this.input.onPadChange = (info, reason) => {
+      useGame.getState().setPad(info);
+      if (reason === "connect") useGame.getState().setPadBanner(padConnectCopy(info));
+      if (reason === "disconnect") useGame.getState().setPadBanner("Controller disconnected");
+    };
+    this.input.refreshPad("poll");
+    useGame.getState().setPad(this.input.pad);
+  }
+
+  private applyGhostChoice(id: TrackId) {
+    const picked = pickRaceGhost(readSave().ghosts[id], readLastSave().runs[id]?.frames, this.ghostPref);
+    this.ghost = picked.frames;
+    this.ghostSource = picked.source;
+    this.ghostPref = "auto";
   }
 
   private fit() {
@@ -260,7 +282,7 @@ export class Game {
     this.trackId = id;
     this.track = getTrack(id);
     this.world.loadTrack(this.track, this.track.def.env);
-    this.ghost = readSave().ghosts[id] ?? null;
+    this.applyGhostChoice(id);
     this.car.reset(this.track);
     this.curr = this.car.snap();
     this.prev = this.car.snap();
@@ -277,7 +299,8 @@ export class Game {
     });
   }
 
-  startRace(id?: TrackId) {
+  startRace(id?: TrackId, pref: GhostPref = "auto") {
+    this.ghostPref = pref;
     if (id) this.load(id);
     else this.load(this.trackId);
     this.car.reset(this.track);
@@ -492,9 +515,8 @@ export class Game {
       }
       if (this.phase === "race") {
         this.time = wallClockMs(this.timeHold, this.raceClockAt, now);
-        if (this.recording.length === 0 || this.time - this.recording[this.recording.length - 1]!.t > 40) {
-          this.recording.push({ t: this.time, s: this.car.s, n: this.car.n, heading: this.car.heading });
-        }
+        const frame = { t: this.time, s: this.car.s, n: this.car.n, heading: this.car.heading };
+        if (shouldRecord(this.recording[this.recording.length - 1], frame)) this.recording.push(frame);
       }
     } else if (this.phase === "menu" || this.phase === "select") {
       this.attractS += dt * 22;
@@ -526,7 +548,7 @@ export class Game {
         this.phase === "race" || this.phase === "countdown"
           ? medalPace(this.trackId, this.phase === "countdown" ? 0 : this.time)
           : { holding: null, remain: null };
-      const ghost = ghostAt(this.ghost, this.time);
+      const ghost = sampleGhost(this.ghost, this.time, this.track.length, this.track.def.closed);
       let ghostDelta: number | null = null;
       if (ghost && this.phase === "race") {
         const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
@@ -581,16 +603,11 @@ export class Game {
   private onFinish() {
     const time = this.time;
     const medal = medalFor(this.trackId, time);
-    const prev = readSave().best[this.trackId] ?? null;
-    const isPb = prev == null || time < prev;
-    if (isPb) {
-      writeSave((s) => {
-        s.best[this.trackId] = time;
-        s.ghosts[this.trackId] = this.recording.slice();
-      });
-      this.ghost = this.recording.slice();
-      useGame.getState().refreshBest();
-    }
+    const commit = applyRunCommit(this.trackId, time, this.recording);
+    const picked = pickRaceGhost(readSave().ghosts[this.trackId], readLastSave().runs[this.trackId]?.frames);
+    this.ghost = picked.frames;
+    this.ghostSource = picked.source;
+    useGame.getState().refreshBest();
     this.audio.finish();
     this.world.addTrauma(0.4);
     this.input.rumble("finish");
@@ -598,10 +615,14 @@ export class Game {
     useGame.getState().setPhase("results");
     useGame.getState().setResults({
       time,
-      best: isPb ? time : prev,
+      best: commit.best,
       medal,
-      isPb,
+      isPb: commit.isPb,
       trackId: this.trackId,
+      ghostSaved: commit.isPb ? commit.savedGhost : commit.savedLast,
+      ghostSource: this.ghostSource,
+      lastTime: commit.lastTime,
+      recents: commit.recents,
     });
   }
 
@@ -688,17 +709,3 @@ export class Game {
   }
 }
 
-const _ghostAt = { s: 0, n: 0 };
-
-function ghostAt(frames: GhostFrame[] | null, time: number): { s: number; n: number } | null {
-  if (!frames || frames.length < 2) return null;
-  let i = 0;
-  while (i < frames.length - 1 && frames[i + 1]!.t < time) i++;
-  const a = frames[i]!;
-  const b = frames[Math.min(frames.length - 1, i + 1)]!;
-  const span = b.t - a.t || 1;
-  const t = Math.max(0, Math.min(1, (time - a.t) / span));
-  _ghostAt.s = a.s + (b.s - a.s) * t;
-  _ghostAt.n = a.n + (b.n - a.n) * t;
-  return _ghostAt;
-}

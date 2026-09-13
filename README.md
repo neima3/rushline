@@ -19,13 +19,17 @@ Each track has author / gold / silver / bronze medal times, checkpoints, boost p
 ### Desktop
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
-| Steer | A / D or ← / → | Left stick / d-pad |
-| Accelerate | W or ↑ | RT / A |
-| Brake / reverse | S or ↓ | LT / B |
-| Slide | Space | LB / X |
-| Respawn | R | Y |
-| Camera | C | — |
-| Pause | Esc | Start |
+| Steer | A / D or ← / → | Left stick / D-pad |
+| Accelerate | W or ↑ | RT / R2 / A |
+| Brake / reverse | S or ↓ | LT / L2 / B |
+| Slide | Space or Shift | LB / L1 / X |
+| Respawn | R | Y / Triangle |
+| Camera | C | View / Share / RB |
+| Pause | Esc or P | Menu / Start / Options |
+
+Stick and triggers use an inner deadzone (16% stick, 8% trigger) so a resting pad does not steal keyboard or touch. Hot-plug is live: connecting a pad shows an on-screen hint; keyboard, touch, and Track Assist stay unchanged.
+
+A personal-best ghost is saved with the time. If that ghost is missing or too thin, the last finished run is used instead. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 
 ### Mobile
 - **Left pad** — steer

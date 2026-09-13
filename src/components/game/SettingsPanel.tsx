@@ -130,6 +130,14 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
               onChange={(autoThrottle) => patch({ autoThrottle })}
             />
             <Toggle label="Invert steer" on={s.invertSteer} onChange={(invertSteer) => patch({ invertSteer })} />
+            <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+              <p className="text-sm font-medium text-fg">Gamepad</p>
+              <p className="mt-1">Steer · left stick / D-pad</p>
+              <p>Accel · RT / A &nbsp; Brake · LT / B</p>
+              <p>Slide · LB / X &nbsp; Respawn · Y</p>
+              <p>Camera · View / RB &nbsp; Pause · Menu</p>
+              <p className="mt-1.5 text-subtle">Keyboard and touch stay live. Track Assist is unchanged.</p>
+            </div>
           </Section>
 
           <Section title="HUD">

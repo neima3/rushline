@@ -1,10 +1,11 @@
-import type { ReactNode, RefObject } from "react";
+import { useEffect, type ReactNode, type RefObject } from "react";
 import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
+import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
 import { allTrackDefs, getTrack, medalFor, medalPace, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
-import type { Medal, TrackId } from "@/game/types";
+import type { Medal, ResultsState, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTime, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
@@ -20,6 +21,9 @@ export function Overlay({ gameRef }: Props) {
   const muted = useGame((s) => s.muted);
   const camera = useGame((s) => s.camera);
   const best = useGame((s) => s.best);
+  const lastTimes = useGame((s) => s.lastTimes);
+  const recents = useGame((s) => s.recents);
+  const padBanner = useGame((s) => s.padBanner);
   const ready = useGame((s) => s.ready);
   const auto = useGame((s) => s.autoThrottle);
   const pad = useGame((s) => s.pad);
@@ -51,6 +55,8 @@ export function Overlay({ gameRef }: Props) {
           muted={muted}
           auto={auto}
           pad={pad}
+          lastTimes={lastTimes}
+          recents={recents}
           onStart={() => g()?.startRace("circuit")}
           onTracks={() => g()?.setPhase("select")}
           onBack={() => g()?.menu()}
@@ -141,11 +147,14 @@ export function Overlay({ gameRef }: Props) {
             <div className="mt-5 space-y-3">
               <p className="font-display text-5xl tabular-nums leading-none tracking-tight">{formatTime(results.time)}</p>
               <MedalBoard trackId={results.trackId} time={results.time} earned={results.medal} />
-              <p className="text-sm text-muted">Best {formatTime(results.best ?? results.time)}</p>
+              <TimesBoard results={results} />
             </div>
           }
           actions={[
             { label: "Retry", primary: true, onClick: () => g()?.startRace(results.trackId) },
+            ...(results.isPb
+              ? []
+              : [{ label: "Retry vs last run", onClick: () => g()?.startRace(results.trackId, "last") }]),
             { label: "Tracks", onClick: () => g()?.setPhase("select") },
             { label: "Menu", onClick: () => g()?.menu() },
           ]}
@@ -175,11 +184,13 @@ export function Overlay({ gameRef }: Props) {
 
       {phase === "race" ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
-          {pad.active
-            ? "LT/RT brake · L-stick steer · X slide · Y respawn · Menu pause"
+          {pad.connected
+            ? padRaceHint(pad.xbox)
             : "WASD steer and throttle · Space slide · R respawn · C camera · Esc pause"}
         </p>
       ) : null}
+
+      {padBanner ? <PadBanner text={padBanner} /> : null}
     </div>
   );
 }
@@ -193,9 +204,26 @@ function PadChip({ xbox }: { xbox: boolean }) {
   );
 }
 
+function PadBanner({ text }: { text: string }) {
+  useEffect(() => {
+    const id = window.setTimeout(() => useGame.getState().setPadBanner(null), 4200);
+    return () => window.clearTimeout(id);
+  }, [text]);
+  return (
+    <div className="pointer-events-none absolute bottom-[max(3.4rem,calc(env(safe-area-inset-bottom)+2.4rem))] left-1/2 z-30 w-[min(36rem,calc(100%-1.5rem))] -translate-x-1/2">
+      <p role="status" data-pad-banner className="pad-banner hud-chip px-3.5 py-2 text-center text-[11px] leading-snug text-fg">
+        <Gamepad2 className="mr-1.5 inline-block size-3.5 align-[-0.15em]" />
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function Menu({
   ready,
   best,
+  lastTimes,
+  recents,
   muted,
   auto,
   pad,
@@ -209,6 +237,8 @@ function Menu({
 }: {
   ready: boolean;
   best: Partial<Record<TrackId, number>>;
+  lastTimes: Partial<Record<TrackId, number>>;
+  recents: Partial<Record<TrackId, number[]>>;
   muted: boolean;
   auto: boolean;
   pad: { connected: boolean; xbox: boolean; active: boolean };
@@ -235,8 +265,8 @@ function Menu({
           <p className="mt-2 flex items-center gap-2 text-xs text-subtle">
             <Gamepad2 className="size-3.5" />
             {pad.connected
-              ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start`
-              : "Xbox controller supported — press any button"}
+              ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start · ${padRaceHint(pad.xbox)}`
+              : "Plug in a pad — RT accel, LT brake, Y respawn, RB camera"}
           </p>
         </div>
 
@@ -279,7 +309,9 @@ function Menu({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {allTrackDefs().map((t) => (
+            {allTrackDefs().map((t) => {
+              const last = lastTimes[t.id];
+              return (
               <button
                 key={t.id}
                 type="button"
@@ -294,13 +326,18 @@ function Menu({
                 <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
                   <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
                   <span className="mt-1 text-xs text-muted">{t.blurb}</span>
-                  <span className="mt-2 flex items-center gap-2 text-xs tabular-nums text-subtle">
-                    <MedalRow medal={medalFor(t.id, best[t.id] ?? Number.POSITIVE_INFINITY)} />
-                    Best {formatTime(best[t.id] ?? -1)}
+                  <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">
+                    <span className="flex items-center gap-2">
+                      <MedalRow medal={medalFor(t.id, best[t.id] ?? Number.POSITIVE_INFINITY)} />
+                      Best {formatTime(best[t.id] ?? -1)}
+                      {last != null && last !== best[t.id] ? ` · Last ${formatTime(last)}` : ""}
+                    </span>
+                    <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
                   </span>
                 </span>
               </button>
-            ))}
+              );
+            })}
             <button
               type="button"
               onClick={onBack}
@@ -532,6 +569,51 @@ function MedalRow({ medal, compact, pace }: { medal: Medal | null; compact?: boo
         );
       })}
     </span>
+  );
+}
+
+function TrackMedalTimes({ trackId, recents }: { trackId: TrackId; recents?: number[] }) {
+  const medals = TRACK_DEFS[trackId].medals;
+  return (
+    <span className="flex flex-wrap gap-x-2 text-[10px] uppercase tracking-widest text-subtle">
+      <span>A {formatTime(medals.author)}</span>
+      <span>G {formatTime(medals.gold)}</span>
+      <span>S {formatTime(medals.silver)}</span>
+      <span>B {formatTime(medals.bronze)}</span>
+      {recents && recents.length > 1 ? <span className="normal-case tracking-normal">· {recents.length} local times</span> : null}
+    </span>
+  );
+}
+
+function TimesBoard({ results }: { results: ResultsState }) {
+  const ghostNote = results.isPb
+    ? results.ghostSaved
+      ? "PB ghost saved — it will race you next run"
+      : "PB time saved — ghost did not persist"
+    : results.ghostSource === "last"
+      ? "Last run is your ghost (PB ghost missing or thin)"
+      : results.ghostSource === "pb"
+        ? "Racing your PB ghost · Retry vs last run to chase this lap"
+        : "No ghost yet — this run is saved locally";
+  return (
+    <div className="space-y-2 text-sm">
+      <p className="text-muted">
+        Best {formatTime(results.best ?? results.time)}
+        {results.lastTime != null && results.lastTime !== results.best ? ` · Last ${formatTime(results.lastTime)}` : ""}
+      </p>
+      <p className="text-xs leading-snug text-subtle">{ghostNote}</p>
+      {results.recents.length > 0 ? (
+        <ol className="space-y-0.5 text-xs tabular-nums text-subtle">
+          {results.recents.map((t, i) => (
+            <li key={`${t}-${i}`} className={t === results.time ? "text-fg" : undefined}>
+              {i + 1}. {formatTime(t)}
+              {t === results.best ? " · PB" : ""}
+              {t === results.time ? " · now" : ""}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
   );
 }
 

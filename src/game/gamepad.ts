@@ -19,22 +19,49 @@ export type PadAxes = {
   xbox: boolean;
 };
 
-const XBOX_RE = /xbox|xinput|microsoft|360|series|dualsense|dualshock|playstation|gamepad/i;
+export type PadPoller = () => PadAxes | null;
+
+export const PAD_STICK_DEADZONE = 0.16;
+export const PAD_TRIGGER_DEADZONE = 0.08;
+export const PAD_TRIGGER_MAX = 0.94;
+export const PAD_USE_EPS = 0.08;
+
+/** Standard Gamepad mapping — Trackmania-style face / shoulder layout. */
+export const PAD_MAP = {
+  steer: "Left stick / D-pad",
+  throttle: "RT / R2 / A",
+  brake: "LT / L2 / B",
+  slide: "LB / L1 / X",
+  respawn: "Y / Triangle",
+  pause: "Menu / Start / Options",
+  camera: "View / Share / RB",
+} as const;
+
+const XBOX_RE = /xbox|xinput|microsoft|360|series/i;
+const PLAY_RE = /dualsense|dualshock|playstation|ps4|ps5/i;
 
 export function isXboxId(id: string) {
-  return /xbox|xinput|microsoft|360|series/i.test(id);
+  return XBOX_RE.test(id);
 }
 
-function radialDeadzone(x: number, y: number, dz = 0.16) {
+export function radialDeadzone(x: number, y: number, dz = PAD_STICK_DEADZONE) {
   const m = Math.hypot(x, y);
   if (m < dz) return { x: 0, y: 0 };
   const scale = (m - dz) / (1 - dz) / m;
   return { x: x * scale, y: y * scale };
 }
 
-function curve(x: number) {
+export function steerCurvePad(x: number) {
   const s = Math.sign(x);
-  return s * Math.pow(Math.abs(x), 1.35);
+  const a = Math.abs(x);
+  if (a < 0.02) return 0;
+  return s * Math.pow(a, 1.35);
+}
+
+export function remapTrigger(raw: number, dz = PAD_TRIGGER_DEADZONE, max = PAD_TRIGGER_MAX) {
+  if (!Number.isFinite(raw) || raw <= dz) return 0;
+  const t = (raw - dz) / (max - dz);
+  return Math.max(0, Math.min(1, t));
 }
 
 function btn(pad: Gamepad, i: number) {
@@ -54,53 +81,90 @@ function axisTo01(a: number | undefined) {
   return Math.max(0, a);
 }
 
-function trigger(pad: Gamepad, buttonIndex: number, ...axisIdx: number[]) {
+/** Triggers: Standard mapping uses buttons 6/7 only so right-stick axes never become brake/gas. */
+export function readTrigger(pad: Gamepad, buttonIndex: number, fallbackAxes: number[] = []) {
   const fromBtn = analog(pad, buttonIndex);
-  if (fromBtn > 0.08) return fromBtn;
-  for (const i of axisIdx) {
+  if (pad.mapping === "standard" || fallbackAxes.length === 0) return remapTrigger(fromBtn);
+  if (fromBtn > PAD_TRIGGER_DEADZONE) return remapTrigger(fromBtn);
+  for (const i of fallbackAxes) {
     const v = axisTo01(pad.axes[i]);
-    if (v > 0.08) return v;
+    if (v > PAD_TRIGGER_DEADZONE) return remapTrigger(v);
   }
   return 0;
 }
 
-export function pollPads(): PadAxes | null {
+export function padFromGamepad(pad: Gamepad): PadAxes {
+  const stick = radialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
+  let dpadX = 0;
+  let dpadY = 0;
+  if (btn(pad, 14)) dpadX -= 1;
+  if (btn(pad, 15)) dpadX += 1;
+  if (btn(pad, 12)) dpadY -= 1;
+  if (btn(pad, 13)) dpadY += 1;
+
+  const standard = pad.mapping === "standard";
+  const lt = readTrigger(pad, 6, standard ? [] : [2, 4]);
+  const rt = readTrigger(pad, 7, standard ? [] : [5, 3]);
+  const digitalSteer = dpadX < 0 ? 1 : dpadX > 0 ? -1 : 0;
+  const analogSteer = steerCurvePad(-stick.x);
+  const steer = Math.max(-1, Math.min(1, analogSteer + digitalSteer));
+
+  return {
+    steer,
+    throttle: rt,
+    brake: lt,
+    slide: btn(pad, 2) || btn(pad, 4),
+    a: btn(pad, 0),
+    b: btn(pad, 1),
+    x: btn(pad, 2),
+    y: btn(pad, 3),
+    lb: btn(pad, 4),
+    rb: btn(pad, 5),
+    start: btn(pad, 9),
+    view: btn(pad, 8),
+    dpadX,
+    dpadY: Math.abs(stick.y) > 0.55 ? Math.sign(stick.y) : dpadY,
+    id: pad.id,
+    xbox: isXboxId(pad.id) || (!PLAY_RE.test(pad.id) && (pad.mapping === "standard" || XBOX_RE.test(pad.id))),
+  };
+}
+
+function defaultPoll(): PadAxes | null {
   const pads = typeof navigator !== "undefined" && navigator.getGamepads ? navigator.getGamepads() : [];
   for (const pad of pads) {
     if (!pad) continue;
-    const stick = radialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
-    const right = radialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.2);
-    let dpadX = 0;
-    let dpadY = 0;
-    if (btn(pad, 14)) dpadX -= 1;
-    if (btn(pad, 15)) dpadX += 1;
-    if (btn(pad, 12)) dpadY -= 1;
-    if (btn(pad, 13)) dpadY += 1;
-    if (Math.abs(stick.x) < 0.01 && Math.abs(right.x) > 0.5) dpadX += Math.sign(right.x);
-
-    const lt = trigger(pad, 6, 2, 4);
-    const rt = trigger(pad, 7, 5, 3);
-
-    return {
-      steer: curve(-stick.x) + (dpadX < 0 ? 1 : dpadX > 0 ? -1 : 0),
-      throttle: rt,
-      brake: lt,
-      slide: btn(pad, 2) || btn(pad, 4),
-      a: btn(pad, 0),
-      b: btn(pad, 1),
-      x: btn(pad, 2),
-      y: btn(pad, 3),
-      lb: btn(pad, 4),
-      rb: btn(pad, 5),
-      start: btn(pad, 9),
-      view: btn(pad, 8),
-      dpadX,
-      dpadY: Math.abs(stick.y) > 0.45 ? Math.sign(stick.y) : dpadY,
-      id: pad.id,
-      xbox: isXboxId(pad.id) || pad.mapping === "standard" || XBOX_RE.test(pad.id),
-    };
+    return padFromGamepad(pad);
   }
   return null;
+}
+
+let poller: PadPoller = defaultPoll;
+
+export function pollPads(): PadAxes | null {
+  return poller();
+}
+
+export function setPadPoller(fn: PadPoller | null) {
+  poller = fn ?? defaultPoll;
+}
+
+export function padInUse(gp: PadAxes): boolean {
+  return (
+    Math.abs(gp.steer) > PAD_USE_EPS ||
+    gp.throttle > PAD_USE_EPS ||
+    gp.brake > PAD_USE_EPS ||
+    gp.slide ||
+    gp.a ||
+    gp.b ||
+    gp.x ||
+    gp.y ||
+    gp.start ||
+    gp.view ||
+    gp.lb ||
+    gp.rb ||
+    gp.dpadX !== 0 ||
+    gp.dpadY !== 0
+  );
 }
 
 export function padInfoFrom(axes: PadAxes | null, recentlyUsed: boolean): PadInfo {
@@ -114,6 +178,19 @@ export function padInfoFrom(axes: PadAxes | null, recentlyUsed: boolean): PadInf
     active: recentlyUsed,
   };
 }
+
+export function padRaceHint(xbox: boolean): string {
+  return xbox
+    ? "LT brake · RT accel · L-stick steer · X slide · Y respawn · RB camera · Menu pause"
+    : "L2 brake · R2 accel · L-stick steer · □ slide · △ respawn · R1 camera · Options pause";
+}
+
+export function padConnectCopy(info: PadInfo): string {
+  const name = info.xbox ? "Xbox controller" : "Controller";
+  return `${name} connected — ${padRaceHint(info.xbox)}`;
+}
+
+export type PadHotPlug = "connect" | "disconnect" | "poll";
 
 type RumbleKind = "boost" | "crash" | "turbo" | "land" | "finish";
 
