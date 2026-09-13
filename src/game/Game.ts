@@ -6,6 +6,7 @@ import {
   type CarSnap,
   type GhostFrame,
   type GhostPref,
+  type GhostSource,
   type Phase,
   type TrackId,
 } from "./types";
@@ -102,7 +103,7 @@ export class Game {
   private attractS = 0;
   private recording: GhostFrame[] = [];
   private ghost: GhostFrame[] | null = null;
-  private ghostSource: "pb" | "last" | "none" = "none";
+  private ghostSource: GhostSource = "none";
   private ghostPref: GhostPref = "auto";
   private ghostSmooth: number | null = null;
   private cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null = null;
