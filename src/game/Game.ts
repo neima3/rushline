@@ -17,6 +17,7 @@ import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio, muteFromSearch } from "./audio";
+import { buildResults } from "./flow";
 import { applyRunCommit, readLastSave, readSave, TRACK_ORDER, useGame } from "./store";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
@@ -620,6 +621,8 @@ export class Game {
 
   private onFinish() {
     const time = this.time;
+    const prevBest = readSave().best[this.trackId] ?? null;
+    const priorGhost = this.ghost;
     const medal = medalFor(this.trackId, time);
     const commit = applyRunCommit(this.trackId, time, this.recording);
     const picked = pickRaceGhost(readSave().ghosts[this.trackId], readLastSave().runs[this.trackId]?.frames);
@@ -632,17 +635,19 @@ export class Game {
     this.input.rumble("finish");
     this.phase = "results";
     useGame.getState().setPhase("results");
-    useGame.getState().setResults({
-      time,
-      best: commit.best,
-      medal,
-      isPb: commit.isPb,
-      trackId: this.trackId,
-      ghostSaved: commit.isPb ? commit.savedGhost : commit.savedLast,
-      ghostSource: this.ghostSource,
-      lastTime: commit.lastTime,
-      recents: commit.recents,
-    });
+    useGame.getState().setResults(
+      buildResults({
+        time,
+        trackId: this.trackId,
+        prevBest,
+        ghost: priorGhost,
+        medal,
+        ghostSaved: commit.isPb ? commit.savedGhost : commit.savedLast,
+        ghostSource: this.ghostSource,
+        lastTime: commit.lastTime,
+        recents: commit.recents,
+      }),
+    );
   }
 
   setTouchSteer(v: number) {

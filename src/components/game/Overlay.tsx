@@ -1,14 +1,20 @@
-import { useEffect, type ReactNode, type RefObject } from "react";
-import { Flag, Gamepad2, Gauge, Pause, Settings, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { RefObject } from "react";
+import { Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
+import { loadHints } from "@/game/flow";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
-import { allTrackDefs, getTrack, medalFor, medalPace, sampleAt, TRACK_DEFS } from "@/game/track";
+import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
-import type { Medal, ResultsState, TrackId } from "@/game/types";
-import { cn, formatDelta, formatSpeed, formatTime, formatTimeParts } from "@/lib/utils";
+import type { Medal, TrackId } from "@/game/types";
+import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
+import { FirstRunHint } from "./overlay/FirstRunHint";
+import { MenuScreen } from "./overlay/MenuScreen";
+import { ResultsScreen } from "./overlay/ResultsScreen";
+import { keepPlayFocus, MedalRow, Modal } from "./overlay/chrome";
 
 type Props = {
   gameRef: RefObject<Game | null>;
@@ -33,6 +39,7 @@ export function Overlay({ gameRef }: Props) {
   const fps = useGame((s) => s.fps);
   const touch = useGame((s) => s.touch);
   const trackId = useGame((s) => s.trackId);
+  const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
 
   return (
@@ -40,7 +47,7 @@ export function Overlay({ gameRef }: Props) {
       {phase === "menu" || phase === "select" ? (
         <button
           type="button"
-          className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+          className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
           onClick={() => {
             g()?.uiClick();
             setSettingsOpen(true);
@@ -48,11 +55,12 @@ export function Overlay({ gameRef }: Props) {
           aria-label="Settings"
         >
           <Settings className="size-4" strokeWidth={1.75} />
+          <span className="text-xs font-medium uppercase tracking-widest text-muted">Settings</span>
         </button>
       ) : null}
 
       {phase === "menu" || phase === "select" ? (
-        <Menu
+        <MenuScreen
           ready={ready}
           best={best}
           muted={muted}
@@ -62,7 +70,7 @@ export function Overlay({ gameRef }: Props) {
           recents={recents}
           onStart={() => {
             g()?.uiClick();
-            g()?.startRace("circuit");
+            g()?.startRace(trackId);
           }}
           onTracks={() => {
             g()?.uiClick();
@@ -84,6 +92,10 @@ export function Overlay({ gameRef }: Props) {
           onAuto={() => {
             g()?.uiClick();
             g()?.setAutoThrottle(!auto);
+          }}
+          onSettings={() => {
+            g()?.uiClick();
+            setSettingsOpen(true);
           }}
           select={phase === "select"}
         />
@@ -120,7 +132,7 @@ export function Overlay({ gameRef }: Props) {
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-start justify-between">
           <button
             type="button"
-            className="play-control hud-chip flex size-11 items-center justify-center rounded-md text-fg"
+            className="play-control hud-chip flex h-11 items-center gap-2 rounded-md px-3 text-fg"
             onMouseDown={keepPlayFocus}
             onClick={() => {
               g()?.uiClick();
@@ -129,6 +141,7 @@ export function Overlay({ gameRef }: Props) {
             aria-label="Pause"
           >
             <Pause className="size-4" strokeWidth={1.75} />
+            <span className="hidden text-xs font-medium uppercase tracking-widest text-muted sm:inline">Pause</span>
           </button>
           <div className="flex items-center gap-2">
             {pad.connected ? <PadChip xbox={pad.xbox} /> : null}
@@ -161,7 +174,15 @@ export function Overlay({ gameRef }: Props) {
       {phase === "paused" && !settingsOpen ? (
         <Modal
           title="Paused"
+          subtitle={TRACK_DEFS[trackId].name}
           chrome
+          extra={
+            <p className="mt-3 text-xs leading-relaxed text-muted">
+              {touch
+                ? "Options opens graphics, camera, and Track Assist. Resume keeps your run."
+                : "Esc resumes. Options opens graphics, camera, and Track Assist."}
+            </p>
+          }
           actions={[
             {
               label: "Resume",
@@ -186,55 +207,6 @@ export function Overlay({ gameRef }: Props) {
               },
             },
             {
-              label: "Quit",
-              onClick: () => {
-                g()?.uiClick();
-                g()?.menu();
-              },
-            },
-          ]}
-        />
-      ) : null}
-
-      {phase === "results" && results ? (
-        <Modal
-          title={results.isPb ? "Personal best" : "Finished"}
-          subtitle={TRACK_DEFS[results.trackId].name}
-          extra={
-            <div className="mt-5 space-y-3">
-              <p className="font-display text-5xl tabular-nums leading-none tracking-tight">{formatTime(results.time)}</p>
-              <MedalBoard trackId={results.trackId} time={results.time} earned={results.medal} />
-              <TimesBoard results={results} />
-            </div>
-          }
-          actions={[
-            {
-              label: "Retry",
-              primary: true,
-              onClick: () => {
-                g()?.uiClick();
-                g()?.startRace(results.trackId);
-              },
-            },
-            ...(results.isPb
-              ? []
-              : [
-                  {
-                    label: "Retry vs last run",
-                    onClick: () => {
-                      g()?.uiClick();
-                      g()?.startRace(results.trackId, "last");
-                    },
-                  },
-                ]),
-            {
-              label: "Tracks",
-              onClick: () => {
-                g()?.uiClick();
-                g()?.setPhase("select");
-              },
-            },
-            {
               label: "Menu",
               onClick: () => {
                 g()?.uiClick();
@@ -245,8 +217,35 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
+      {phase === "results" && results ? (
+        <ResultsScreen
+          results={results}
+          nextName={TRACK_DEFS[results.nextTrackId].name}
+          onRetry={() => {
+            g()?.uiClick();
+            g()?.startRace(results.trackId);
+          }}
+          onRetryLast={
+            results.isPb
+              ? undefined
+              : () => {
+                  g()?.uiClick();
+                  g()?.startRace(results.trackId, "last");
+                }
+          }
+          onNext={() => {
+            g()?.uiClick();
+            g()?.startRace(results.nextTrackId);
+          }}
+          onMenu={() => {
+            g()?.uiClick();
+            g()?.menu();
+          }}
+        />
+      ) : null}
+
       {settings.showFps && (phase === "race" || phase === "countdown" || phase === "paused") ? (
-        <p className="absolute top-[max(0.95rem,env(safe-area-inset-top))] left-[max(3.6rem,calc(env(safe-area-inset-left)+2.85rem))] text-xs tabular-nums text-muted">
+        <p className="absolute top-[max(0.95rem,env(safe-area-inset-top))] left-[max(4.6rem,calc(env(safe-area-inset-left)+3.8rem))] text-xs tabular-nums text-muted sm:left-[max(7.1rem,calc(env(safe-area-inset-left)+6.2rem))]">
           {fps} fps
         </p>
       ) : null}
@@ -273,7 +272,11 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {phase === "race" ? (
+      {phase === "race" || phase === "countdown" ? (
+        <FirstRunHint touch={touch} padActive={pad.active} onDismiss={() => setHintGone(true)} />
+      ) : null}
+
+      {phase === "race" && hintGone ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
           {pad.connected
             ? padRaceHint(pad.xbox)
@@ -283,15 +286,6 @@ export function Overlay({ gameRef }: Props) {
 
       {padBanner ? <PadBanner text={padBanner} /> : null}
     </div>
-  );
-}
-
-function PadChip({ xbox }: { xbox: boolean }) {
-  return (
-    <span className="hud-chip inline-flex h-11 items-center gap-2 rounded-md px-3 text-xs font-medium uppercase tracking-widest text-muted">
-      <Gamepad2 className="size-4 text-fg" />
-      {xbox ? "Xbox" : "Pad"}
-    </span>
   );
 }
 
@@ -310,136 +304,12 @@ function PadBanner({ text }: { text: string }) {
   );
 }
 
-function Menu({
-  ready,
-  best,
-  lastTimes,
-  recents,
-  muted,
-  auto,
-  pad,
-  onStart,
-  onTracks,
-  onBack,
-  onRace,
-  onMute,
-  onAuto,
-  select,
-}: {
-  ready: boolean;
-  best: Partial<Record<TrackId, number>>;
-  lastTimes: Partial<Record<TrackId, number>>;
-  recents: Partial<Record<TrackId, number[]>>;
-  muted: boolean;
-  auto: boolean;
-  pad: { connected: boolean; xbox: boolean; active: boolean };
-  onStart: () => void;
-  onTracks: () => void;
-  onBack: () => void;
-  onRace: (id: TrackId) => void;
-  onMute: () => void;
-  onAuto: () => void;
-  select: boolean;
-}) {
+function PadChip({ xbox }: { xbox: boolean }) {
   return (
-    <div className="pointer-events-auto absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-bg via-bg/80 to-transparent md:justify-center">
-      <div
-        data-allow-scroll
-        className="flex max-h-full w-full max-w-lg flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:px-0"
-      >
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
-          <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
-          <p className="mt-3 max-w-sm text-pretty text-muted">
-            A precision 3D circuit racer. Hit every checkpoint, keep the car on the plastic, beat the medals.
-          </p>
-          <p className="mt-2 flex items-center gap-2 text-xs text-subtle">
-            <Gamepad2 className="size-3.5" />
-            {pad.connected
-              ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start · ${padRaceHint(pad.xbox)}`
-              : "Plug in a pad — RT accel, LT brake, Y respawn, RB camera"}
-          </p>
-        </div>
-
-        {!select ? (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              disabled={!ready}
-              onMouseDown={keepPlayFocus}
-              onClick={onStart}
-              className="h-12 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98] disabled:opacity-50"
-            >
-              {ready ? "Start" : "Loading…"}
-            </button>
-            <button
-              type="button"
-              onClick={onTracks}
-              className="h-12 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-fg"
-            >
-              Tracks
-            </button>
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={onMute}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-bg-elevated text-sm text-muted"
-              >
-                {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-                {muted ? "Muted" : "Sound"}
-              </button>
-              <button
-                type="button"
-                onClick={onAuto}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-bg-elevated text-sm text-muted"
-              >
-                <Gauge className="size-4" />
-                {auto ? "Auto accel" : "Manual accel"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {allTrackDefs().map((t) => {
-              const last = lastTimes[t.id];
-              return (
-              <button
-                key={t.id}
-                type="button"
-                onMouseDown={keepPlayFocus}
-                onClick={() => onRace(t.id)}
-                data-track={t.id}
-                className="track-card flex overflow-hidden rounded-xl border border-border bg-surface text-left"
-              >
-                <span className="track-card-thumb relative h-24 w-28 shrink-0 overflow-hidden">
-                  <img src={t.thumb} alt="" className="size-full object-cover" crossOrigin="anonymous" />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
-                  <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
-                  <span className="mt-1 text-xs text-muted">{t.blurb}</span>
-                  <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">
-                    <span className="flex items-center gap-2">
-                      <MedalRow medal={medalFor(t.id, best[t.id] ?? Number.POSITIVE_INFINITY)} />
-                      Best {formatTime(best[t.id] ?? -1)}
-                      {last != null && last !== best[t.id] ? ` · Last ${formatTime(last)}` : ""}
-                    </span>
-                    <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
-                  </span>
-                </span>
-              </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={onBack}
-              className="h-11 rounded-md border border-border bg-bg-elevated text-sm text-muted"
-            >
-              Back
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    <span className="hud-chip inline-flex h-11 items-center gap-2 rounded-md px-3 text-xs font-medium uppercase tracking-widest text-muted">
+      <Gamepad2 className="size-4 text-fg" />
+      {xbox ? "Xbox" : "Pad"}
+    </span>
   );
 }
 
@@ -539,12 +409,7 @@ function Hud({
           </div>
         ) : null}
         <div className="hud-pace mt-1.5 flex flex-col items-center gap-1">
-          <span
-            className={cn(
-              "hud-pace-chip tabular-nums tracking-wide",
-              medal ? "text-fg" : "text-subtle",
-            )}
-          >
+          <span className={cn("hud-pace-chip tabular-nums tracking-wide", medal ? "text-fg" : "text-subtle")}>
             {medalPaceLabel(medal)}
             {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}
           </span>
@@ -627,173 +492,6 @@ function Meter({
       </div>
     </div>
   );
-}
-
-function MedalRow({ medal, compact, pace }: { medal: Medal | null; compact?: boolean; pace?: boolean }) {
-  const items: { id: Medal; ring: string; fill: string; label: string }[] = [
-    { id: "bronze", ring: "border-medal-bronze", fill: "bg-medal-bronze", label: "B" },
-    { id: "silver", ring: "border-medal-silver", fill: "bg-medal-silver", label: "S" },
-    { id: "gold", ring: "border-medal-gold", fill: "bg-medal-gold", label: "G" },
-    { id: "author", ring: "border-fg", fill: "bg-fg", label: "A" },
-  ];
-  const order: Medal[] = ["bronze", "silver", "gold", "author"];
-  const reached = medal ? order.indexOf(medal) : -1;
-  return (
-    <span className={cn("flex items-center gap-1.5", compact ? "" : "justify-center")}>
-      {items.map((m, i) => {
-        const current = pace && i === reached;
-        const filled = pace ? i === reached : i <= reached;
-        const available = pace && i < reached;
-        return (
-          <span
-            key={m.id}
-            className={cn(
-              "hud-medal inline-flex items-center justify-center rounded-full border",
-              m.ring,
-              filled ? m.fill : available ? "bg-transparent opacity-80" : "bg-transparent opacity-35",
-              current && "hud-medal-now",
-              compact ? "size-3" : "size-4",
-            )}
-            title={m.label}
-            aria-label={m.label}
-          />
-        );
-      })}
-    </span>
-  );
-}
-
-function TrackMedalTimes({ trackId, recents }: { trackId: TrackId; recents?: number[] }) {
-  const medals = TRACK_DEFS[trackId].medals;
-  return (
-    <span className="flex flex-wrap gap-x-2 text-[10px] uppercase tracking-widest text-subtle">
-      <span>A {formatTime(medals.author)}</span>
-      <span>G {formatTime(medals.gold)}</span>
-      <span>S {formatTime(medals.silver)}</span>
-      <span>B {formatTime(medals.bronze)}</span>
-      {recents && recents.length > 1 ? <span className="normal-case tracking-normal">· {recents.length} local times</span> : null}
-    </span>
-  );
-}
-
-function TimesBoard({ results }: { results: ResultsState }) {
-  const ghostNote = results.isPb
-    ? results.ghostSaved
-      ? "PB ghost saved — it will race you next run"
-      : "PB time saved — ghost did not persist"
-    : results.ghostSource === "last"
-      ? "Last run is your ghost (PB ghost missing or thin)"
-      : results.ghostSource === "pb"
-        ? "Racing your PB ghost · Retry vs last run to chase this lap"
-        : "No ghost yet — this run is saved locally";
-  return (
-    <div className="space-y-2 text-sm">
-      <p className="text-muted">
-        Best {formatTime(results.best ?? results.time)}
-        {results.lastTime != null && results.lastTime !== results.best ? ` · Last ${formatTime(results.lastTime)}` : ""}
-      </p>
-      <p className="text-xs leading-snug text-subtle">{ghostNote}</p>
-      {results.recents.length > 0 ? (
-        <ol className="space-y-0.5 text-xs tabular-nums text-subtle">
-          {results.recents.map((t, i) => (
-            <li key={`${t}-${i}`} className={t === results.time ? "text-fg" : undefined}>
-              {i + 1}. {formatTime(t)}
-              {t === results.best ? " · PB" : ""}
-              {t === results.time ? " · now" : ""}
-            </li>
-          ))}
-        </ol>
-      ) : null}
-    </div>
-  );
-}
-
-function MedalBoard({ trackId, time, earned }: { trackId: TrackId; time: number; earned: Medal | null }) {
-  const medals = TRACK_DEFS[trackId].medals;
-  const pace = medalPace(trackId, time);
-  const rows: { id: Medal; label: string; at: number }[] = [
-    { id: "author", label: "Author", at: medals.author },
-    { id: "gold", label: "Gold", at: medals.gold },
-    { id: "silver", label: "Silver", at: medals.silver },
-    { id: "bronze", label: "Bronze", at: medals.bronze },
-  ];
-  return (
-    <div className="space-y-2">
-      <MedalRow medal={earned} />
-      <ul className="space-y-1 text-sm">
-        {rows.map((row) => {
-          const got = !pace.lost.includes(row.id);
-          return (
-            <li
-              key={row.id}
-              className={cn(
-                "flex items-center justify-between gap-3 tabular-nums",
-                earned === row.id ? "text-fg" : got ? "text-muted" : "text-subtle/70",
-              )}
-            >
-              <span className="uppercase tracking-widest">{row.label}</span>
-              <span>
-                {got ? "✓" : "·"} {formatTime(row.at)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function Modal({
-  title,
-  subtitle,
-  extra,
-  actions,
-  chrome,
-}: {
-  title: string;
-  subtitle?: string;
-  extra?: ReactNode;
-  chrome?: boolean;
-  actions: { label: string; onClick: () => void; primary?: boolean }[];
-}) {
-  return (
-    <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/70 px-4">
-      <div
-        className={cn(
-          "w-full max-w-sm p-6",
-          chrome
-            ? "hud-chrome hud-pause-card"
-            : "rounded-xl border border-border bg-surface shadow-[0_24px_80px_rgba(0,0,0,0.45)]",
-        )}
-      >
-        {subtitle ? <p className="text-xs uppercase tracking-[0.18em] text-muted">{subtitle}</p> : null}
-        <h2 className={cn("font-display leading-none tracking-tight", chrome ? "text-3xl uppercase" : "text-4xl")}>
-          {title}
-        </h2>
-        {extra}
-        <div className="mt-6 flex flex-col gap-2">
-          {actions.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              onMouseDown={keepPlayFocus}
-              onClick={a.onClick}
-              className={cn(
-                "h-11 rounded-md text-sm font-medium",
-                a.primary ? "bg-accent text-accent-fg" : "border border-border bg-bg-elevated text-fg",
-              )}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function keepPlayFocus(e: { preventDefault: () => void }) {
-  e.preventDefault();
 }
 
 function MiniMap({
