@@ -106,3 +106,17 @@ export function persistHints(next: HintState, storage?: StorageLike | null): Hin
 export function dismissControlsHint(storage?: StorageLike | null): HintState {
   return persistHints({ controlsDismissed: true }, storage);
 }
+
+/** Sample finish used by the overlay preview (`?screen=results`). */
+export function previewResults(): ResultsState {
+  return buildResults({
+    time: 51_240,
+    trackId: "circuit",
+    prevBest: 52_880,
+    ghost: [
+      { t: 0, s: 0, n: 0, heading: 0 },
+      { t: 52_880, s: 100, n: 0, heading: 0 },
+    ],
+    medal: "gold",
+  });
+}

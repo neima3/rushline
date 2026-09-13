@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
-import { loadHints } from "@/game/flow";
+import { loadHints, previewResults } from "@/game/flow";
 import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
 import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
@@ -37,6 +37,22 @@ export function Overlay({ gameRef }: Props) {
   const trackId = useGame((s) => s.trackId);
   const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
+
+  useEffect(() => {
+    const screen = new URLSearchParams(window.location.search).get("screen");
+    if (!screen) return;
+    const s = useGame.getState();
+    if (screen === "results") {
+      s.setResults(previewResults());
+      s.setPhase("results");
+    } else if (screen === "paused") {
+      s.setPhase("paused");
+    } else if (screen === "select") {
+      s.setPhase("select");
+    } else if (screen === "hint") {
+      s.setPhase("countdown");
+    }
+  }, []);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">

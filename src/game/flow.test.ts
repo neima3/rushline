@@ -10,6 +10,7 @@ import {
   parseHints,
   pbDeltaMs,
   persistHints,
+  previewResults,
   resultsHeadline,
 } from "./flow.ts";
 import type { GhostFrame } from "./types.ts";
@@ -96,6 +97,15 @@ describe("buildResults", () => {
     const r = buildResults({ time: 30_000, trackId: "helix", prevBest: null, ghost: null, medal: "gold" });
     assert.equal(r.medal, "gold");
     assert.equal(r.nextTrackId, "circuit");
+  });
+
+  it("previewResults is a gold PB with a ghost compare", () => {
+    const r = previewResults();
+    assert.equal(r.isPb, true);
+    assert.equal(r.medal, "gold");
+    assert.equal(r.hadGhost, true);
+    assert.ok((r.ghostDelta ?? 0) < 0);
+    assert.equal(r.nextTrackId, "canyon");
   });
 });
 

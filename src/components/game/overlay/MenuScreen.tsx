@@ -50,23 +50,34 @@ export function MenuScreen({
         className="overlay-enter flex max-h-full w-full max-w-xl flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0"
       >
         <header className="overlay-stagger-1">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
-          <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
-          <p className="mt-3 max-w-sm text-pretty text-muted">
-            A precision 3D circuit racer. Hit every checkpoint, keep the car on the plastic, beat the medals.
-          </p>
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/80 bg-bg/50 px-3 py-1 text-xs text-subtle">
-            <Gamepad2 className="size-3.5" />
-            {pad.connected
-              ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start`
-              : "Xbox controller supported — press any button"}
-          </p>
+          {select ? (
+            <>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
+              <h1 className="font-display text-5xl leading-none tracking-tight md:text-6xl">Tracks</h1>
+              <p className="mt-2 max-w-sm text-pretty text-muted">Pick a circuit. Beat the medals. Your ghost rides shotgun.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
+              <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
+              <p className="mt-3 max-w-sm text-pretty text-muted">
+                A precision 3D circuit racer. Hit every checkpoint, keep the car on the plastic, beat the medals.
+              </p>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/80 bg-bg/50 px-3 py-1 text-xs text-subtle">
+                <Gamepad2 className="size-3.5" />
+                {pad.connected
+                  ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start`
+                  : "Xbox controller supported — press any button"}
+              </p>
+            </>
+          )}
         </header>
 
         {!select ? (
           <div className="overlay-stagger-2 flex flex-col gap-2">
             <button
               type="button"
+              data-action="start"
               disabled={!ready}
               onMouseDown={keepPlayFocus}
               onClick={onStart}
@@ -117,7 +128,6 @@ export function MenuScreen({
           </div>
         ) : (
           <div className="overlay-stagger-2 flex flex-col gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Select circuit</p>
             {allTrackDefs().map((t, i) => {
               const pb = best[t.id];
               const medal = medalFor(t.id, pb ?? Number.POSITIVE_INFINITY);
@@ -132,7 +142,9 @@ export function MenuScreen({
                   style={{ animationDelay: `${80 + i * 55}ms` }}
                   className={cn(
                     "track-card overlay-card-in flex overflow-hidden rounded-xl border text-left transition-[transform,border-color,background-color] duration-150",
-                    selected ? "border-fg/45 bg-surface" : "border-border bg-surface/90 hover:border-border",
+                    selected
+                      ? "track-card-selected border-[rgba(94,232,255,0.42)] bg-surface"
+                      : "border-border bg-surface/90 hover:border-fg/20",
                   )}
                 >
                   <span className="track-card-thumb relative h-[6.5rem] w-28 shrink-0 overflow-hidden sm:w-32">
