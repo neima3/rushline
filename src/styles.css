@@ -444,6 +444,16 @@ body {
   border: none;
 }
 
+.game-root h1.font-display {
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 28px rgba(94, 232, 255, 0.12);
+}
+
+.game-root [data-allow-scroll] button.flex.overflow-hidden {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

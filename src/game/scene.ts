@@ -5,6 +5,7 @@ import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
 import { bakeSkyEnvironment, SkyDome } from "./sky";
+import { buildGate } from "./gates";
 import { Vfx } from "./vfx";
 import { PostFx } from "./postfx";
 import type { Settings } from "./settings";
@@ -358,8 +359,9 @@ export class World {
       this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     }
     this.applyFog();
-    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false);
+    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false, this.quality.tier !== "low");
     this.tuneBloom(this.theme);
+    this.post.setGrade(this.theme);
     this.applyEnvironmentMap();
     if (this.builtTrack) this.applyThemeLights(this.theme);
     const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
@@ -483,6 +485,7 @@ export class World {
     this.applyFog();
     this.applyThemeLights(theme);
     this.tuneBloom(theme);
+    this.post.setGrade(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
     applyGroundMaterial(this.ground, theme, this.textures);
@@ -566,6 +569,7 @@ export class World {
     this.skyEnvRT = null;
     this.skyTex = null;
     this.sky = new SkyDome(fog, tint);
+    this.sky.setTheme(this.theme, THEMES[this.theme].sunPos);
     this.scene.add(this.sky.mesh);
     this.loader.load(
       url,
@@ -585,49 +589,16 @@ export class World {
   }
 
   private addGates(track: BuiltTrack, theme: ThemeId) {
-    const arch = (s: number, finish: boolean) => {
-      const sm = sampleAt(track, s);
-      const g = new THREE.Group();
-      const col = finish ? 0xf4f4f2 : theme === "night" ? 0x7ea0c8 : 0xdde4ee;
-      const mat = new THREE.MeshStandardMaterial({
-        color: col,
-        emissive: finish ? 0x8890a0 : 0x3a80d0,
-        emissiveIntensity: finish ? 0.25 : 0.7,
-        roughness: 0.32,
-        metalness: 0.45,
-      });
-      const h = 3.4;
-      const w = sm.width * 0.5 + 0.35;
-      const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, h, 0.16), mat);
-      const p2 = p1.clone();
-      p1.position.set(-w, h / 2, 0);
-      p2.position.set(w, h / 2, 0);
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 2 + 0.16, 0.14, 0.14), mat);
-      bar.position.set(0, h, 0);
-      g.add(p1, p2, bar);
-      if (finish) {
-        const banner = new THREE.Mesh(
-          new THREE.PlaneGeometry(w * 2, 0.72),
-          new THREE.MeshBasicMaterial({ color: 0x111113, fog: true }),
-        );
-        banner.position.set(0, h - 0.48, 0.02);
-        g.add(banner);
-        const stripe = new THREE.Mesh(
-          new THREE.PlaneGeometry(w * 2, 0.12),
-          new THREE.MeshBasicMaterial({ color: 0xc4a574, fog: true }),
-        );
-        stripe.position.set(0, h - 0.18, 0.03);
-        g.add(stripe);
-      }
-      g.position.set(sm.x, sm.y, sm.z);
-      _fwd.set(sm.tx, sm.ty, sm.tz);
-      _up.set(sm.ux, sm.uy, sm.uz);
-      g.quaternion.setFromRotationMatrix(_lookMat(_fwd, _up));
-      this.trackRoot.add(g);
-      this.disposables.push(mat);
+    const add = (s: number, finish: boolean) => {
+      const built = buildGate(sampleAt(track, s), theme, finish);
+      this.trackRoot.add(built.group);
+      this.disposables.push(...built.mats);
+      this.textures.push(...built.textures);
     };
-    arch(2.2, true);
-    for (const s of track.checkpoints) arch(s, false);
+    // Spawn is s=6. The gantry sits ahead of the grid so chase cam reads
+    // the checker at lights-out (Trackmania start). Ground checker stays at 2.2.
+    add(11.2, true);
+    for (const s of track.checkpoints) add(s, false);
   }
 
   applyCar(snap: CarSnap, dt: number, steer: number, brake: number) {
@@ -904,6 +875,7 @@ export class World {
     this.hemi.intensity = look.hemi;
     this.renderer.toneMappingExposure = look.exposure;
     this.scene.environmentIntensity = look.env;
+    this.sky?.setTheme(theme, pack.sunPos);
     const nightFill = theme === "night" && this.quality.nightFills;
     this.fill.color.set(theme === "night" ? 0xb878d8 : 0x8ab4d8);
     this.fill.intensity = nightFill ? 0.5 : 0;
