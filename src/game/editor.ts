@@ -7,6 +7,38 @@ export const MAX_EDITOR_POINTS = 24;
 export const MIN_POINT_GAP = 8;
 export const MIN_LOOP_LENGTH = 180;
 export const MAX_LOOP_LENGTH = 4200;
+export const EDITOR_GRID = 8;
+export const PLACE_POINT_HIT = 12;
+export const PLACE_RIBBON_HIT = 16;
+export const MAX_EDITOR_HISTORY = 48;
+export const EDITOR_FLY_SPEED = 38;
+export const EDITOR_ATTRACT_SPEED = 22;
+
+export type PlaceTool = "move" | "checkpoint" | "boost";
+
+export type PointHistory = {
+  past: EditorPoint[][];
+  future: EditorPoint[][];
+};
+
+export type PlaceResult = {
+  points: EditorPoint[];
+  selected: number;
+  message: string;
+  changed: boolean;
+};
+
+export type FlythroughSample = {
+  x: number;
+  y: number;
+  z: number;
+  tx: number;
+  ty: number;
+  tz: number;
+  ux: number;
+  uy: number;
+  uz: number;
+};
 
 export type EditorPoint = {
   x: number;
@@ -167,6 +199,10 @@ export function writeCustomSave(save: CustomTrackSave, io: PersistIo | null = br
   }
 }
 
+export function clonePoints(points: EditorPoint[]): EditorPoint[] {
+  return points.map((p) => ({ ...p }));
+}
+
 export function cloneSave(save: CustomTrackSave): CustomTrackSave {
   return {
     version: 1,
@@ -174,7 +210,56 @@ export function cloneSave(save: CustomTrackSave): CustomTrackSave {
     env: save.env,
     surface: save.surface,
     laps: save.laps === 2 ? 2 : 1,
-    points: save.points.map((p) => ({ ...p })),
+    points: clonePoints(save.points),
+  };
+}
+
+export function pointsEqual(a: EditorPoint[], b: EditorPoint[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const p = a[i]!;
+    const q = b[i]!;
+    if (p.x !== q.x || p.y !== q.y || p.z !== q.z || p.width !== q.width || p.bank !== q.bank) return false;
+    if (Boolean(p.boost) !== Boolean(q.boost) || Boolean(p.checkpoint) !== Boolean(q.checkpoint)) return false;
+  }
+  return true;
+}
+
+export function emptyPointHistory(): PointHistory {
+  return { past: [], future: [] };
+}
+
+export function recordPointChange(history: PointHistory, before: EditorPoint[]): PointHistory {
+  const last = history.past[history.past.length - 1];
+  if (last && pointsEqual(last, before)) return { past: history.past, future: [] };
+  const past = [...history.past, clonePoints(before)];
+  return {
+    past: past.length > MAX_EDITOR_HISTORY ? past.slice(past.length - MAX_EDITOR_HISTORY) : past,
+    future: [],
+  };
+}
+
+export function undoPoints(history: PointHistory, current: EditorPoint[]): { history: PointHistory; points: EditorPoint[] } | null {
+  const prev = history.past[history.past.length - 1];
+  if (!prev) return null;
+  return {
+    points: clonePoints(prev),
+    history: {
+      past: history.past.slice(0, -1),
+      future: [...history.future, clonePoints(current)],
+    },
+  };
+}
+
+export function redoPoints(history: PointHistory, current: EditorPoint[]): { history: PointHistory; points: EditorPoint[] } | null {
+  const next = history.future[history.future.length - 1];
+  if (!next) return null;
+  return {
+    points: clonePoints(next),
+    history: {
+      past: [...history.past, clonePoints(current)],
+      future: history.future.slice(0, -1),
+    },
   };
 }
 
@@ -335,6 +420,110 @@ export function insertPoint(points: EditorPoint[], afterIndex: number, at?: { x:
 export function removePoint(points: EditorPoint[], index: number): EditorPoint[] {
   if (points.length <= MIN_EDITOR_POINTS) return points;
   return points.filter((_, i) => i !== index);
+}
+
+export function snapCoord(v: number, grid = EDITOR_GRID): number {
+  if (!(grid > 0) || !Number.isFinite(v)) return v;
+  return Math.round(v / grid) * grid;
+}
+
+export function snapXZ(x: number, z: number, snap = true, grid = EDITOR_GRID): { x: number; z: number } {
+  if (!snap) return { x, z };
+  return { x: snapCoord(x, grid), z: snapCoord(z, grid) };
+}
+
+export function snapPointsToGrid(points: EditorPoint[], grid = EDITOR_GRID): EditorPoint[] {
+  return points.map((p) => sanitizePoint({ ...p, x: snapCoord(p.x, grid), z: snapCoord(p.z, grid) }) ?? p);
+}
+
+export function flattenHeights(points: EditorPoint[], y = 0.02): EditorPoint[] {
+  return points.map((p) => sanitizePoint({ ...p, y }) ?? p);
+}
+
+export function flattenBanks(points: EditorPoint[]): EditorPoint[] {
+  return points.map((p) => sanitizePoint({ ...p, bank: 0 }) ?? p);
+}
+
+export function flattenRibbon(points: EditorPoint[]): EditorPoint[] {
+  return flattenBanks(flattenHeights(points));
+}
+
+export function nearestPoint(points: EditorPoint[], x: number, z: number): { index: number; dist: number } {
+  let best = { index: 0, dist: Infinity };
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]!;
+    const dist = Math.hypot(p.x - x, p.z - z);
+    if (dist < best.dist) best = { index: i, dist };
+  }
+  return best;
+}
+
+export function placeOnRibbon(points: EditorPoint[], x: number, z: number, tool: PlaceTool, snap = false): PlaceResult {
+  const hit = snapXZ(x, z, snap);
+  const near = nearestPoint(points, hit.x, hit.z);
+  if (tool === "checkpoint" || tool === "boost") {
+    if (near.dist <= PLACE_POINT_HIT) {
+      if (tool === "checkpoint" && near.index === 0) {
+        return { points, selected: 0, message: "Start is the line. Place a later checkpoint.", changed: false };
+      }
+      const p = points[near.index]!;
+      const on = tool === "checkpoint" ? !p.checkpoint : !p.boost;
+      const next = movePoint(points, near.index, tool === "checkpoint" ? { checkpoint: on } : { boost: on });
+      const kind = tool === "checkpoint" ? "Checkpoint" : "Boost";
+      return {
+        points: next,
+        selected: near.index,
+        message: on ? `${kind} on point ${near.index + 1}.` : `${kind} cleared.`,
+        changed: true,
+      };
+    }
+    const seg = nearestSegment(points, hit.x, hit.z);
+    if (seg.dist > PLACE_RIBBON_HIT) {
+      return { points, selected: near.index, message: "Click the ribbon or a point.", changed: false };
+    }
+    if (points.length >= MAX_EDITOR_POINTS) {
+      return { points, selected: near.index, message: `Cap is ${MAX_EDITOR_POINTS} points.`, changed: false };
+    }
+    const at = snapXZ(seg.px, seg.pz, snap);
+    let next = insertPoint(points, seg.index, at);
+    const idx = Math.min(next.length - 1, seg.index + 1);
+    next = movePoint(next, idx, tool === "checkpoint" ? { checkpoint: true } : { boost: true });
+    return {
+      points: next,
+      selected: idx,
+      message: tool === "checkpoint" ? "Checkpoint placed." : "Boost pad placed.",
+      changed: true,
+    };
+  }
+
+  const seg = nearestSegment(points, hit.x, hit.z);
+  if (seg.dist > PLACE_RIBBON_HIT) {
+    return { points, selected: near.index, message: "", changed: false };
+  }
+  if (points.length >= MAX_EDITOR_POINTS) {
+    return { points, selected: near.index, message: `Cap is ${MAX_EDITOR_POINTS} points.`, changed: false };
+  }
+  const at = snapXZ(seg.px, seg.pz, snap);
+  const next = insertPoint(points, seg.index, at);
+  return { points: next, selected: seg.index + 1, message: "Point added.", changed: true };
+}
+
+export function editorFlythroughPose(sm: FlythroughSample): { cam: { x: number; y: number; z: number }; look: { x: number; y: number; z: number } } {
+  const back = 8.6;
+  const lift = 3.15;
+  const look = 15.5;
+  return {
+    cam: {
+      x: sm.x - sm.tx * back + sm.ux * 2.35,
+      y: sm.y + lift,
+      z: sm.z - sm.tz * back + sm.uz * 2.35,
+    },
+    look: {
+      x: sm.x + sm.tx * look,
+      y: sm.y + 1.08 + sm.ty * look * 0.12,
+      z: sm.z + sm.tz * look,
+    },
+  };
 }
 
 export function nearestSegment(points: EditorPoint[], x: number, z: number): { index: number; dist: number; px: number; pz: number } {

@@ -47,6 +47,8 @@ describe("help control sheet", () => {
     assert.ok(COPY.touchItems.some((line) => /Rewind/.test(line)));
     assert.ok(COPY.playNotes.some((line) => /rewind/i.test(line)));
     assert.ok(COPY.playNotes.some((line) => /Custom/.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /Editor 1\.1/.test(line) && /undo\/redo/.test(line)));
+    assert.equal(COPY.editorEyebrow, "Editor 1.1");
     assert.ok(COPY.touchItems.some((line) => /Left pad/.test(line)));
     assert.ok(COPY.touchItems.some((line) => /hold to restart/.test(line)));
     assert.ok(COPY.photoNotes.some((line) => /PNG/.test(line)));

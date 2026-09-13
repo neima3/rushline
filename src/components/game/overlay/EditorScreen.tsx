@@ -1,25 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Flag, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Download, Flag, Magnet, Minus, Plus, Redo2, RotateCcw, Trash2, Undo2, Upload, Video } from "lucide-react";
 import {
+  clonePoints,
   cloneSave,
   defaultCustomSave,
   downloadCustomJson,
+  EDITOR_GRID,
   EDITOR_SURFACES,
   EDITOR_THEMES,
+  emptyPointHistory,
+  flattenRibbon,
   insertPoint,
   MAX_EDITOR_POINTS,
   MIN_EDITOR_POINTS,
   movePoint,
-  nearestSegment,
   parseCustomSave,
+  placeOnRibbon,
+  pointsEqual,
   readCustomSave,
+  recordPointChange,
+  redoPoints,
   removePoint,
   sampleLoop,
   setCustomDraft,
+  snapPointsToGrid,
+  snapXZ,
+  undoPoints,
   validateCustom,
   type CustomTrackSave,
   type EditorPoint,
+  type PlaceTool,
+  type PointHistory,
 } from "@/game/editor";
+import { COPY } from "@/game/help";
 import { validateCustomBuild } from "@/game/track";
 import { cn } from "@/lib/utils";
 import { keepPlayFocus } from "./chrome";
@@ -30,20 +43,36 @@ type Props = {
   onPreview: (save: CustomTrackSave) => void;
   onSave: (save: CustomTrackSave) => boolean;
   onDrive: (save: CustomTrackSave) => boolean;
+  onFlythrough: (on: boolean) => void;
 };
 
-export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Props) {
+export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive, onFlythrough }: Props) {
   const [draft, setDraft] = useState<CustomTrackSave>(() => readCustomSave());
   const [selected, setSelected] = useState(0);
+  const [tool, setTool] = useState<PlaceTool>("move");
+  const [snap, setSnap] = useState(false);
+  const [fly, setFly] = useState(false);
+  const [history, setHistory] = useState<PointHistory>(() => emptyPointHistory());
   const [note, setNote] = useState("Drag points. Click the ribbon to add one.");
   const fileRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef(onPreview);
+  const flyRef = useRef(onFlythrough);
+  const draftRef = useRef(draft);
+  const historyRef = useRef(history);
+  const selectedRef = useRef(selected);
+  const strokeRef = useRef<EditorPoint[] | null>(null);
   previewRef.current = onPreview;
+  flyRef.current = onFlythrough;
+  draftRef.current = draft;
+  historyRef.current = history;
+  selectedRef.current = selected;
 
   const issue = useMemo(() => validateCustom(draft), [draft]);
   const mesh = useMemo(() => (issue.ok ? validateCustomBuild() : null), [draft, issue.ok]);
   const readyToDrive = issue.ok && (mesh?.ok ?? false);
   const point = draft.points[selected] ?? draft.points[0];
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
 
   useEffect(() => {
     setCustomDraft(draft);
@@ -51,18 +80,89 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
     return () => window.clearTimeout(handle);
   }, [draft]);
 
+  useEffect(() => {
+    flyRef.current(fly);
+    return () => flyRef.current(false);
+  }, [fly]);
+
   const patch = (next: CustomTrackSave, message?: string) => {
     setDraft(next);
     setCustomDraft(next);
     if (message) setNote(message);
   };
 
-  const updatePoints = (points: EditorPoint[], message?: string, select?: number) => {
-    const next = { ...draft, points };
+  const applyPoints = (points: EditorPoint[], message?: string, select?: number, record = true) => {
+    const cur = draftRef.current;
+    if (record && !pointsEqual(points, cur.points)) {
+      setHistory(recordPointChange(historyRef.current, cur.points));
+    }
     if (select != null) setSelected(Math.max(0, Math.min(points.length - 1, select)));
-    else if (selected >= points.length) setSelected(Math.max(0, points.length - 1));
-    patch(next, message);
+    else if (selectedRef.current >= points.length) setSelected(Math.max(0, points.length - 1));
+    patch({ ...cur, points }, message);
   };
+
+  const beginStroke = () => {
+    strokeRef.current = clonePoints(draftRef.current.points);
+  };
+
+  const endStroke = () => {
+    const before = strokeRef.current;
+    strokeRef.current = null;
+    if (before && !pointsEqual(before, draftRef.current.points)) {
+      setHistory(recordPointChange(historyRef.current, before));
+    }
+  };
+
+  const undo = () => {
+    const cur = draftRef.current;
+    const result = undoPoints(historyRef.current, cur.points);
+    if (!result) return;
+    setHistory(result.history);
+    setSelected(Math.max(0, Math.min(selectedRef.current, result.points.length - 1)));
+    patch({ ...cur, points: result.points }, "Undid point edit.");
+  };
+
+  const redo = () => {
+    const cur = draftRef.current;
+    const result = redoPoints(historyRef.current, cur.points);
+    if (!result) return;
+    setHistory(result.history);
+    setSelected(Math.max(0, Math.min(selectedRef.current, result.points.length - 1)));
+    patch({ ...cur, points: result.points }, "Redid point edit.");
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if (key === "z") {
+        e.preventDefault();
+        undo();
+      } else if (key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const toolHint =
+    tool === "checkpoint"
+      ? "Click the ribbon or a point to drop a checkpoint."
+      : tool === "boost"
+        ? "Click the ribbon or a point to drop a boost pad."
+        : snap
+          ? "Snap on · drag points · click the ribbon to add."
+          : "Drag points. Click the ribbon to add one.";
 
   return (
     <div
@@ -74,28 +174,121 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
         className="overlay-enter flex max-h-full w-full max-w-xl flex-col gap-4 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0"
       >
         <header>
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Track editor lite</p>
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">{COPY.editorEyebrow}</p>
           <h1 className="font-display text-5xl leading-none tracking-tight">Custom ribbon</h1>
           <p className="mt-2 max-w-sm text-pretty text-sm text-muted">
-            Closed Catmull-Rom loop. Place a few points, check the mesh, then drive it. Time trial only — Cup stays on the stock nine.
+            Closed Catmull-Rom loop. Place checkpoints and boosts on the plan, undo a miss, then fly the ribbon. Time trial
+            only — Cup stays on the stock nine.
           </p>
         </header>
 
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">Plan · drag points · click ribbon to add</p>
+        <div className="grid grid-cols-3 gap-2" data-editor-tools>
+          <ToolButton
+            label="Move"
+            active={tool === "move"}
+            onClick={() => {
+              setTool("move");
+              setNote("Drag points. Click the ribbon to add one.");
+            }}
+          />
+          <ToolButton
+            label="Checkpoint"
+            active={tool === "checkpoint"}
+            onClick={() => {
+              setTool("checkpoint");
+              setNote("Click the ribbon or a point to drop a checkpoint.");
+            }}
+          />
+          <ToolButton
+            label="Boost"
+            active={tool === "boost"}
+            onClick={() => {
+              setTool("boost");
+              setNote("Click the ribbon or a point to drop a boost pad.");
+            }}
+          />
+        </div>
+
+        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">{toolHint}</p>
         <EditorMap
           points={draft.points}
           selected={selected}
+          tool={tool}
+          snap={snap}
           onSelect={setSelected}
-          onMove={(i, x, z) => updatePoints(movePoint(draft.points, i, { x, z }))}
-          onInsert={(after, x, z) => {
-            if (draft.points.length >= MAX_EDITOR_POINTS) {
-              setNote(`Cap is ${MAX_EDITOR_POINTS} points.`);
+          onMove={(i, x, z) => {
+            const at = snapXZ(x, z, snap);
+            applyPoints(movePoint(draftRef.current.points, i, at), undefined, i, false);
+          }}
+          onPlace={(x, z) => {
+            const result = placeOnRibbon(draftRef.current.points, x, z, tool, snap);
+            if (!result.changed) {
+              if (result.message) setNote(result.message);
               return;
             }
-            const next = insertPoint(draft.points, after, { x, z });
-            updatePoints(next, "Point added.", after + 1);
+            applyPoints(result.points, result.message, result.selected);
           }}
+          onStrokeStart={beginStroke}
+          onStrokeEnd={endStroke}
         />
+
+        <div className="grid grid-cols-5 gap-2">
+          <IconBtn
+            label="Undo"
+            dataAttr="data-editor-undo"
+            disabled={!canUndo}
+            onClick={undo}
+          >
+            <Undo2 className="size-3.5" />
+          </IconBtn>
+          <IconBtn
+            label="Redo"
+            dataAttr="data-editor-redo"
+            disabled={!canRedo}
+            onClick={redo}
+          >
+            <Redo2 className="size-3.5" />
+          </IconBtn>
+          <IconBtn
+            label={snap ? "Snap on" : "Snap"}
+            dataAttr="data-editor-snap"
+            active={snap}
+            onClick={() => {
+              const next = !snap;
+              setSnap(next);
+              setNote(next ? `Snap to ${EDITOR_GRID} m grid.` : "Free move.");
+            }}
+          >
+            <Magnet className="size-3.5" />
+          </IconBtn>
+          <IconBtn
+            label="Flatten"
+            dataAttr="data-editor-flatten"
+            onClick={() => applyPoints(flattenRibbon(draft.points), "Ribbon flattened.")}
+          >
+            <Minus className="size-3.5" />
+          </IconBtn>
+          <IconBtn
+            label={fly ? "Flying" : "Fly"}
+            dataAttr="data-editor-fly"
+            active={fly}
+            onClick={() => {
+              const next = !fly;
+              setFly(next);
+              setNote(next ? "Flying the ribbon — watch the 3D preview." : "Flythrough off.");
+            }}
+          >
+            <Video className="size-3.5" />
+          </IconBtn>
+        </div>
+        <button
+          type="button"
+          onMouseDown={keepPlayFocus}
+          onClick={() => applyPoints(snapPointsToGrid(draft.points), `Points snapped to ${EDITOR_GRID} m.`)}
+          className="h-10 rounded-md border border-border bg-bg-elevated text-xs text-fg"
+        >
+          Snap all points
+        </button>
 
         <p className={cn("text-xs", readyToDrive ? "text-ok" : "text-danger")} data-editor-status>
           {readyToDrive
@@ -168,7 +361,9 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
                 max={24}
                 step={0.1}
                 value={point.y}
-                onChange={(e) => updatePoints(movePoint(draft.points, selected, { y: Number(e.target.value) }))}
+                onPointerDown={beginStroke}
+                onPointerUp={endStroke}
+                onChange={(e) => applyPoints(movePoint(draft.points, selected, { y: Number(e.target.value) }), undefined, selected, false)}
               />
             </label>
             <label className="mt-2 flex flex-col gap-1 text-[10px] uppercase tracking-widest text-subtle">
@@ -179,7 +374,9 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
                 max={16}
                 step={0.1}
                 value={point.width}
-                onChange={(e) => updatePoints(movePoint(draft.points, selected, { width: Number(e.target.value) }))}
+                onPointerDown={beginStroke}
+                onPointerUp={endStroke}
+                onChange={(e) => applyPoints(movePoint(draft.points, selected, { width: Number(e.target.value) }), undefined, selected, false)}
               />
             </label>
             <label className="mt-2 flex flex-col gap-1 text-[10px] uppercase tracking-widest text-subtle">
@@ -190,19 +387,21 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
                 max={0.55}
                 step={0.01}
                 value={point.bank}
-                onChange={(e) => updatePoints(movePoint(draft.points, selected, { bank: Number(e.target.value) }))}
+                onPointerDown={beginStroke}
+                onPointerUp={endStroke}
+                onChange={(e) => applyPoints(movePoint(draft.points, selected, { bank: Number(e.target.value) }), undefined, selected, false)}
               />
             </label>
             <div className="mt-3 flex flex-wrap gap-2">
               <Toggle
                 label="Checkpoint"
                 on={Boolean(point.checkpoint)}
-                onClick={() => updatePoints(movePoint(draft.points, selected, { checkpoint: !point.checkpoint }))}
+                onClick={() => applyPoints(movePoint(draft.points, selected, { checkpoint: !point.checkpoint }))}
               />
               <Toggle
                 label="Boost"
                 on={Boolean(point.boost)}
-                onClick={() => updatePoints(movePoint(draft.points, selected, { boost: !point.boost }))}
+                onClick={() => applyPoints(movePoint(draft.points, selected, { boost: !point.boost }))}
               />
             </div>
           </div>
@@ -214,7 +413,7 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
             onMouseDown={keepPlayFocus}
             onClick={() => {
               const next = insertPoint(draft.points, selected);
-              updatePoints(next, "Point added.", selected + 1);
+              applyPoints(next, "Point added.", selected + 1);
             }}
             disabled={draft.points.length >= MAX_EDITOR_POINTS}
             className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-bg-elevated text-xs text-fg disabled:opacity-40"
@@ -225,7 +424,7 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
           <button
             type="button"
             onMouseDown={keepPlayFocus}
-            onClick={() => updatePoints(removePoint(draft.points, selected), "Point removed.")}
+            onClick={() => applyPoints(removePoint(draft.points, selected), "Point removed.")}
             disabled={draft.points.length <= MIN_EDITOR_POINTS}
             className="flex h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-bg-elevated text-xs text-fg disabled:opacity-40"
           >
@@ -237,6 +436,7 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
             onMouseDown={keepPlayFocus}
             onClick={() => {
               const next = defaultCustomSave();
+              setHistory(recordPointChange(historyRef.current, draftRef.current.points));
               setSelected(0);
               patch(next, "Default oval restored.");
             }}
@@ -303,6 +503,7 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
               if (!file) return;
               void file.text().then((text) => {
                 const next = parseCustomSave(text);
+                setHistory(recordPointChange(historyRef.current, draftRef.current.points));
                 setSelected(0);
                 patch(cloneSave(next), `Loaded ${next.name}.`);
               });
@@ -319,6 +520,60 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
         </div>
       </div>
     </div>
+  );
+}
+
+function ToolButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-editor-tool={label.toLowerCase()}
+      aria-pressed={active}
+      onMouseDown={keepPlayFocus}
+      onClick={onClick}
+      className={cn(
+        "h-10 rounded-md border text-[11px] font-medium uppercase tracking-widest",
+        active ? "border-fg/45 bg-bg-elevated text-fg" : "border-border bg-bg text-muted",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function IconBtn({
+  label,
+  children,
+  onClick,
+  disabled,
+  active,
+  dataAttr,
+}: {
+  label: string;
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  dataAttr?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      aria-pressed={active}
+      {...(dataAttr ? { [dataAttr]: "" } : {})}
+      onMouseDown={keepPlayFocus}
+      onClick={onClick}
+      className={cn(
+        "flex h-11 flex-col items-center justify-center gap-0.5 rounded-md border text-[9px] uppercase tracking-widest disabled:opacity-35",
+        active ? "border-fg/45 bg-bg-elevated text-fg" : "border-border bg-bg-elevated text-muted",
+      )}
+    >
+      {children}
+      {label}
+    </button>
   );
 }
 
@@ -341,15 +596,23 @@ function Toggle({ label, on, onClick }: { label: string; on: boolean; onClick: (
 function EditorMap({
   points,
   selected,
+  tool,
+  snap,
   onSelect,
   onMove,
-  onInsert,
+  onPlace,
+  onStrokeStart,
+  onStrokeEnd,
 }: {
   points: EditorPoint[];
   selected: number;
+  tool: PlaceTool;
+  snap: boolean;
   onSelect: (i: number) => void;
   onMove: (i: number, x: number, z: number) => void;
-  onInsert: (after: number, x: number, z: number) => void;
+  onPlace: (x: number, z: number) => void;
+  onStrokeStart: () => void;
+  onStrokeEnd: () => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ i: number } | null>(null);
@@ -383,13 +646,26 @@ function EditorMap({
     return { x: loc.x, z: loc.y };
   };
 
+  const gridLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  if (snap) {
+    const xStart = Math.floor(x0 / EDITOR_GRID) * EDITOR_GRID;
+    const zStart = Math.floor(z0 / EDITOR_GRID) * EDITOR_GRID;
+    for (let x = xStart; x <= x0 + w; x += EDITOR_GRID) {
+      gridLines.push({ x1: x, y1: z0, x2: x, y2: z0 + h });
+    }
+    for (let z = zStart; z <= z0 + h; z += EDITOR_GRID) {
+      gridLines.push({ x1: x0, y1: z, x2: x0 + w, y2: z });
+    }
+  }
+
   return (
     <div className="h-52 shrink-0 overflow-hidden rounded-xl border border-fg/25 bg-[#14141a] sm:h-60">
       <svg
         ref={svgRef}
         data-editor-map
+        data-editor-tool={tool}
         viewBox={`${x0} ${z0} ${w} ${h}`}
-        className="block h-full w-full touch-none"
+        className={cn("block h-full w-full touch-none", tool === "move" ? "cursor-default" : "cursor-crosshair")}
         onPointerMove={(e) => {
           if (!drag.current) return;
           e.preventDefault();
@@ -397,19 +673,31 @@ function EditorMap({
           onMove(drag.current.i, x, z);
         }}
         onPointerUp={() => {
+          if (drag.current) onStrokeEnd();
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          if (drag.current) onStrokeEnd();
           drag.current = null;
         }}
         onPointerLeave={() => {
+          if (drag.current) onStrokeEnd();
           drag.current = null;
         }}
         onPointerDown={(e) => {
           if ((e.target as Element).closest("[data-point]")) return;
           const { x, z } = worldFromEvent(e);
-          const hit = nearestSegment(points, x, z);
-          if (hit.dist < 14) onInsert(hit.index, x, z);
+          onPlace(x, z);
         }}
       >
         <rect x={x0} y={z0} width={w} height={h} fill="#14141a" />
+        {gridLines.length ? (
+          <g stroke="#2a2a31" strokeWidth={Math.max(w, h) * 0.0014} opacity={0.85}>
+            {gridLines.map((g, i) => (
+              <line key={i} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} />
+            ))}
+          </g>
+        ) : null}
         <path
           d={loop.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.z}`).join(" ") + " Z"}
           fill="none"
@@ -427,8 +715,9 @@ function EditorMap({
         {points.map((p, i) => {
           const r = Math.max(w, h) * (i === selected ? 0.018 : 0.014);
           const fill = p.checkpoint ? "#8dccad" : p.boost ? "#c4a574" : i === 0 ? "#f4f4f2" : "#9a9aa3";
+          const mark = r * 1.7;
           return (
-            <g key={i} data-point={i}>
+            <g key={i} data-point={i} data-point-kind={p.checkpoint ? "checkpoint" : p.boost ? "boost" : i === 0 ? "start" : "point"}>
               <circle
                 cx={p.x}
                 cy={p.z}
@@ -439,11 +728,30 @@ function EditorMap({
                 className="cursor-pointer"
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  drag.current = { i };
                   onSelect(i);
+                  if (tool !== "move") {
+                    onPlace(p.x, p.z);
+                    return;
+                  }
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  onStrokeStart();
+                  drag.current = { i };
                 }}
               />
+              {p.checkpoint ? (
+                <polygon
+                  points={`${p.x},${p.z - mark} ${p.x + mark * 0.42},${p.z - mark * 0.28} ${p.x - mark * 0.42},${p.z - mark * 0.28}`}
+                  fill="#8dccad"
+                  className="pointer-events-none"
+                />
+              ) : null}
+              {p.boost && !p.checkpoint ? (
+                <polygon
+                  points={`${p.x},${p.z + mark * 0.15} ${p.x - mark * 0.38},${p.z + mark * 0.7} ${p.x + mark * 0.38},${p.z + mark * 0.7}`}
+                  fill="#c4a574"
+                  className="pointer-events-none"
+                />
+              ) : null}
             </g>
           );
         })}

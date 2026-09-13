@@ -11,7 +11,14 @@ import {
   type Phase,
   type TrackId,
 } from "./types";
-import { setCustomDraft, validateCustom, writeCustomSave, type CustomTrackSave } from "./editor.ts";
+import {
+  EDITOR_ATTRACT_SPEED,
+  EDITOR_FLY_SPEED,
+  setCustomDraft,
+  validateCustom,
+  writeCustomSave,
+  type CustomTrackSave,
+} from "./editor.ts";
 import {
   armHotseatSeat,
   commitHotseatRun,
@@ -123,6 +130,7 @@ export class Game {
   private phase: Phase = "menu";
   private camera: CameraMode = "chase";
   private attractS = 0;
+  private editorFly = false;
   private recording: GhostFrame[] = [];
   private ghost: GhostFrame[] | null = null;
   private ghostSource: GhostSource = "none";
@@ -480,7 +488,7 @@ export class Game {
     }
   }
 
-  load(id: TrackId, racing = false) {
+  load(id: TrackId, racing = false, opts?: { keepCamera?: boolean }) {
     this.trackId = id;
     this.track = getTrack(id);
     if (racing) this.applyRaceLaps();
@@ -490,9 +498,13 @@ export class Game {
     this.car.reset(this.track);
     this.car.snap(this.curr);
     copySnap(this.prev, this.curr);
-    this.attractS = 0;
     this.acc = 0;
-    this.world.snapCamera(this.curr, this.camera);
+    if (opts?.keepCamera && this.track.length > 0) {
+      this.attractS = ((this.attractS % this.track.length) + this.track.length) % this.track.length;
+    } else {
+      this.attractS = 0;
+      this.world.snapCamera(this.curr, this.camera);
+    }
     useGame.getState().setTrack(id);
     useGame.getState().setHud({
       laps: this.track.def.laps,
@@ -552,9 +564,14 @@ export class Game {
   }
 
   closeEditor() {
+    this.editorFly = false;
     this.setPhase("select");
     invalidateCustomTrack();
     this.load("custom");
+  }
+
+  setEditorFly(on: boolean) {
+    this.editorFly = on;
   }
 
   openEditor() {
@@ -564,6 +581,7 @@ export class Game {
     useGame.getState().setHelpOpen(false);
     useGame.getState().setCupSession(null);
     invalidateCustomTrack();
+    this.editorFly = false;
     this.load("custom");
     this.phase = "editor";
     this.audio.setScene("editor");
@@ -581,7 +599,7 @@ export class Game {
     setCustomDraft(save);
     invalidateCustomTrack();
     if (this.phase !== "editor") return;
-    this.load("custom");
+    this.load("custom", false, { keepCamera: true });
     this.phase = "editor";
     useGame.getState().setPhase("editor");
   }
@@ -891,7 +909,8 @@ export class Game {
         this.rewind.record(this.time, this.car.captureSim());
       }
     } else if (isLobbyPhase(this.phase)) {
-      this.attractS += dt * 22;
+      const speed = this.phase === "editor" && this.editorFly ? EDITOR_FLY_SPEED : EDITOR_ATTRACT_SPEED;
+      this.attractS += dt * speed;
       if (this.attractS > this.track.length) this.attractS -= this.track.length;
     }
 
@@ -923,7 +942,17 @@ export class Game {
         this.world.updateCamera(camSnap, dt, this.camera, false, 0, this.track, this.reduced, 0);
       }
     } else {
-      this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
+      this.world.updateCamera(
+        vis,
+        dt,
+        this.camera,
+        attract,
+        this.attractS,
+        this.track,
+        this.reduced,
+        actions.steer,
+        this.phase === "editor" && this.editorFly,
+      );
     }
     this.audio.setScene(this.photoMode || this.replayMode ? "paused" : this.phase);
     const racing = !this.photoMode && !this.replayMode && (this.phase === "race" || this.phase === "countdown");

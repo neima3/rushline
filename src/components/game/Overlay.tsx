@@ -181,6 +181,9 @@ export function Overlay({ gameRef }: Props) {
           }}
           onSave={(save) => Boolean(g()?.persistCustom(save))}
           onDrive={(save) => Boolean(g()?.driveCustom(save))}
+          onFlythrough={(on) => {
+            g()?.setEditorFly(on);
+          }}
         />
       ) : null}
 

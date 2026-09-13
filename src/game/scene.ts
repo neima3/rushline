@@ -26,6 +26,7 @@ import {
 } from "./quality";
 import { camBoostPull, camFovTarget, camFwdRate, camLandDrop } from "./feel";
 import { camLiveFollow, camLiveLook, camSnapOffsets, isChaseCam, isCloseCam } from "./camera";
+import { editorFlythroughPose } from "./editor";
 import { sampleGhost } from "./ghost";
 import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
@@ -866,20 +867,28 @@ export class World {
     track: BuiltTrack | null,
     reduced: boolean,
     steer = 0,
+    flythrough = false,
   ) {
     this.clockT += dt;
     if (attract && track) {
       const sm = sampleAt(track, attractS, _roadSample);
-      _desired.set(sm.x + sm.ux * 8 - sm.tx * 16, sm.y + 6.5, sm.z + sm.uz * 8 - sm.tz * 16);
-      _look.set(sm.x, sm.y + 1.1, sm.z);
-      const k = 1 - Math.exp(-1.4 * dt);
+      if (flythrough) {
+        const pose = editorFlythroughPose(sm);
+        _desired.set(pose.cam.x, pose.cam.y, pose.cam.z);
+        _look.set(pose.look.x, pose.look.y, pose.look.z);
+      } else {
+        _desired.set(sm.x + sm.ux * 8 - sm.tx * 16, sm.y + 6.5, sm.z + sm.uz * 8 - sm.tz * 16);
+        _look.set(sm.x, sm.y + 1.1, sm.z);
+      }
+      const k = 1 - Math.exp(-(flythrough ? 2.6 : 1.4) * dt);
       this.camPos.lerp(_desired, k);
       this.lookPos.lerp(_look, k);
       this.camUp.copy(_worldUp);
       this.camera.position.copy(this.camPos);
       this.camera.up.copy(_worldUp);
       this.camera.lookAt(this.lookPos);
-      this.camera.fov += (this.camFov - 2 - this.camera.fov) * (1 - Math.exp(-3 * dt));
+      const fovTarget = flythrough ? this.camFov : this.camFov - 2;
+      this.camera.fov += (fovTarget - this.camera.fov) * (1 - Math.exp(-3 * dt));
       this.camera.updateProjectionMatrix();
       this.car.group.visible = true;
       return;
