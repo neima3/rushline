@@ -41,7 +41,10 @@ export function Overlay({ gameRef }: Props) {
         <button
           type="button"
           className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex size-11 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => {
+            g()?.uiClick();
+            setSettingsOpen(true);
+          }}
           aria-label="Settings"
         >
           <Settings className="size-4" strokeWidth={1.75} />
@@ -57,12 +60,31 @@ export function Overlay({ gameRef }: Props) {
           pad={pad}
           lastTimes={lastTimes}
           recents={recents}
-          onStart={() => g()?.startRace("circuit")}
-          onTracks={() => g()?.setPhase("select")}
-          onBack={() => g()?.menu()}
-          onRace={(id) => g()?.startRace(id)}
-          onMute={() => g()?.setMuted(!muted)}
-          onAuto={() => g()?.setAutoThrottle(!auto)}
+          onStart={() => {
+            g()?.uiClick();
+            g()?.startRace("circuit");
+          }}
+          onTracks={() => {
+            g()?.uiClick();
+            g()?.setPhase("select");
+          }}
+          onBack={() => {
+            g()?.uiClick();
+            g()?.menu();
+          }}
+          onRace={(id) => {
+            g()?.uiClick();
+            g()?.startRace(id);
+          }}
+          onMute={() => {
+            const next = !muted;
+            g()?.setMuted(next);
+            if (!next) g()?.uiClick();
+          }}
+          onAuto={() => {
+            g()?.uiClick();
+            g()?.setAutoThrottle(!auto);
+          }}
           select={phase === "select"}
         />
       ) : null}
@@ -100,7 +122,10 @@ export function Overlay({ gameRef }: Props) {
             type="button"
             className="play-control hud-chip flex size-11 items-center justify-center rounded-md text-fg"
             onMouseDown={keepPlayFocus}
-            onClick={() => g()?.pause()}
+            onClick={() => {
+              g()?.uiClick();
+              g()?.pause();
+            }}
             aria-label="Pause"
           >
             <Pause className="size-4" strokeWidth={1.75} />
@@ -110,14 +135,21 @@ export function Overlay({ gameRef }: Props) {
             <GhostChip
               label={camera === "hood" ? "Hood" : "Chase"}
               camera={camera}
-              onClick={() => g()?.setCamera(camera === "chase" ? "hood" : "chase")}
+              onClick={() => {
+                g()?.uiClick();
+                g()?.setCamera(camera === "chase" ? "hood" : "chase");
+              }}
               className="hud-chip"
             />
             <button
               type="button"
               className="play-control hud-chip flex size-11 items-center justify-center rounded-md"
               onMouseDown={keepPlayFocus}
-              onClick={() => g()?.setMuted(!muted)}
+              onClick={() => {
+                const next = !muted;
+                g()?.setMuted(next);
+                if (!next) g()?.uiClick();
+              }}
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
@@ -131,10 +163,35 @@ export function Overlay({ gameRef }: Props) {
           title="Paused"
           chrome
           actions={[
-            { label: "Resume", primary: true, onClick: () => g()?.resume() },
-            { label: "Options", onClick: () => setSettingsOpen(true) },
-            { label: "Restart", onClick: () => g()?.startRace() },
-            { label: "Quit", onClick: () => g()?.menu() },
+            {
+              label: "Resume",
+              primary: true,
+              onClick: () => {
+                g()?.uiClick();
+                g()?.resume();
+              },
+            },
+            {
+              label: "Options",
+              onClick: () => {
+                g()?.uiClick();
+                setSettingsOpen(true);
+              },
+            },
+            {
+              label: "Restart",
+              onClick: () => {
+                g()?.uiClick();
+                g()?.startRace();
+              },
+            },
+            {
+              label: "Quit",
+              onClick: () => {
+                g()?.uiClick();
+                g()?.menu();
+              },
+            },
           ]}
         />
       ) : null}
@@ -151,12 +208,39 @@ export function Overlay({ gameRef }: Props) {
             </div>
           }
           actions={[
-            { label: "Retry", primary: true, onClick: () => g()?.startRace(results.trackId) },
+            {
+              label: "Retry",
+              primary: true,
+              onClick: () => {
+                g()?.uiClick();
+                g()?.startRace(results.trackId);
+              },
+            },
             ...(results.isPb
               ? []
-              : [{ label: "Retry vs last run", onClick: () => g()?.startRace(results.trackId, "last") }]),
-            { label: "Tracks", onClick: () => g()?.setPhase("select") },
-            { label: "Menu", onClick: () => g()?.menu() },
+              : [
+                  {
+                    label: "Retry vs last run",
+                    onClick: () => {
+                      g()?.uiClick();
+                      g()?.startRace(results.trackId, "last");
+                    },
+                  },
+                ]),
+            {
+              label: "Tracks",
+              onClick: () => {
+                g()?.uiClick();
+                g()?.setPhase("select");
+              },
+            },
+            {
+              label: "Menu",
+              onClick: () => {
+                g()?.uiClick();
+                g()?.menu();
+              },
+            },
           ]}
         />
       ) : null}
@@ -180,7 +264,14 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {settingsOpen ? <SettingsPanel touch={touch} onClose={() => setSettingsOpen(false)} /> : null}
+      {settingsOpen ? (
+        <SettingsPanel
+          touch={touch}
+          onClose={() => setSettingsOpen(false)}
+          onUiClick={() => g()?.uiClick()}
+          onMute={(v) => g()?.setMuted(v)}
+        />
+      ) : null}
 
       {phase === "race" ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
