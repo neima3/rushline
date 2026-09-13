@@ -83,6 +83,10 @@ export const NIGHT_FOG = { near: 88, far: 460 } as const;
 export const DAY_FOG = { near: 80, far: 440 } as const;
 /** Deep forest night — own window. Helix Night stays 88/460. */
 export const GROVE_FOG = { near: 46, far: 220 } as const;
+/** Volcanic dusk haze — own window. Never reuse Helix 88/460. */
+export const EMBER_FOG = { near: 64, far: 300 } as const;
+/** Rainy city / dock — own window. Helix Night stays 88/460. */
+export const STORM_FOG = { near: 50, far: 230 } as const;
 
 /** Settings #17 tier cost — particles / DPR / day fog scale. Night fog ignores muls. */
 export const SETTINGS_TIER_COST: Record<
@@ -214,6 +218,18 @@ export function fogWindow(
       far: GROVE_FOG.far * (knobs?.fogFarMul ?? 1),
     };
   }
+  if (theme === "ember") {
+    return {
+      near: EMBER_FOG.near * (knobs?.fogNearMul ?? 1),
+      far: EMBER_FOG.far * (knobs?.fogFarMul ?? 1),
+    };
+  }
+  if (theme === "storm") {
+    return {
+      near: STORM_FOG.near * (knobs?.fogNearMul ?? 1),
+      far: STORM_FOG.far * (knobs?.fogFarMul ?? 1),
+    };
+  }
   return {
     near: DAY_FOG.near * (knobs?.fogNearMul ?? 1),
     far: DAY_FOG.far * (knobs?.fogFarMul ?? 1),
@@ -304,6 +320,28 @@ export function themeLightLevels(
       env: quality.environment ? 0.22 : 0,
       bloomMul: 0.4,
       bloomThreshold: Math.min(quality.bloomThreshold, 0.84),
+    };
+  }
+  if (theme === "ember") {
+    // Lava dusk. Own ladder — Circuit High pull and Helix night stay locked.
+    return {
+      sun: 1.22,
+      hemi: 0.72,
+      exposure: 1.0,
+      env: quality.environment ? 0.18 : 0,
+      bloomMul: 0.38,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.9),
+    };
+  }
+  if (theme === "storm") {
+    // Rainy dock. Own fog + lights — never reuse Helix 88/460 or Circuit High.
+    return {
+      sun: 0.88,
+      hemi: 0.98,
+      exposure: 1.08,
+      env: quality.environment ? 0.2 : 0,
+      bloomMul: 0.36,
+      bloomThreshold: Math.min(quality.bloomThreshold, 0.86),
     };
   }
   const high = quality.tier === "high";

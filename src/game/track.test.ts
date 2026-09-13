@@ -64,12 +64,16 @@ describe("White Pass", () => {
     assert.equal(TRACK_DEFS.yard.defaultSurface, "tech");
     assert.equal(TRACK_DEFS.mesa.defaultSurface, "dirt");
     assert.equal(TRACK_DEFS.hollow.defaultSurface, "dirt");
+    assert.equal(TRACK_DEFS.ember.defaultSurface, "dirt");
+    assert.equal(TRACK_DEFS.storm.defaultSurface, "plastic");
     const circuit = getTrack("circuit");
     const canyon = getTrack("canyon");
     const summit = getTrack("summit");
     const yard = getTrack("yard");
     const mesa = getTrack("mesa");
     const hollow = getTrack("hollow");
+    const ember = getTrack("ember");
+    const storm = getTrack("storm");
     assert.ok(circuit.samples.every((s) => s.surface === "plastic"));
     assert.ok(summit.samples.every((s) => s.surface === "ice"));
     assert.ok(yard.samples.every((s) => s.surface === "tech"));
@@ -82,6 +86,13 @@ describe("White Pass", () => {
     assert.ok(hollow.samples.some((s) => s.surface === "dirt"));
     assert.ok(hollow.samples.some((s) => s.surface === "tech"));
     assert.ok(hollow.samples.filter((s) => s.surface === "dirt").length > hollow.samples.length * 0.4);
+    assert.ok(ember.samples.some((s) => s.surface === "dirt"));
+    assert.ok(ember.samples.some((s) => s.surface === "plastic"));
+    assert.ok(ember.samples.filter((s) => s.surface === "dirt").length > ember.samples.length * 0.4);
+    assert.ok(storm.samples.some((s) => s.surface === "plastic"));
+    assert.ok(storm.samples.some((s) => s.surface === "ice"));
+    assert.ok(storm.samples.some((s) => s.surface === "tech"));
+    assert.ok(storm.samples.filter((s) => s.surface === "plastic").length > storm.samples.length * 0.3);
   });
 });
 
@@ -229,12 +240,111 @@ describe("Black Hollow", () => {
   it("lists Red Mesa and Black Hollow after Arc Yard without rewriting the first five", () => {
     const ids = allTrackDefs().map((t) => t.id);
     assert.deepEqual(ids.slice(0, 7), ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"]);
-    assert.equal(ids[7], "custom");
+    assert.equal(ids[7], "ember");
+    assert.equal(ids[8], "storm");
+    assert.equal(ids[9], "custom");
     assert.equal(TRACK_DEFS.yard.name, "Arc Yard");
     assert.equal(TRACK_DEFS.yard.env, "works");
     assert.equal(TRACK_DEFS.helix.env, "night");
     assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
     assert.equal(TRACK_DEFS.mesa.env, "mesa");
     assert.equal(TRACK_DEFS.hollow.env, "grove");
+  });
+});
+
+describe("Ember Caldera", () => {
+  it("compiles a closed ember ribbon with checkpoints and boosts", () => {
+    const def = TRACK_DEFS.ember;
+    assert.equal(def.name, "Ember Caldera");
+    assert.equal(def.env, "ember");
+    assert.equal(def.laps, 1);
+    assert.equal(def.closed, true);
+    assert.ok(def.thumb.includes("ember"));
+
+    const track = getTrack("ember");
+    assert.ok(track.samples.length > 80, `samples ${track.samples.length}`);
+    assert.ok(track.length > 800 && track.length < 1600, `length ${track.length}`);
+    assert.ok(track.checkpoints.length >= 3, `cps ${track.checkpoints.join(",")}`);
+    assert.ok(track.boosts.length >= 2, `boosts ${track.boosts.join(",")}`);
+    for (let i = 1; i < track.checkpoints.length; i++) {
+      assert.ok(track.checkpoints[i]! > track.checkpoints[i - 1]!, "checkpoints advance");
+    }
+    const first = track.samples[0]!;
+    const last = track.samples[track.samples.length - 1]!;
+    const seam = Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z);
+    assert.ok(seam < 18, `close seam ${seam}`);
+  });
+
+  it("has a rising medal ladder and ghost-ready save key", () => {
+    const m = TRACK_DEFS.ember.medals;
+    assert.ok(m.author < m.gold && m.gold < m.silver && m.silver < m.bronze);
+    assert.equal(medalFor("ember", m.author), "author");
+    assert.equal(medalFor("ember", m.gold), "gold");
+    assert.equal(medalFor("ember", m.silver), "silver");
+    assert.equal(medalFor("ember", m.bronze), "bronze");
+    assert.equal(medalFor("ember", m.bronze + 1), null);
+    const pace = medalPace("ember", 0);
+    assert.equal(pace.holding, "author");
+    assert.ok((pace.remain ?? 0) > 0);
+  });
+
+  it("stores an Ember Caldera ghost on the same save shape as the other tracks", () => {
+    const ghost = [
+      { t: 0, s: 6, n: 0, heading: 0 },
+      { t: 400, s: 18, n: 0.1, heading: 0 },
+    ];
+    const save = { version: 1 as const, best: { ember: 34_000 }, ghosts: { ember: ghost } };
+    assert.equal(save.best.ember, 34_000);
+    assert.equal(save.ghosts.ember?.length, 2);
+    assert.equal(medalFor("ember", save.best.ember), "gold");
+  });
+});
+
+describe("Storm Dock", () => {
+  it("compiles a closed storm ribbon with checkpoints and boosts", () => {
+    const def = TRACK_DEFS.storm;
+    assert.equal(def.name, "Storm Dock");
+    assert.equal(def.env, "storm");
+    assert.equal(def.laps, 1);
+    assert.equal(def.closed, true);
+    assert.ok(def.thumb.includes("storm"));
+
+    const track = getTrack("storm");
+    assert.ok(track.samples.length > 80, `samples ${track.samples.length}`);
+    assert.ok(track.length > 800 && track.length < 1600, `length ${track.length}`);
+    assert.ok(track.checkpoints.length >= 3, `cps ${track.checkpoints.join(",")}`);
+    assert.ok(track.boosts.length >= 2, `boosts ${track.boosts.join(",")}`);
+    for (let i = 1; i < track.checkpoints.length; i++) {
+      assert.ok(track.checkpoints[i]! > track.checkpoints[i - 1]!, "checkpoints advance");
+    }
+    const first = track.samples[0]!;
+    const last = track.samples[track.samples.length - 1]!;
+    const seam = Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z);
+    assert.ok(seam < 18, `close seam ${seam}`);
+  });
+
+  it("has a rising medal ladder and ghost-ready save key", () => {
+    const m = TRACK_DEFS.storm.medals;
+    assert.ok(m.author < m.gold && m.gold < m.silver && m.silver < m.bronze);
+    assert.equal(medalFor("storm", m.author), "author");
+    assert.equal(medalFor("storm", m.gold), "gold");
+    assert.equal(medalFor("storm", m.silver), "silver");
+    assert.equal(medalFor("storm", m.bronze), "bronze");
+    assert.equal(medalFor("storm", m.bronze + 1), null);
+    const pace = medalPace("storm", 0);
+    assert.equal(pace.holding, "author");
+    assert.ok((pace.remain ?? 0) > 0);
+  });
+
+  it("lists Ember Caldera and Storm Dock after Black Hollow without rewriting the first seven", () => {
+    const ids = allTrackDefs().map((t) => t.id);
+    assert.deepEqual(ids.slice(0, 9), ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow", "ember", "storm"]);
+    assert.equal(ids[9], "custom");
+    assert.equal(TRACK_DEFS.hollow.name, "Black Hollow");
+    assert.equal(TRACK_DEFS.hollow.env, "grove");
+    assert.equal(TRACK_DEFS.helix.env, "night");
+    assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
+    assert.equal(TRACK_DEFS.ember.env, "ember");
+    assert.equal(TRACK_DEFS.storm.env, "storm");
   });
 });

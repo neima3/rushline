@@ -65,6 +65,18 @@ describe("look polish 3 presentation locks", () => {
     assert.deepEqual(fogWindow("night", { fogNearMul: 0.4, fogFarMul: 0.4 }), NIGHT_FOG);
   });
 
+  it("gives ember dusk and storm rain their own grades without rewriting Circuit or Helix", () => {
+    assert.equal(GRADE.ember.tint, 0xffd8b0);
+    assert.ok(GRADE.ember.saturation > GRADE.stadium.saturation);
+    assert.equal(GRADE.storm.tint, 0xc8dcec);
+    assert.ok(GRADE.storm.vignette > GRADE.stadium.vignette);
+    assert.ok(GRADE.storm.saturation < GRADE.stadium.saturation);
+    assert.ok(SKY_LOOK.ember.haze > SKY_LOOK.stadium.haze);
+    assert.ok(SKY_LOOK.storm.haze > SKY_LOOK.night.haze);
+    assert.equal(themeLightLevels("stadium", QUALITY_PRESETS.high).sun, CIRCUIT_HIGH_LOCK.sun);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.4, fogFarMul: 0.4 }), NIGHT_FOG);
+  });
+
   it("keeps car paint in a clearcoat / low-roughness range", () => {
     assert.ok(CAR_PAINT.clearcoat >= 0.9);
     assert.ok(CAR_PAINT.clearcoatRoughness <= 0.06);

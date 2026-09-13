@@ -36,8 +36,8 @@ export type CupProgress = {
 export const CUP_ORDER: CupId[] = ["gold", "author"];
 
 export const CUP_META: Record<CupId, { name: string; blurb: string }> = {
-  gold: { name: "Gold Cup", blurb: "Gold or better on every circuit. Seven events, in order." },
-  author: { name: "Author Cup", blurb: "Author times on the same seven. Unlocks after Gold Cup." },
+  gold: { name: "Gold Cup", blurb: "Gold or better on every circuit. Nine events, in order." },
+  author: { name: "Author Cup", blurb: "Author times on the same nine. Unlocks after Gold Cup." },
 };
 
 const RANK: Record<Medal, number> = {

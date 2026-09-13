@@ -23,6 +23,8 @@ export const TRACK_ENV_LABEL: Record<ThemeId, string> = {
   works: "Works",
   mesa: "Mesa",
   grove: "Grove",
+  ember: "Ember",
+  storm: "Storm",
 };
 
 export const MEDAL_LABEL: Record<Medal, string> = {

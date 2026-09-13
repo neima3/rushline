@@ -90,19 +90,21 @@ describe("custom mesh + menu slot", () => {
     assert.ok(seam < 18, `seam ${seam}`);
   });
 
-  it("lists Custom after the seven stock tracks and keeps Cup on stock only", () => {
+  it("lists Custom after the nine stock tracks and keeps Cup on stock only", () => {
     const ids = allTrackDefs().map((t) => t.id);
-    assert.deepEqual(ids.slice(0, 7), [...TRACK_ORDER]);
-    assert.equal(ids[7], "custom");
+    assert.deepEqual(ids.slice(0, 9), [...TRACK_ORDER]);
+    assert.equal(ids[9], "custom");
     assert.deepEqual(PLAYABLE_ORDER, [...TRACK_ORDER, "custom"]);
     assert.ok(!TRACK_ORDER.includes("custom" as never));
-    assert.equal(CUP_EVENTS.gold.length, 7);
-    assert.equal(CUP_EVENTS.author.length, 7);
+    assert.equal(CUP_EVENTS.gold.length, 9);
+    assert.equal(CUP_EVENTS.author.length, 9);
     assert.ok(CUP_EVENTS.gold.every((e) => e.trackId !== "custom"));
     assert.equal(getTrackDef("custom").id, "custom");
     assert.equal(TRACK_DEFS.circuit.name, "Green Circuit");
     assert.equal(TRACK_DEFS.hollow.name, "Black Hollow");
+    assert.equal(TRACK_DEFS.ember.name, "Ember Caldera");
+    assert.equal(TRACK_DEFS.storm.name, "Storm Dock");
     assert.equal(nextTrackId("custom"), "circuit");
-    assert.equal(nextTrackId("hollow"), "circuit");
+    assert.equal(nextTrackId("storm"), "circuit");
   });
 });

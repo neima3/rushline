@@ -77,7 +77,7 @@ export function EditorScreen({ ready, onBack, onPreview, onSave, onDrive }: Prop
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Track editor lite</p>
           <h1 className="font-display text-5xl leading-none tracking-tight">Custom ribbon</h1>
           <p className="mt-2 max-w-sm text-pretty text-sm text-muted">
-            Closed Catmull-Rom loop. Place a few points, check the mesh, then drive it. Time trial only — Cup stays on the stock seven.
+            Closed Catmull-Rom loop. Place a few points, check the mesh, then drive it. Time trial only — Cup stays on the stock nine.
           </p>
         </header>
 

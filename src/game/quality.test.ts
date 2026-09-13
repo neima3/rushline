@@ -158,6 +158,24 @@ describe("quality presets", () => {
     assert.ok(groveFog.near < NIGHT_FOG.near);
     assert.ok(groveFog.far < NIGHT_FOG.far);
     assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5 }), NIGHT_FOG);
+
+    const ember = themeLightLevels("ember", QUALITY_PRESETS.high);
+    assert.notEqual(ember.sun, high.sun);
+    assert.notEqual(ember.exposure, helix.exposure);
+    assert.ok(ember.bloomMul < 0.5);
+    const emberFog = fogWindow("ember");
+    assert.ok(emberFog.near !== NIGHT_FOG.near);
+    assert.ok(emberFog.far !== NIGHT_FOG.far);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5 }), NIGHT_FOG);
+
+    const storm = themeLightLevels("storm", QUALITY_PRESETS.high);
+    assert.notEqual(storm.sun, helix.sun);
+    assert.notEqual(storm.hemi, helix.hemi);
+    assert.ok(storm.exposure < helix.exposure);
+    const stormFog = fogWindow("storm");
+    assert.ok(stormFog.near < NIGHT_FOG.near);
+    assert.ok(stormFog.far < NIGHT_FOG.far);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5 }), NIGHT_FOG);
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {

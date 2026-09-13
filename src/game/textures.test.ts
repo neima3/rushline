@@ -46,6 +46,8 @@ describe("track look tokens", () => {
     assert.equal(themeDefaultSurface("works"), "tech");
     assert.equal(themeDefaultSurface("mesa"), "dirt");
     assert.equal(themeDefaultSurface("grove"), "dirt");
+    assert.equal(themeDefaultSurface("ember"), "dirt");
+    assert.equal(themeDefaultSurface("storm"), "plastic");
     const plastic = roadSurfaceTint("stadium", "plastic");
     assert.equal(plastic.r, ROAD_TINT.stadium.r);
     assert.equal(plastic.g, ROAD_TINT.stadium.g);
@@ -76,6 +78,26 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.grove.g > ROAD_TINT.grove.r);
     assert.ok(ROAD_TINT.night.b > ROAD_TINT.night.r);
     const crown = roadCrown("grove");
+    assert.ok(crown.edge > crown.mid);
+  });
+
+  it("keeps ember lava warmer than Mesa without matching Ridge dusk", () => {
+    const [r, g, b] = ASPHALT_BASE.ember;
+    assert.ok(r > g && g > b, `ember base should read lava ${r},${g},${b}`);
+    assert.ok(ASPHALT_BASE.ember[0] > ASPHALT_BASE.canyon[0]);
+    assert.ok(ROAD_TINT.ember.r > ROAD_TINT.canyon.r);
+    assert.ok(ROAD_TINT.ember.r < ROAD_TINT.stadium.r);
+    const crown = roadCrown("ember");
+    assert.ok(crown.edge > crown.mid);
+  });
+
+  it("keeps storm asphalt cooler and wetter than Circuit without rewriting Helix", () => {
+    const [r, g, b] = ASPHALT_BASE.storm;
+    assert.ok(b > r && b >= g, `storm base should read wet ${r},${g},${b}`);
+    assert.ok(ASPHALT_BASE.storm[2] < ASPHALT_BASE.night[2] + 20);
+    assert.ok(ROAD_TINT.storm.b > ROAD_TINT.storm.r);
+    assert.ok(ROAD_TINT.night.b > ROAD_TINT.night.r);
+    const crown = roadCrown("storm");
     assert.ok(crown.edge > crown.mid);
   });
 });

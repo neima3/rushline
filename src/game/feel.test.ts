@@ -319,6 +319,8 @@ describe("surface grip types", () => {
     assert.equal(defaultSurface("yard"), "tech");
     assert.equal(defaultSurface("mesa"), "dirt");
     assert.equal(defaultSurface("hollow"), "dirt");
+    assert.equal(defaultSurface("ember"), "dirt");
+    assert.equal(defaultSurface("storm"), "plastic");
   });
 
   it("lets ice commit a slide with less steer than plastic", () => {
