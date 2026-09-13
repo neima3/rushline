@@ -50,10 +50,10 @@ export type SurfaceFeel = {
 };
 
 const SURFACE_FEEL: Record<SurfaceKind, SurfaceFeel> = {
-  plastic: { grip: 1, slideEntry: 1, accel: 1, brake: 0.97, drag: 1, turn: 1.03, yaw: 1.05 },
-  dirt: { grip: 0.62, slideEntry: 0.5, accel: 0.8, brake: 0.74, drag: 1.24, turn: 1.14, yaw: 1.2 },
+  plastic: { grip: 1, slideEntry: 1, accel: 1, brake: 0.97, drag: 1, turn: 1.06, yaw: 1.04 },
+  dirt: { grip: 0.62, slideEntry: 0.5, accel: 0.8, brake: 0.74, drag: 1.24, turn: 1.16, yaw: 1.24 },
   ice: { grip: 0.34, slideEntry: 0.32, accel: 0.88, brake: 0.46, drag: 0.76, turn: 1.28, yaw: 1.42 },
-  tech: { grip: 1.1, slideEntry: 1.14, accel: 1.04, brake: 1.06, drag: 0.94, turn: 0.94, yaw: 0.92 },
+  tech: { grip: 1.1, slideEntry: 1.14, accel: 1.04, brake: 1.06, drag: 0.94, turn: 0.92, yaw: 0.9 },
 };
 
 export function defaultSurface(id: TrackId): SurfaceKind {
@@ -95,16 +95,16 @@ export function shapeTouchSteer(raw: number): number {
   const a = Math.abs(x);
   if (a <= TOUCH_STEER_DEADZONE) return 0;
   const t = (a - TOUCH_STEER_DEADZONE) / (1 - TOUCH_STEER_DEADZONE);
-  const shaped = t * t * 0.18 + t * 0.82;
+  const shaped = t * t * 0.08 + t * 0.92;
   return Math.sign(x) * clamp(shaped, 0, 1);
 }
 
-/** Shared steer curve. Deadzone kept; mid-lock a hair more linear. */
+/** Shared steer curve. Deadzone kept; mid-lock nearly linear so WASD/pad bite. */
 export function steerCurve(x: number) {
   const s = Math.sign(x);
   const a = Math.abs(x);
   if (a < 0.06) return 0;
-  return s * (a * a * 0.22 + a * 0.78);
+  return s * (a * a * 0.1 + a * 0.9);
 }
 
 /**
@@ -184,12 +184,17 @@ export function driftSteerThreshold(slideHeld: boolean): number {
 /** After a plant, bleed steer so the nose does not flick off the ribbon. */
 export function landSteerScale(landLock: number): number {
   if (landLock <= 0) return 1;
-  return 0.52 + 0.48 * (1 - Math.min(1, landLock / 0.2));
+  return 0.62 + 0.38 * (1 - Math.min(1, landLock / 0.2));
 }
 
-/** Air yaw — a bit more than ground so you can line up Ridge / Helix landings. */
+/** Air yaw — enough to line Ridge / Helix / Ember drops without hover-steer. */
 export function airTurnRate(): number {
-  return 2.12;
+  return 2.48;
+}
+
+/** Side slip while air-steering so a lined drop actually moves onto the ribbon. */
+export function airLatRate(): number {
+  return 3.35;
 }
 
 /** Trackmania-style air pitch: throttle dives, brake lifts. */
@@ -214,7 +219,18 @@ export function canLandWindow(): { min: number; max: number } {
 
 export function landLockTime(impact: number, magnet: boolean): number {
   if (magnet) return 0.16;
-  return 0.15 + Math.min(0.08, Math.max(0, impact) * 0.006);
+  return 0.13 + Math.min(0.1, Math.max(0, impact) * 0.007);
+}
+
+/**
+ * Landing heading mix. Idle air → plant to velocity (consistent Ridge/Helix
+ * drops). Active air-steer keeps more of the aimed nose.
+ */
+export function landHeadingMix(airSteerAbs: number, magnet: boolean): { keep: number; fromVel: number } {
+  if (magnet) return { keep: 0.72, fromVel: 0 };
+  const a = clamp(airSteerAbs, 0, 1);
+  const keep = 0.28 + a * 0.32;
+  return { keep, fromVel: 1 - keep };
 }
 
 export function boostPadPunch(): number {
@@ -328,13 +344,15 @@ export function blendHold(speed: number, trip: number, cruise: number, hold: num
 }
 
 /**
- * Digital WASD is a switch — apply immediately. Analog (touch / pad) eases
- * so a thumb twitch is not full lock, but still reaches target in ~4 frames.
+ * Digital WASD / D-pad is a switch — apply immediately. Analog (touch / stick)
+ * eases on so a twitch is not full lock, then snaps back faster than it locks
+ * so release is not mush.
  */
 export function steerFilter(prev: number, target: number, dt: number, analog: boolean): number {
   const goal = clamp(target, -1, 1);
   if (!analog) return goal;
-  const rate = 16.5;
+  const releasing = Math.abs(goal) < Math.abs(prev) - 0.02;
+  const rate = releasing ? 26 : 21;
   return prev + (goal - prev) * Math.min(1, rate * Math.max(0, dt));
 }
 
@@ -342,8 +360,17 @@ export function steerFilter(prev: number, target: number, dt: number, analog: bo
 export function steerBite(steerAbs: number): number {
   const a = Math.abs(steerAbs);
   if (a < 0.06) return 1;
-  if (a < 0.38) return 1.2 - a * 0.32;
+  if (a < 0.38) return 1.26 - a * 0.38;
   return 1.04;
+}
+
+/**
+ * How much heading-return applies while you are steering. Full lock kills the
+ * mushy fight so a committed WASD/stick turn is the turn you asked for.
+ */
+export function steerHoldAlign(steerAbs: number, drifting: boolean): number {
+  if (drifting) return 1;
+  return Math.max(0, 1 - Math.abs(steerAbs) * 1.35);
 }
 
 /**
@@ -369,25 +396,50 @@ export function slideYawLimit(drifting: boolean, slideHeld: boolean, yawScale = 
 }
 
 /** Catch the slide on release — snap back to grip instead of sticky mush. */
-export function slideReleaseSnap(exiting: boolean, steerAbs: number): number {
+export function slideReleaseSnap(exiting: boolean, steerAbs: number, grip = 1): number {
   if (!exiting) return 0;
-  return steerAbs < 0.14 ? 7.4 : 2.6;
+  const straight = steerAbs < 0.14;
+  const base = straight ? 7.4 : 2.6;
+  // Tech (high grip) plants harder; ice stays loose unless you straighten.
+  const scale = straight ? 0.55 + grip * 0.45 : 0.38 + grip * 0.62;
+  return base * scale;
+}
+
+/**
+ * TM countersteer: opposite lock while sliding tightens the line.
+ * Same-sign lock adds a little more angle.
+ */
+export function slideSteerMul(steer: number, heading: number, drifting: boolean): number {
+  if (!drifting || Math.abs(steer) < 0.1 || Math.abs(heading) < 0.06) return 1;
+  if (Math.sign(steer) === Math.sign(heading)) return 1.08;
+  return 0.84;
+}
+
+/** Extra heading catch when you countersteer out of a committed slide. */
+export function slideCounterAlign(steer: number, heading: number, drifting: boolean): number {
+  if (!drifting || Math.abs(steer) < 0.1 || Math.abs(heading) < 0.06) return 0;
+  if (Math.sign(steer) !== -Math.sign(heading)) return 0;
+  return 3.1 * Math.abs(steer);
+}
+
+export function slideExitHold(): number {
+  return 0.12;
 }
 
 /** Residual air yaw dies when you let go — line the drop, don't hover. */
 export function airYawSettle(steerAbs: number, airTime: number): number {
   if (steerAbs > 0.1) return 0;
-  return airTime > 0.7 ? 2.9 : 1.55;
+  return airTime > 0.7 ? 3.2 : 1.85;
 }
 
 /**
  * Extra gravity when high above the ribbon and falling toward it.
- * Rewards a lined Ridge / Helix drop without adding hover thrust.
+ * Rewards a lined Ridge / Helix / Ember drop without adding hover thrust.
  */
 export function airRibbonPull(height: number, into: number, airTime: number): number {
   if (airTime < 0.1 || height < 1.35) return 0;
   if (into > 1.2) return 0;
-  return clamp((height - 1.35) * 3.2, 0, 7.5);
+  return clamp((height - 1.35) * 3.6, 0, 8.2);
 }
 
 export type GhostSample = { t: number; s: number };

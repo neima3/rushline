@@ -256,7 +256,8 @@ export class Input {
     const now = this.nowMs();
     const dt = this.lastSampleAt ? Math.min(0.05, (now - this.lastSampleAt) / 1000) : 1 / 60;
     this.lastSampleAt = now;
-    const analog = Math.abs(this.touchSteer) > 0.02 || Boolean(gp && Math.abs(gp.steer) > 0.08);
+    const analog =
+      Math.abs(this.touchSteer) > 0.02 || Boolean(gp && Math.abs(gp.steer) > 0.08 && gp.dpadX === 0);
     steer = steerFilter(this.filtSteer, steer, dt, analog);
     this.filtSteer = steer;
 

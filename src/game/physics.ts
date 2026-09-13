@@ -4,6 +4,7 @@ import type { Actions, BuiltTrack, CarSnap, SurfaceKind } from "./types";
 import type { RewindCar } from "./rewind";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
+  airLatRate,
   airPitchAccel,
   airRibbonPull,
   airTurnRate,
@@ -14,6 +15,7 @@ import {
   curbSnap,
   defaultSurface,
   headingReturn,
+  landHeadingMix,
   landLockTime,
   landSpeedKeep,
   landSteerScale,
@@ -22,11 +24,15 @@ import {
   openingLandLock,
   plantLateral,
   slideCommitted,
+  slideCounterAlign,
+  slideExitHold,
   slideReleaseSnap,
+  slideSteerMul,
   slideYawLimit,
   stayPlanted,
   steerBite,
   steerCurve,
+  steerHoldAlign,
   surfaceFeel,
 } from "./feel.ts";
 
@@ -38,8 +44,8 @@ const MAX_BOOST = 56;
 const MAX_REV = 14;
 const DRAG = 0.26;
 const COAST = 0.74;
-const TURN = 2.68;
-const DRIFT_TURN = 3.05;
+const TURN = 2.92;
+const DRIFT_TURN = 3.22;
 const RIDE = 0.38;
 const GRAVITY = 30;
 const FIXED = 1 / 60;
@@ -100,7 +106,9 @@ export class CarSim {
   trackAssist: TrackAssist = "medium";
   private wasSlide = false;
   private slideLatched = false;
+  private slideExit = 0;
   private airTime = 0;
+  private airSteer = 0;
   private landLock = 0;
   private airBlend = 0;
   private recoverLock = 0;
@@ -135,7 +143,9 @@ export class CarSim {
     this.skipInterp = true;
     this.wasSlide = false;
     this.slideLatched = false;
+    this.slideExit = 0;
     this.airTime = 0;
+    this.airSteer = 0;
     this.landLock = openingLandLock(track.def.id, this.trackAssist);
     this.airBlend = 0;
     this.recoverLock = 0;
@@ -168,8 +178,10 @@ export class CarSim {
     this.justRespawn = true;
     this.wasSlide = false;
     this.slideLatched = false;
+    this.slideExit = 0;
     this.skipInterp = true;
     this.airTime = 0;
+    this.airSteer = 0;
     this.landLock = 0;
     this.airBlend = 0;
     this.recoverLock = 0.85;
@@ -278,6 +290,7 @@ export class CarSim {
     this.justRespawn = false;
     this.wallHit = Math.max(0, this.wallHit - dt);
     this.landLock = Math.max(0, this.landLock - dt);
+    this.slideExit = Math.max(0, this.slideExit - dt);
     this.recoverLock = Math.max(0, this.recoverLock - dt);
     const prevS = this.s;
 
@@ -340,7 +353,7 @@ export class CarSim {
     const speedAbs = Math.abs(this.speed);
     const speedNorm = Math.min(1, speedAbs / MAX_SPEED);
     const spdF = THREE.MathUtils.smoothstep(speedAbs, 0.35, 5.5);
-    const speedSteer = 1 - 0.18 * speedNorm;
+    const speedSteer = 1 - 0.12 * speedNorm;
     const reverse = this.speed >= 0 ? 1 : -1;
     const steer = steerCurve(actions.steer);
     const steerAbs = Math.abs(steer);
@@ -350,7 +363,10 @@ export class CarSim {
 
     if (this.wasSlide && !slideHeld) {
       this.releaseTurbo();
-      const snapOut = slideReleaseSnap(true, steerAbs);
+      this.slideExit = slideExitHold();
+    }
+    if (this.slideExit > 0 && !drifting) {
+      const snapOut = slideReleaseSnap(true, steerAbs, feel.grip);
       if (snapOut) this.heading *= 1 - snapOut * dt;
     }
     if (drifting) {
@@ -364,6 +380,7 @@ export class CarSim {
     let turn = (drifting ? DRIFT_TURN : TURN) * spdF * speedSteer * feel.turn;
     if (slideHeld && !drifting) turn *= 1.08;
     if (drifting) turn *= 1 + this.driftCharge * 0.05;
+    turn *= slideSteerMul(steer, this.heading, drifting);
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
     turn *= landSteerScale(this.landLock);
     turn *= steerBite(steerAbs);
@@ -372,7 +389,9 @@ export class CarSim {
     if (bleed) this.heading *= 1 - bleed * dt;
 
     const align = headingReturn(steerAbs, drifting, this.trackAssist) * feel.grip;
-    this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
+    this.heading *= 1 - align * dt * steerHoldAlign(steerAbs, drifting);
+    const counter = slideCounterAlign(steer, this.heading, drifting);
+    if (counter) this.heading *= 1 - counter * dt;
     const maxYaw = slideYawLimit(drifting, slideHeld, feel.yaw);
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
@@ -483,12 +502,13 @@ export class CarSim {
     this.airTime += dt;
     const airTurn = airTurnRate();
     const steer = steerCurve(actions.steer);
+    this.airSteer = Math.abs(steer);
     this.heading += steer * airTurn * dt;
     const settle = airYawSettle(Math.abs(steer), this.airTime);
     if (settle > 0) this.heading *= 1 - settle * dt;
     this.heading = clamp(this.heading, -0.7, 0.7);
 
-    const yaw = steer * airTurn * 0.62 * dt;
+    const yaw = steer * airTurn * 0.68 * dt;
     if (Math.abs(yaw) > 1e-5) {
       const c = Math.cos(yaw);
       const s = Math.sin(yaw);
@@ -530,6 +550,12 @@ export class CarSim {
       const L = track.length;
       if (this.s >= L) this.s -= L;
       if (this.s < 0) this.s += L;
+    }
+    if (Math.abs(steer) > 0.08) {
+      const airLat = steer * airLatRate() * dt;
+      this.px += near.rx * airLat;
+      this.py += near.ry * airLat;
+      this.pz += near.rz * airLat;
     }
 
     const upright = near.uy > 0.35;
@@ -636,16 +662,18 @@ export class CarSim {
     const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
     const vr = this.vx * near.rx + this.vy * near.ry + this.vz * near.rz;
     const keep = landSpeedKeep(impact, magnet);
+    const mix = landHeadingMix(this.airSteer, magnet);
     if (magnet) {
       this.speed = clamp(vt * keep, -MAX_REV, MAX_SPEED);
-      this.heading = clamp(this.heading * 0.72, -0.42, 0.42);
+      this.heading = clamp(this.heading * mix.keep, -0.42, 0.42);
       this.skipInterp = true;
     } else {
       this.speed = Math.hypot(vt, vr) * Math.sign(vt || 1) * keep;
       const fromVel = Math.atan2(-vr, Math.max(0.18, Math.abs(vt)) * Math.sign(vt || 1));
-      this.heading = clamp(this.heading * 0.35 + fromVel * 0.65, -0.62, 0.62);
+      this.heading = clamp(this.heading * mix.keep + fromVel * mix.fromVel, -0.62, 0.62);
       this.skipInterp = impact > 14;
     }
+    this.airSteer = 0;
     this.place(track);
   }
 

@@ -54,6 +54,7 @@ describe("gamepad deadzones", () => {
   it("keeps a gentle steer curve", () => {
     assert.equal(steerCurvePad(0), 0);
     assert.ok(Math.abs(steerCurvePad(0.5)) < 0.5);
+    assert.ok(Math.abs(steerCurvePad(0.5)) > 0.38, "mid-stick must not stay mushy");
     assert.ok(Math.abs(steerCurvePad(-1)) > 0.98);
   });
 });

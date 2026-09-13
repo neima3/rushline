@@ -58,7 +58,7 @@ export function steerCurvePad(x: number) {
   const s = Math.sign(x);
   const a = Math.abs(x);
   if (a < 0.02) return 0;
-  return s * Math.pow(a, 1.35);
+  return s * Math.pow(a, 1.16);
 }
 
 export function remapTrigger(raw: number, dz = PAD_TRIGGER_DEADZONE, max = PAD_TRIGGER_MAX) {

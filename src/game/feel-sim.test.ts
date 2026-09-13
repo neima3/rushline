@@ -150,6 +150,46 @@ describe("mobile feel sims", () => {
     assert.ok(Math.abs(car.heading) < held * 0.45, `exit still mushy ${car.heading} vs ${held}`);
   });
 
+  it("rewards countersteer to tighten a committed slide", () => {
+    const circuit = getTrack("circuit");
+    const setup = () => {
+      const car = new CarSim();
+      car.reset(circuit);
+      car.s = 80;
+      car.n = 0;
+      car.speed = 22;
+      car.heading = 0.48;
+      car.step(circuit, { ...cruise, steer: 1, slide: 1 }, 1 / 60);
+      return car;
+    };
+    const hold = setup();
+    const counter = setup();
+    for (let i = 0; i < 16; i++) {
+      hold.step(circuit, { ...cruise, steer: 1, slide: 1 }, 1 / 60);
+      counter.step(circuit, { ...cruise, steer: -1, slide: 1 }, 1 / 60);
+    }
+    assert.ok(Math.abs(counter.heading) < Math.abs(hold.heading) * 0.86, `counter ${counter.heading} vs hold ${hold.heading}`);
+  });
+
+  it("exits a tech slide harder than ice from the same yaw", () => {
+    const yard = getTrack("yard");
+    const summit = getTrack("summit");
+    const run = (track: ReturnType<typeof getTrack>) => {
+      const car = new CarSim();
+      car.reset(track);
+      car.s = 36;
+      car.n = 0;
+      car.speed = 20;
+      car.heading = 0.55;
+      car.step(track, { ...cruise, steer: 1, slide: 1 }, 1 / 60);
+      for (let i = 0; i < 10; i++) car.step(track, { ...cruise, steer: 0, slide: 0 }, 1 / 60);
+      return Math.abs(car.heading);
+    };
+    const techExit = run(yard);
+    const iceExit = run(summit);
+    assert.ok(techExit < iceExit * 0.92, `tech ${techExit} should plant harder than ice ${iceExit}`);
+  });
+
   it("air settle damps residual yaw and ribbon-pull is extra gravity, not hover", () => {
     const canyon = getTrack("canyon");
     const car = new CarSim();
@@ -253,6 +293,49 @@ describe("mobile feel sims", () => {
     assert.ok(landSpeed > 18, `kept speed ${landSpeed}`);
     assert.equal(landPulse, true);
     assert.ok(Math.abs(car.n) < sm.width * 0.45, `n ${car.n}`);
+  });
+
+  it("plants Helix, Mesa, and Ember short drops with speed and a centered n", () => {
+    for (const id of ["helix", "mesa", "ember"] as const) {
+      const track = getTrack(id);
+      const car = new CarSim();
+      car.reset(track);
+      let sm = sampleAt(track, id === "helix" ? 24 : 80);
+      if (id === "helix") {
+        for (const s of [24, 36, 128, 20]) {
+          const cand = sampleAt(track, s);
+          if (cand.uy > 0.9 && !helixNearGate(track, cand.s)) {
+            sm = cand;
+            break;
+          }
+        }
+      }
+      car.s = sm.s;
+      car.n = 0;
+      car.airborne = true;
+      car.px = sm.x + sm.ux * 1.7;
+      car.py = sm.y + sm.uy * 1.7;
+      car.pz = sm.z + sm.uz * 1.7;
+      car.vx = sm.tx * 24;
+      car.vy = sm.ty * 24 - 2;
+      car.vz = sm.tz * 24;
+      car.fx = sm.tx;
+      car.fy = sm.ty;
+      car.fz = sm.tz;
+      let landed = false;
+      let landSpeed = 0;
+      for (let i = 0; i < 90; i++) {
+        car.step(track, cruise, 1 / 60);
+        if (!car.airborne) {
+          landed = true;
+          landSpeed = car.speed;
+          break;
+        }
+      }
+      assert.equal(landed, true, `${id} should plant back on the ribbon`);
+      assert.ok(landSpeed > 18, `${id} kept speed ${landSpeed}`);
+      assert.ok(Math.abs(car.n) < sm.width * 0.45, `${id} n ${car.n}`);
+    }
   });
 
   it("does not rubber-band a 1.8m hover in one step", () => {
