@@ -11,13 +11,14 @@ import {
   ghostFilename,
   ghostHudTag,
   importGhostFromText,
+  isTrackId,
   packTape,
   parseGhostText,
   parseShare,
   pickExportGhost,
 } from "./ghost-share.ts";
 import { LAST_KEY, SAVE_KEY, commitRun, memoryIo, parseSave } from "./persist.ts";
-import type { GhostFrame } from "./types.ts";
+import { TRACK_ORDER, type GhostFrame } from "./types.ts";
 
 function rec(n = 40, step = 40): GhostFrame[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -89,6 +90,22 @@ describe("ghost file encode/decode", () => {
     assert.equal(ghostHudTag("import"), "RIVAL");
     assert.equal(ghostHudTag("pb"), "GHOST");
   });
+
+  it("accepts Red Mesa and Black Hollow keys from the seven-track campaign", () => {
+    assert.deepEqual(TRACK_ORDER.slice(-2), ["mesa", "hollow"]);
+    assert.equal(isTrackId("mesa"), true);
+    assert.equal(isTrackId("hollow"), true);
+    assert.equal(isTrackId("red-mesa"), false);
+    for (const trackId of ["mesa", "hollow"] as const) {
+      const file = encodeGhostFile({ trackId, time: 36_000, source: "last", frames: rec(20) });
+      assert.equal(file.trackId, trackId);
+      const decoded = decodeGhostFile(file);
+      assert.equal(decoded.ok, true);
+      if (!decoded.ok) continue;
+      assert.equal(decoded.file.trackId, trackId);
+      assert.equal(ghostFilename(file), `rushline-${trackId}-last-36000.json`);
+    }
+  });
 });
 
 describe("imported rival persist", () => {
@@ -122,6 +139,17 @@ describe("imported rival persist", () => {
     assert.equal(pickExportGhost("circuit", "import", io), null);
     assert.equal(clearImportedGhost("canyon", io), true);
     assert.equal(pickExportGhost("canyon", "import", io), null);
+  });
+
+  it("keeps Red Mesa and Black Hollow rivals on separate keys", () => {
+    const io = memoryIo();
+    assert.ok(commitImportedGhost("mesa", 40_000, rec(22), io));
+    assert.ok(commitImportedGhost("hollow", 29_000, rec(18), io));
+    assert.equal(pickExportGhost("mesa", "import", io)?.time, 40_000);
+    assert.equal(pickExportGhost("hollow", "import", io)?.time, 29_000);
+    assert.equal(clearImportedGhost("mesa", io), true);
+    assert.equal(pickExportGhost("mesa", "import", io), null);
+    assert.equal(pickExportGhost("hollow", "import", io)?.time, 29_000);
   });
 
   it("exports PB and last from the existing save keys", () => {
