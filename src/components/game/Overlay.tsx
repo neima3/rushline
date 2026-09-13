@@ -249,7 +249,7 @@ function Menu({
               onClick={onStart}
               className="h-12 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg transition-[transform,filter] duration-150 ease-out enabled:hover:brightness-95 enabled:active:scale-[0.98] disabled:opacity-50"
             >
-              Start
+              {ready ? "Start" : "Loading…"}
             </button>
             <button
               type="button"

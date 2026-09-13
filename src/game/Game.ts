@@ -71,6 +71,7 @@ export class Game {
   private unsubSettings: (() => void) | null = null;
   private frames = 0;
   private fpsAt = 0;
+  private tabHidden = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -101,6 +102,9 @@ export class Game {
 
     this.ro = new ResizeObserver(() => this.fit());
     this.ro.observe(canvas.parentElement || canvas);
+    window.visualViewport?.addEventListener("resize", this.onViewport);
+    window.addEventListener("orientationchange", this.onViewport);
+    document.addEventListener("visibilitychange", this.onVis);
     this.fit();
 
     window.__controlsTest = {
@@ -137,8 +141,39 @@ export class Game {
   private fit() {
     const parent = this.canvas.parentElement || this.canvas;
     const r = parent.getBoundingClientRect();
-    this.world.resize(Math.max(1, r.width), Math.max(1, r.height));
+    let w = Math.max(1, r.width);
+    let h = Math.max(1, r.height);
+    const vv = window.visualViewport;
+    if (vv && vv.width > 0 && vv.height > 0) {
+      w = Math.max(1, Math.min(w, vv.width));
+      h = Math.max(1, Math.min(h, vv.height));
+    }
+    this.world.resize(w, h);
   }
+
+  private onViewport = () => this.fit();
+
+  private onVis = () => {
+    if (document.hidden) {
+      this.tabHidden = true;
+      if (this.phase === "race") this.timeHold = this.time;
+      if (this.phase === "countdown") {
+        this.countdown = Math.max(0, countdownRemaining(this.countdownAt, performance.now(), COUNTDOWN_S));
+      }
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      return;
+    }
+    this.tabHidden = false;
+    const now = performance.now();
+    this.lastT = now;
+    this.fpsAt = now;
+    if (this.phase === "race") this.raceClockAt = now;
+    if (this.phase === "countdown") {
+      this.countdownAt = countdownPausedAt(now, this.countdown, COUNTDOWN_S);
+    }
+    if (this.running && this.raf === 0) this.raf = requestAnimationFrame(this.loop);
+  };
 
   setPhase(phase: Phase) {
     this.phase = phase;
@@ -324,6 +359,10 @@ export class Game {
 
   private loop = (now: number) => {
     if (!this.running) return;
+    if (this.tabHidden || document.hidden) {
+      this.raf = 0;
+      return;
+    }
     this.raf = requestAnimationFrame(this.loop);
     const rawDt = (now - this.lastT) / 1000;
     this.lastT = now;
@@ -471,7 +510,7 @@ export class Game {
     const attract = this.phase === "menu" || this.phase === "select";
     this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
     this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide);
-    this.world.render();
+    if (!this.world.contextLost) this.world.render();
 
     this.frames++;
     if (now - this.fpsAt > 400) {
@@ -634,9 +673,13 @@ export class Game {
   dispose() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+    this.raf = 0;
     this.unsubSettings?.();
     this.unsubSettings = null;
     this.ro.disconnect();
+    window.visualViewport?.removeEventListener("resize", this.onViewport);
+    window.removeEventListener("orientationchange", this.onViewport);
+    document.removeEventListener("visibilitychange", this.onVis);
     this.input.detach();
     this.audio.dispose();
     this.world.dispose();
@@ -644,6 +687,8 @@ export class Game {
     if (window.__controlsTest) delete window.__controlsTest;
   }
 }
+
+const _ghostAt = { s: 0, n: 0 };
 
 function ghostAt(frames: GhostFrame[] | null, time: number): { s: number; n: number } | null {
   if (!frames || frames.length < 2) return null;
@@ -653,5 +698,7 @@ function ghostAt(frames: GhostFrame[] | null, time: number): { s: number; n: num
   const b = frames[Math.min(frames.length - 1, i + 1)]!;
   const span = b.t - a.t || 1;
   const t = Math.max(0, Math.min(1, (time - a.t) / span));
-  return { s: a.s + (b.s - a.s) * t, n: a.n + (b.n - a.n) * t };
+  _ghostAt.s = a.s + (b.s - a.s) * t;
+  _ghostAt.n = a.n + (b.n - a.n) * t;
+  return _ghostAt;
 }
