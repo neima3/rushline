@@ -28,7 +28,7 @@ import {
   type RunCommit,
 } from "./persist";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix"];
+export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit"];
 export { SAVE_KEY, LAST_KEY, commitRun };
 export type { RunCommit };
 

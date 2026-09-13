@@ -189,6 +189,17 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "/textures/sky-night.jpg",
     skyTint: 0xe6dcff,
   },
+  alpine: {
+    fog: 0xc4d6e6,
+    ground: 0xd8e4ee,
+    hemiSky: 0xd8eaf8,
+    hemiGround: 0xb0c0cc,
+    sun: 0xfff2dc,
+    sunPos: [62, 48, 88],
+    exposure: 0.96,
+    sky: "",
+    skyTint: 0xeef6fc,
+  },
 };
 
 export class World {
@@ -515,7 +526,7 @@ export class World {
     this.tuneBloom(theme);
     this.post.setGrade(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
-    this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : -0.6;
+    this.ground.position.y = theme === "canyon" ? -18 : theme === "night" ? -8 : theme === "alpine" ? -1.1 : -0.6;
     applyGroundMaterial(this.ground, theme, this.textures);
 
     const built = buildTrackMeshes(track, theme);
@@ -599,6 +610,10 @@ export class World {
     this.sky = new SkyDome(fog, tint);
     this.sky.setTheme(this.theme, THEMES[this.theme].sunPos);
     this.scene.add(this.sky.mesh);
+    if (!url) {
+      this.applyEnvironmentMap();
+      return;
+    }
     this.loader.load(
       url,
       (tex) => {
@@ -905,12 +920,13 @@ export class World {
     this.scene.environmentIntensity = look.env;
     this.sky?.setTheme(theme, pack.sunPos);
     const nightFill = theme === "night" && this.quality.nightFills;
-    this.fill.color.set(theme === "night" ? 0xb878d8 : 0x8ab4d8);
-    this.fill.intensity = nightFill ? 0.5 : 0;
+    const alpineFill = theme === "alpine" && this.quality.environment;
+    this.fill.color.set(theme === "night" ? 0xb878d8 : theme === "alpine" ? 0xc8dcea : 0x8ab4d8);
+    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : 0;
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
-    this.fill2.color.set(theme === "night" ? 0xe890c8 : 0xb8c8dc);
-    this.fill2.intensity = nightFill ? 0.28 : 0;
+    this.fill2.color.set(theme === "night" ? 0xe890c8 : theme === "alpine" ? 0xe8f2fa : 0xb8c8dc);
+    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {
