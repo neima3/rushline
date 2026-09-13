@@ -161,9 +161,9 @@ export type HudState = {
   surface: SurfaceKind;
 };
 
-export type GhostSource = "pb" | "last" | "import" | "none";
+export type GhostSource = "pb" | "last" | "import" | "author" | "none";
 
-export type GhostPref = "auto" | "pb" | "last" | "import";
+export type GhostPref = "auto" | "pb" | "last" | "import" | "author";
 
 export type CupId = "gold" | "author";
 

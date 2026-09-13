@@ -203,6 +203,10 @@ export function MenuScreen({
                         <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
                           Rival {formatTime(imports[t.id]!)}
                         </span>
+                      ) : t.id !== "custom" && pb == null ? (
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
+                          Author ghost {formatTime(t.medals.author)}
+                        </span>
                       ) : null}
                       <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
                     </span>

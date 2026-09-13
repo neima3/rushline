@@ -33,7 +33,7 @@ Each stock track has author / gold / silver / bronze times, checkpoints, boost p
 
 **Surfaces** change how the car grips. Plastic (Circuit, Mesa table) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
-A personal-best ghost is saved with the time. If that ghost is missing or too thin, the last finished run is used instead. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
+Each stock circuit ships a lightweight **author ghost** paced to the Author medal, so a first-time run always has a rival. A personal-best ghost is saved with the time and replaces it. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 
 **Ghost share** — export a last-run or PB tape as a JSON file from Results or Tracks, then import a friend's file to race that circuit as a rival. Sharing is local only (download / pick a file). A rival never overwrites your PB, last run, Rush Cup, or Garage paint. Clear it from Tracks when you want the usual ghost back. Files live in `localStorage` under `rushline-ghost-share-v1`.
 

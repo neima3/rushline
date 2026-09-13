@@ -52,9 +52,11 @@ describe("help control sheet", () => {
     assert.match(COPY.cupBlurb, /Gold/);
     assert.match(COPY.garageBlurb, /livery/i);
     assert.match(COPY.ghostTitle, /Ghost share/i);
+    assert.ok(COPY.ghostNotes.some((line) => /author-line ghost/i.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /export/i.test(line) && /JSON/i.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /import/i.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /never overwrites/i.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /author ghost/i.test(line)));
     assert.ok(COPY.playNotes.some((line) => /Ghost share/i.test(line)));
   });
 

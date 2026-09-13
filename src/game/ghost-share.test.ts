@@ -88,6 +88,7 @@ describe("ghost file encode/decode", () => {
     assert.equal(ghostFilename({ trackId: "circuit", source: "pb", time: 52_140.4 }), "rushline-circuit-pb-52140.json");
     assert.equal(ghostFilename({ trackId: "canyon", source: "last", time: 40_000 }), "rushline-canyon-last-40000.json");
     assert.equal(ghostHudTag("import"), "RIVAL");
+    assert.equal(ghostHudTag("author"), "AUTH");
     assert.equal(ghostHudTag("pb"), "GHOST");
   });
 

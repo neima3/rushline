@@ -22,6 +22,7 @@ import {
   ghostSplitMs,
   ghostTimeAtS,
 } from "./feel";
+import { authorGhostFor } from "./author-ghost";
 import { pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
 import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
@@ -236,7 +237,13 @@ export class Game {
 
   private applyGhostChoice(id: TrackId, allowImport = false) {
     const imported = allowImport ? (readImportedGhost(id)?.frames ?? null) : null;
-    const picked = pickRaceGhost(readSave().ghosts[id], readLastSave().runs[id]?.frames, this.ghostPref, imported);
+    const picked = pickRaceGhost(
+      readSave().ghosts[id],
+      readLastSave().runs[id]?.frames,
+      this.ghostPref,
+      imported,
+      authorGhostFor(id),
+    );
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     this.ghostPref = "auto";
@@ -892,7 +899,13 @@ export class Game {
     const priorGhost = this.ghost;
     const medal = medalFor(this.trackId, time);
     const commit = applyRunCommit(this.trackId, time, this.recording);
-    const picked = pickRaceGhost(readSave().ghosts[this.trackId], readLastSave().runs[this.trackId]?.frames);
+    const picked = pickRaceGhost(
+      readSave().ghosts[this.trackId],
+      readLastSave().runs[this.trackId]?.frames,
+      "auto",
+      null,
+      authorGhostFor(this.trackId),
+    );
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     useGame.getState().refreshBest();

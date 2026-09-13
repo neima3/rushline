@@ -71,13 +71,14 @@ export const COPY = {
   ghostTitle: "Ghost share",
   ghostBlurb: "Trackmania-style rival tapes. Export and import stay on this device — no account.",
   ghostNotes: [
+    "Stock tracks ship an author-line ghost at medal pace so you always have a rival before a PB.",
     "Results and Tracks can export your last run or personal-best ghost as a JSON file.",
     "Import a friend's .json on that circuit to race their tape as a rival ghost.",
     "A rival is local only. It never overwrites your PB, last run, Cup, or Garage paint.",
-    "Clear the rival from Tracks when you want the usual PB / last-run ghost back.",
+    "Clear the rival from Tracks when you want the usual PB / last-run ghost back. Author ghosts return if no PB remains.",
   ],
   playNotes: [
-    "Time trial — any track, any medal, personal-best ghost. Custom is a closed ribbon you build in the lite editor.",
+    "Time trial — any track, any medal. First run races the author ghost; a PB or imported rival replaces it. Custom is a closed ribbon you build in the lite editor.",
     "Rush Cup — Gold on all seven, then Author. Next challenge unlocks in order.",
     "R (or Y) returns you to the last checkpoint. Hold R / Y, or press Delete, to restart the whole run.",
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
