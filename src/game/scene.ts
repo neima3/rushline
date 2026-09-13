@@ -197,7 +197,7 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sun: 0xfff2dc,
     sunPos: [62, 48, 88],
     exposure: 0.96,
-    sky: "/textures/sky-alpine.jpg",
+    sky: "",
     skyTint: 0xeef6fc,
   },
 };
@@ -610,6 +610,10 @@ export class World {
     this.sky = new SkyDome(fog, tint);
     this.sky.setTheme(this.theme, THEMES[this.theme].sunPos);
     this.scene.add(this.sky.mesh);
+    if (!url) {
+      this.applyEnvironmentMap();
+      return;
+    }
     this.loader.load(
       url,
       (tex) => {

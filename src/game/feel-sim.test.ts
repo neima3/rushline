@@ -20,6 +20,22 @@ const idle = {
 const cruise = { ...idle, throttle: 0.5 };
 
 describe("mobile feel sims", () => {
+  it("keeps White Pass opening planted through the first valley sweep", () => {
+    const summit = getTrack("summit");
+    const car = new CarSim();
+    car.reset(summit);
+    for (let i = 0; i < 200; i++) {
+      car.step(summit, cruise, 1 / 60);
+      if (car.s < 90) {
+        assert.equal(car.airborne, false, `airborne at s=${car.s}`);
+        const sm = sampleAt(summit, car.s);
+        assert.ok(Math.abs(car.n) < sm.width * 0.45, `n ${car.n} at s=${car.s}`);
+        assert.ok(car.uy > 0.75, `uy ${car.uy} at s=${car.s}`);
+      }
+    }
+    assert.ok(car.s > 35, `expected to roll out, s=${car.s}`);
+  });
+
   it("keeps Ridge opening on the ribbon through the first curve", () => {
     const canyon = getTrack("canyon");
     const car = new CarSim();

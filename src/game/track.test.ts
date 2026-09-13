@@ -38,6 +38,14 @@ describe("White Pass", () => {
     assert.ok((pace.remain ?? 0) > 0);
   });
 
+  it("stores a White Pass ghost on the same save shape as the other tracks", () => {
+    const ghost = [{ t: 0, s: 6, n: 0, heading: 0 }, { t: 400, s: 18, n: 0.1, heading: 0 }];
+    const save = { version: 1 as const, best: { summit: 31_200 }, ghosts: { summit: ghost } };
+    assert.equal(save.best.summit, 31_200);
+    assert.equal(save.ghosts.summit?.length, 2);
+    assert.equal(medalFor("summit", save.best.summit), "gold");
+  });
+
   it("lists White Pass after the original three without rewriting them", () => {
     const ids = allTrackDefs().map((t) => t.id);
     assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit"]);

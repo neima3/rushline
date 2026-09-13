@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" preserveAspectRatio="xMidYMid slice">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#eef6fc"/>
-      <stop offset="0.42" stop-color="#c8dcec"/>
-      <stop offset="1" stop-color="#9ab0c4"/>
+      <stop offset="0" stop-color="#8eb4cc"/>
+      <stop offset="0.45" stop-color="#c4d8e6"/>
+      <stop offset="1" stop-color="#6a8090"/>
     </linearGradient>
-    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fff4d8"/>
-      <stop offset="1" stop-color="#ffd8a0" stop-opacity="0"/>
-    </linearGradient>
+    <radialGradient id="sun" cx="0.78" cy="0.22" r="0.28">
+      <stop offset="0" stop-color="#fff4d0"/>
+      <stop offset="1" stop-color="#fff4d0" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <rect width="280" height="200" fill="url(#sky)"/>
-  <circle cx="214" cy="46" r="28" fill="url(#sun)"/>
-  <polygon points="0,128 48,62 92,118 130,48 176,108 220,38 280,96 280,200 0,200" fill="#d8e4ee"/>
-  <polygon points="48,62 70,88 92,118 60,112" fill="#f4f8fb"/>
-  <polygon points="130,48 148,78 176,108 142,96" fill="#eef4f8"/>
-  <polygon points="220,38 236,70 258,92 228,78" fill="#f6f9fc"/>
-  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#4a5a68" stroke-width="11" stroke-linejoin="round"/>
-  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#8ab0c8" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#d8e8f4" stroke-width="2.2" stroke-dasharray="7 6"/>
-  <rect x="22" y="160" width="10" height="6" fill="#111113"/>
-  <rect x="32" y="160" width="10" height="6" fill="#f4f4f2"/>
-  <circle cx="148" cy="86" r="3.2" fill="#c8e6f6"/>
-  <circle cx="198" cy="118" r="3.2" fill="#c8e6f6"/>
-  <circle cx="168" cy="164" r="3.2" fill="#c8e6f6"/>
+  <rect width="280" height="200" fill="url(#sun)"/>
+  <polygon points="0,132 42,78 78,124 118,52 168,114 214,44 280,102 280,200 0,200" fill="#d2dee8"/>
+  <polygon points="42,78 62,98 78,124 54,116" fill="#f2f6fa"/>
+  <polygon points="118,52 136,82 168,114 138,100" fill="#e8eef4"/>
+  <polygon points="214,44 232,74 256,96 226,80" fill="#f4f8fb"/>
+  <path d="M22 170 C 58 154, 74 130, 92 116 S 124 90, 152 84 S 190 96, 204 120 S 210 158, 168 166 S 98 174, 64 178 S 32 178, 22 170 Z" fill="none" stroke="#2a3640" stroke-width="13" stroke-linejoin="round"/>
+  <path d="M22 170 C 58 154, 74 130, 92 116 S 124 90, 152 84 S 190 96, 204 120 S 210 158, 168 166 S 98 174, 64 178 S 32 178, 22 170 Z" fill="none" stroke="#7aa0b8" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M22 170 C 58 154, 74 130, 92 116 S 124 90, 152 84 S 190 96, 204 120 S 210 158, 168 166 S 98 174, 64 178 S 32 178, 22 170 Z" fill="none" stroke="#e8f2fa" stroke-width="2.4" stroke-dasharray="7 6"/>
+  <rect x="24" y="162" width="11" height="7" fill="#111113"/>
+  <rect x="35" y="162" width="11" height="7" fill="#f4f4f2"/>
+  <circle cx="152" cy="84" r="3.4" fill="#9ad0ea"/>
+  <circle cx="204" cy="120" r="3.4" fill="#9ad0ea"/>
+  <circle cx="168" cy="166" r="3.4" fill="#9ad0ea"/>
 </svg>
