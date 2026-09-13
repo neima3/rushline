@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Game } from "@/game/Game";
+import { muteFromSearch } from "@/game/audio";
 import { loadSettings } from "@/game/settings";
 import { useGame } from "@/game/store";
 import { GameErrorBoundary } from "./GameErrorBoundary";
@@ -30,6 +31,7 @@ export function Rushline() {
 
   useLayoutEffect(() => {
     useGame.getState().hydrateSettings(loadSettings());
+    if (muteFromSearch(window.location.search)) useGame.getState().setMuted(true);
     applyTouchDefaults();
   }, []);
 

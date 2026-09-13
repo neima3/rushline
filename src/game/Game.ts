@@ -16,7 +16,7 @@ import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from 
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
-import { GameAudio } from "./audio";
+import { GameAudio, muteFromSearch } from "./audio";
 import { applyRunCommit, readLastSave, readSave, TRACK_ORDER, useGame } from "./store";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
@@ -101,6 +101,7 @@ export class Game {
       this.setCamera(this.camera === "chase" ? "hood" : "chase");
     };
     this.audio.attach();
+    if (muteFromSearch(window.location.search)) this.setMuted(true);
     this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.bindPad();
     this.applyGhostChoice("circuit");
@@ -136,6 +137,7 @@ export class Game {
 
   private syncSettings(s: Settings) {
     this.world.applySettings(s);
+    this.audio.setQuality(s.quality);
     this.audio.applyVolumes(s.master, s.sfx, s.music);
     this.input.touchSteerSensitivity = s.touchSteerSensitivity;
     this.input.invertSteer = s.invertSteer;
@@ -199,6 +201,7 @@ export class Game {
 
   setPhase(phase: Phase) {
     this.phase = phase;
+    this.audio.setScene(phase);
     useGame.getState().setPhase(phase);
   }
 
@@ -219,6 +222,11 @@ export class Game {
   setMuted(m: boolean) {
     this.audio.setMuted(m);
     useGame.getState().setMuted(m);
+  }
+
+  uiClick() {
+    this.audio.unlock();
+    this.audio.click();
   }
 
   applySettings(s: Settings | GraphicsKnobs) {
@@ -340,6 +348,7 @@ export class Game {
       wrongWay: false,
     });
     this.audio.unlock();
+    this.audio.setScene("countdown");
     this.audio.countdown(3);
     this.capturePlayFocus();
     requestAnimationFrame(() => this.capturePlayFocus());
@@ -353,6 +362,7 @@ export class Game {
       this.countdown = Math.max(0, countdownRemaining(this.countdownAt, performance.now()));
     }
     this.phase = "paused";
+    this.audio.setScene("paused");
     useGame.getState().setPhase("paused");
   }
 
@@ -361,6 +371,7 @@ export class Game {
     const next = this.pausedFrom === "countdown" && this.countdown > 0 ? "countdown" : "race";
     this.pausedFrom = null;
     this.phase = next;
+    this.audio.setScene(next);
     this.lastT = performance.now();
     if (next === "race") this.raceClockAt = this.lastT;
     if (next === "countdown") this.countdownAt = countdownPausedAt(this.lastT, this.countdown);
@@ -370,6 +381,7 @@ export class Game {
 
   menu() {
     this.phase = "menu";
+    this.audio.setScene("menu");
     this.countdown = -1;
     this.acc = 0;
     this.car.reset(this.track);
@@ -477,7 +489,7 @@ export class Game {
           this.input.rumble("turbo");
         }
         if (this.car.justLand) {
-          this.audio.land();
+          this.audio.land(Math.abs(this.car.speed));
           this.world.addTrauma(0.12);
           this.input.rumble("land");
         }
@@ -488,7 +500,7 @@ export class Game {
           this.armCpFlash(this.car.justLap ? "lap" : "cp", now);
         }
         if (this.car.wallHit > 0.15) {
-          this.audio.crash();
+          this.audio.crash(this.car.wallHit);
           this.input.rumble("crash");
         }
         if (this.car.justFinish) {
@@ -531,7 +543,9 @@ export class Game {
     this.world.stepParticles(dt);
     const attract = this.phase === "menu" || this.phase === "select";
     this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
-    this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide);
+    this.audio.setScene(this.phase);
+    const racing = this.phase === "race" || this.phase === "countdown";
+    this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide, racing);
     if (!this.world.contextLost) this.world.render();
 
     this.frames++;
@@ -608,7 +622,8 @@ export class Game {
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     useGame.getState().refreshBest();
-    this.audio.finish();
+    this.audio.setScene("results");
+    this.audio.finish(medal);
     this.world.addTrauma(0.4);
     this.input.rumble("finish");
     this.phase = "results";
@@ -650,13 +665,23 @@ export class Game {
     this.menuYPrev = y;
 
     if (this.phase === "menu") {
-      if (actions.confirm) this.startRace(this.trackId);
+      if (actions.confirm) {
+        this.audio.click();
+        this.startRace(this.trackId);
+      }
       return;
     }
     if (this.phase === "select") {
-      if (actions.back) this.menu();
-      if (actions.confirm) this.startRace(this.trackId);
+      if (actions.back) {
+        this.audio.click();
+        this.menu();
+      }
+      if (actions.confirm) {
+        this.audio.click();
+        this.startRace(this.trackId);
+      }
       if (yEdge) {
+        this.audio.click();
         const i = TRACK_ORDER.indexOf(this.trackId);
         const next = TRACK_ORDER[(i + y + TRACK_ORDER.length) % TRACK_ORDER.length]!;
         this.load(next);
@@ -664,13 +689,23 @@ export class Game {
       return;
     }
     if (this.phase === "paused") {
-      if (actions.confirm) this.resume();
-      else if (actions.back) this.menu();
+      if (actions.confirm) {
+        this.audio.click();
+        this.resume();
+      } else if (actions.back) {
+        this.audio.click();
+        this.menu();
+      }
       return;
     }
     if (this.phase === "results") {
-      if (actions.confirm) this.startRace(this.trackId);
-      else if (actions.back) this.menu();
+      if (actions.confirm) {
+        this.audio.click();
+        this.startRace(this.trackId);
+      } else if (actions.back) {
+        this.audio.click();
+        this.menu();
+      }
     }
   }
 

@@ -16,15 +16,35 @@ const ASSISTS: { id: TrackAssist; label: string; name: string }[] = [
   { id: "high", label: "High", name: "High" },
 ];
 
-export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: boolean }) {
+export function SettingsPanel({
+  onClose,
+  touch,
+  onUiClick,
+  onMute,
+}: {
+  onClose: () => void;
+  touch: boolean;
+  onUiClick?: () => void;
+  onMute?: (muted: boolean) => void;
+}) {
   const s = useGame((st) => st.settings);
+  const muted = useGame((st) => st.muted);
   const patch = useGame((st) => st.patchSettings);
   const setQuality = useGame((st) => st.setQuality);
   const reset = useGame((st) => st.resetSettings);
+  const click = () => onUiClick?.();
 
   return (
     <div className="pointer-events-auto absolute inset-0 z-40 flex justify-end bg-bg/70">
-      <button type="button" className="absolute inset-0 hidden md:block" aria-label="Close settings" onClick={onClose} />
+      <button
+        type="button"
+        className="absolute inset-0 hidden md:block"
+        aria-label="Close settings"
+        onClick={() => {
+          click();
+          onClose();
+        }}
+      />
       <aside
         role="dialog"
         aria-modal="true"
@@ -43,7 +63,10 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              click();
+              onClose();
+            }}
             className="h-12 min-w-20 rounded-md bg-accent px-4 text-sm font-medium text-accent-fg md:h-11"
           >
             Done
@@ -57,7 +80,10 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
                 <button
                   key={q.id}
                   type="button"
-                  onClick={() => setQuality(q.id)}
+                  onClick={() => {
+                    click();
+                    setQuality(q.id);
+                  }}
                   className={cn(
                     "h-12 rounded-md text-sm font-medium md:h-10",
                     s.quality === q.id ? "bg-accent text-accent-fg" : "text-muted",
@@ -67,13 +93,50 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
                 </button>
               ))}
             </div>
-            <Toggle label="Shadows" on={s.shadows} onChange={(shadows) => patch({ shadows })} />
-            <Toggle label="Bloom" on={s.bloom} onChange={(bloom) => patch({ bloom })} />
-            <Toggle label="Motion blur" on={s.motionBlur} onChange={(motionBlur) => patch({ motionBlur })} />
-            <Toggle label="Show FPS" on={s.showFps} onChange={(showFps) => patch({ showFps })} />
+            <Toggle
+              label="Shadows"
+              on={s.shadows}
+              onChange={(shadows) => {
+                click();
+                patch({ shadows });
+              }}
+            />
+            <Toggle
+              label="Bloom"
+              on={s.bloom}
+              onChange={(bloom) => {
+                click();
+                patch({ bloom });
+              }}
+            />
+            <Toggle
+              label="Motion blur"
+              on={s.motionBlur}
+              onChange={(motionBlur) => {
+                click();
+                patch({ motionBlur });
+              }}
+            />
+            <Toggle
+              label="Show FPS"
+              on={s.showFps}
+              onChange={(showFps) => {
+                click();
+                patch({ showFps });
+              }}
+            />
           </Section>
 
           <Section title="Audio">
+            <Toggle
+              label="Mute"
+              hint="Also available from the Sound button on the menu and HUD"
+              on={muted}
+              onChange={(next) => {
+                onMute?.(next);
+                if (!next) click();
+              }}
+            />
             <Slider label="Master" value={s.master} onChange={(master) => patch({ master })} />
             <Slider label="SFX" value={s.sfx} onChange={(sfx) => patch({ sfx })} />
             <Slider label="Music" value={s.music} onChange={(music) => patch({ music })} />
@@ -112,7 +175,10 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
                     type="button"
                     aria-label={a.name}
                     aria-pressed={s.trackAssist === a.id}
-                    onClick={() => patch({ trackAssist: a.id })}
+                    onClick={() => {
+                      click();
+                      patch({ trackAssist: a.id });
+                    }}
                     className={cn(
                       "h-12 rounded-md text-sm font-medium md:h-10",
                       s.trackAssist === a.id ? "bg-accent text-accent-fg" : "text-muted",
@@ -127,9 +193,19 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
               label="Auto-throttle"
               hint={touch ? "Default on for touch" : "Fills throttle when you are not braking"}
               on={s.autoThrottle}
-              onChange={(autoThrottle) => patch({ autoThrottle })}
+              onChange={(autoThrottle) => {
+                click();
+                patch({ autoThrottle });
+              }}
             />
-            <Toggle label="Invert steer" on={s.invertSteer} onChange={(invertSteer) => patch({ invertSteer })} />
+            <Toggle
+              label="Invert steer"
+              on={s.invertSteer}
+              onChange={(invertSteer) => {
+                click();
+                patch({ invertSteer });
+              }}
+            />
             <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5 text-xs leading-relaxed text-muted">
               <p className="text-sm font-medium text-fg">Gamepad</p>
               <p className="mt-1">Steer · left stick / D-pad</p>
@@ -141,14 +217,31 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
           </Section>
 
           <Section title="HUD">
-            <Toggle label="Speed" on={s.showSpeed} onChange={(showSpeed) => patch({ showSpeed })} />
-            <Toggle label="Minimap" on={s.showMinimap} onChange={(showMinimap) => patch({ showMinimap })} />
+            <Toggle
+              label="Speed"
+              on={s.showSpeed}
+              onChange={(showSpeed) => {
+                click();
+                patch({ showSpeed });
+              }}
+            />
+            <Toggle
+              label="Minimap"
+              on={s.showMinimap}
+              onChange={(showMinimap) => {
+                click();
+                patch({ showMinimap });
+              }}
+            />
             <Slider label="Ghost opacity" value={s.ghostOpacity} onChange={(ghostOpacity) => patch({ ghostOpacity })} />
           </Section>
 
           <button
             type="button"
-            onClick={() => reset(touch)}
+            onClick={() => {
+              click();
+              reset(touch);
+            }}
             className="mt-2 h-12 w-full rounded-md border border-border bg-bg-elevated text-sm text-muted md:h-11"
           >
             Reset defaults
