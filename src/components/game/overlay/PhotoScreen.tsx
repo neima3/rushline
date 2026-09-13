@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Aperture, Camera, X } from "lucide-react";
+import { photoHint } from "@/game/help";
 import { PHOTO_DRAG_PITCH, PHOTO_DRAG_YAW } from "@/game/photo";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
@@ -177,11 +178,7 @@ export function PhotoScreen({ touch, onNudge, onCapture, onClose, onScrub, onFol
               </button>
             </div>
 
-            <p className="text-center text-[11px] leading-snug text-muted">
-              {touch
-                ? "Drag to orbit · hide HUD is on · Capture saves a PNG"
-                : "Drag or WASD to orbit · Q/E zoom · F / Esc exit · Enter captures"}
-            </p>
+            <p className="text-center text-[11px] leading-snug text-muted">{photoHint(touch)}</p>
           </div>
         </>
       ) : null}

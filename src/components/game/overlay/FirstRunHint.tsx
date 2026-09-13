@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { dismissControlsHint, loadHints } from "@/game/flow";
+import { firstRunBody } from "@/game/help";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,11 +19,7 @@ export function FirstRunHint({ touch, padActive, onDismiss }: Props) {
     onDismiss?.();
   };
 
-  const body = touch
-    ? "Steer on the left pad. Accel and brake on the right. Pause is top-left — Options opens settings."
-    : padActive
-      ? "LT/RT brake · L-stick steer · X slide · Menu pause · Options for settings."
-      : "WASD steer and throttle · Space slide · R respawn · Esc pause · Options for graphics and Track Assist.";
+  const body = firstRunBody({ touch, padActive });
 
   return (
     <div

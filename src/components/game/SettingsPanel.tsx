@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { COPY } from "@/game/help";
 import { useGame } from "@/game/store";
 import type { Quality, TrackAssist } from "@/game/settings";
 import { cn } from "@/lib/utils";
@@ -18,11 +19,13 @@ const ASSISTS: { id: TrackAssist; label: string; name: string }[] = [
 
 export function SettingsPanel({
   onClose,
+  onOpenHelp,
   touch,
   onUiClick,
   onMute,
 }: {
   onClose: () => void;
+  onOpenHelp?: () => void;
   touch: boolean;
   onUiClick?: () => void;
   onMute?: (muted: boolean) => void;
@@ -60,7 +63,7 @@ export function SettingsPanel({
             <h2 id="settings-title" className="font-display text-4xl leading-none tracking-tight">
               Settings
             </h2>
-            <p className="mt-1 max-w-[16rem] text-xs text-subtle">Graphics, camera, and Track Assist. Your current preset stays put until you change it.</p>
+            <p className="mt-1 max-w-[16rem] text-xs text-subtle">{COPY.settingsBlurb}</p>
           </div>
           <button
             type="button"
@@ -208,12 +211,23 @@ export function SettingsPanel({
               }}
             />
             <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5 text-xs leading-relaxed text-muted">
-              <p className="text-sm font-medium text-fg">Gamepad</p>
-              <p className="mt-1">Steer · left stick / D-pad</p>
-              <p>Accel · RT / A &nbsp; Brake · LT / B</p>
-              <p>Slide · LB / X &nbsp; Respawn · Y</p>
-              <p>Camera · View / RB &nbsp; Pause · Menu</p>
-              <p className="mt-1.5 text-subtle">Keyboard and touch stay live. Track Assist is unchanged.</p>
+              <p className="text-sm font-medium text-fg">Keyboard, touch, and gamepad</p>
+              <p className="mt-1">
+                Full bindings — including photo mode and menu navigation — live on the Help sheet so they stay in sync
+                with the code.
+              </p>
+              {onOpenHelp ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    click();
+                    onOpenHelp();
+                  }}
+                  className="mt-2.5 h-10 w-full rounded-md bg-accent text-sm font-medium text-accent-fg"
+                >
+                  Open controls sheet
+                </button>
+              ) : null}
             </div>
           </Section>
 

@@ -1,7 +1,8 @@
-import { Car, Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
+import { Car, CircleHelp, Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
 import { allTrackDefs, medalFor, TRACK_DEFS } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
+import { COPY } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { useGame } from "@/game/store";
 import type { TrackId } from "@/game/types";
@@ -25,6 +26,7 @@ type Props = {
   onMute: () => void;
   onAuto: () => void;
   onSettings: () => void;
+  onHelp: () => void;
   onGarage: () => void;
   select: boolean;
   garage: boolean;
@@ -47,6 +49,7 @@ export function MenuScreen({
   onMute,
   onAuto,
   onSettings,
+  onHelp,
   onGarage,
   select,
   garage,
@@ -64,16 +67,14 @@ export function MenuScreen({
         className="overlay-enter flex max-h-full w-full max-w-xl flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0"
       >
         <header className="overlay-stagger-1">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Time trial</p>
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">{COPY.productEyebrow}</p>
           <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
-          <p className="mt-3 max-w-sm text-pretty text-muted">
-            A precision 3D circuit racer. Hit every checkpoint, keep the car on the plastic, beat the medals.
-          </p>
+          <p className="mt-3 max-w-sm text-pretty text-muted">{COPY.tagline}</p>
           <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/80 bg-bg/50 px-3 py-1 text-xs text-subtle">
             <Gamepad2 className="size-3.5" />
             {pad.connected
               ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start · ${padRaceHint(pad.xbox)}`
-              : "Plug in a pad — RT accel, LT brake, Y respawn, RB camera"}
+              : COPY.padIdle}
           </p>
         </header>
 
@@ -98,7 +99,7 @@ export function MenuScreen({
               onClick={onCup}
               className="flex h-14 flex-col items-start justify-center rounded-lg border border-border bg-surface px-5 text-left text-fg transition-colors hover:bg-bg-elevated"
             >
-              <span className="text-sm font-medium">Cup</span>
+              <span className="text-sm font-medium">Rush Cup</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{cupLabel}</span>
             </button>
             <button
@@ -115,6 +116,14 @@ export function MenuScreen({
             >
               <Car className="size-4" />
               Garage
+            </button>
+            <button
+              type="button"
+              onClick={onHelp}
+              className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-fg transition-colors hover:bg-bg-elevated"
+            >
+              <CircleHelp className="size-4" />
+              Help & controls
             </button>
             <div className="mt-1 grid grid-cols-3 gap-2">
               <button
@@ -143,13 +152,11 @@ export function MenuScreen({
                 <span className="hidden sm:inline">Settings</span>
               </button>
             </div>
-            <p className="mt-1 hidden text-xs text-subtle md:block">
-              WASD steer · Space slide · Esc pause · Cup for medals · Garage for liveries
-            </p>
+            <p className="mt-1 hidden text-xs text-subtle md:block">{COPY.menuHint}</p>
           </div>
         ) : (
           <div className="overlay-stagger-2 flex flex-col gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Select circuit</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">{COPY.selectEyebrow}</p>
             {allTrackDefs().map((t, i) => {
               const pb = best[t.id];
               const last = lastTimes[t.id];
@@ -216,8 +223,8 @@ function GaragePicker({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="overlay-stagger-2 flex flex-col gap-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Garage</p>
-      <p className="text-xs text-subtle">Pick a paint. It stays on the car across every track.</p>
+      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">{COPY.garageTitle}</p>
+      <p className="text-xs text-subtle">{COPY.garageBlurb}</p>
       <div className="grid grid-cols-2 gap-2">
         {LIVERY_ORDER.map((id, i) => {
           const def = liveryDef(id);
