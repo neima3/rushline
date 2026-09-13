@@ -20,6 +20,7 @@ describe("help control sheet", () => {
     assert.equal(byId.brake?.pad, PAD_MAP.brake);
     assert.equal(byId.slide?.pad, PAD_MAP.slide);
     assert.equal(byId.respawn?.pad, PAD_MAP.respawn);
+    assert.equal(byId.rewind?.pad, PAD_MAP.rewind);
     assert.equal(byId.camera?.pad, PAD_MAP.camera);
     assert.equal(byId.photo?.pad, PAD_MAP.photo);
     assert.equal(byId.pause?.pad, PAD_MAP.pause);
@@ -28,6 +29,7 @@ describe("help control sheet", () => {
     assert.match(byId.brake!.keys, /S/);
     assert.match(byId.slide!.keys, /Space/);
     assert.equal(byId.respawn!.keys, "R");
+    assert.match(byId.rewind!.keys, /Backspace/);
     assert.equal(byId.camera!.keys, "C");
     assert.equal(byId.photo!.keys, "F");
     assert.match(byId.pause!.keys, /Esc/);
@@ -36,6 +38,8 @@ describe("help control sheet", () => {
   it("covers menu, photo, and touch so the sheet matches the shipped UI", () => {
     assert.equal(MENU_CONTROL_ROWS.length, 3);
     assert.ok(PHOTO_CONTROL_ROWS.some((row) => row.id === "capture" && row.keys === "Enter"));
+    assert.ok(COPY.touchItems.some((line) => /Rewind/.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /rewind/i.test(line)));
     assert.ok(COPY.touchItems.some((line) => /Left pad/.test(line)));
     assert.ok(COPY.photoNotes.some((line) => /PNG/.test(line)));
     assert.match(COPY.tagline, /Rush Cup/);
@@ -44,9 +48,10 @@ describe("help control sheet", () => {
   });
 
   it("keeps runtime hint strings aligned with the sheet", () => {
+    assert.match(raceHint("keyboard"), /Backspace/);
     assert.match(raceHint("keyboard"), /WASD/);
-    assert.match(raceHint("xbox"), /RT accel/);
-    assert.match(raceHint("play"), /R2 accel/);
+    assert.match(raceHint("xbox"), /LB\+Y rewind/);
+    assert.match(raceHint("play"), /L1\+△ rewind/);
     assert.match(firstRunBody({ touch: true, padActive: false }), /Left pad/);
     assert.match(firstRunBody({ touch: false, padActive: true }), /Help/);
     assert.match(photoHint(false), /WASD/);

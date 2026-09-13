@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { TrackAssist } from "./settings";
 import type { Actions, BuiltTrack, CarSnap } from "./types";
+import type { RewindCar } from "./rewind";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
   airPitchAccel,
@@ -667,6 +668,99 @@ export class CarSim {
         this.justLap = true;
       }
     }
+  }
+
+  captureSim(): RewindCar {
+    return {
+      s: this.s,
+      n: this.n,
+      heading: this.heading,
+      speed: this.speed,
+      airborne: this.airborne,
+      vx: this.vx,
+      vy: this.vy,
+      vz: this.vz,
+      px: this.px,
+      py: this.py,
+      pz: this.pz,
+      qx: this.qx,
+      qy: this.qy,
+      qz: this.qz,
+      qw: this.qw,
+      yaw: this.yaw,
+      boost: this.boost,
+      slideAmt: this.slideAmt,
+      driftCharge: this.driftCharge,
+      lastCp: this.lastCp,
+      lap: this.lap,
+      finished: this.finished,
+      wrongWay: this.wrongWay,
+      fx: this.fx,
+      fy: this.fy,
+      fz: this.fz,
+      ux: this.ux,
+      uy: this.uy,
+      uz: this.uz,
+      wallHit: this.wallHit,
+      wasSlide: this.wasSlide,
+      slideLatched: this.slideLatched,
+      airTime: this.airTime,
+      landLock: this.landLock,
+      airBlend: this.airBlend,
+      recoverLock: this.recoverLock,
+      boostPunch: this.boostPunch,
+    };
+  }
+
+  restoreSim(state: RewindCar) {
+    this.s = state.s;
+    this.n = state.n;
+    this.heading = state.heading;
+    this.speed = state.speed;
+    this.airborne = state.airborne;
+    this.vx = state.vx;
+    this.vy = state.vy;
+    this.vz = state.vz;
+    this.px = state.px;
+    this.py = state.py;
+    this.pz = state.pz;
+    this.qx = state.qx;
+    this.qy = state.qy;
+    this.qz = state.qz;
+    this.qw = state.qw;
+    this.yaw = state.yaw;
+    this.boost = state.boost;
+    this.slideAmt = state.slideAmt;
+    this.driftCharge = state.driftCharge;
+    this.lastCp = state.lastCp;
+    this.lap = state.lap;
+    this.finished = state.finished;
+    this.wrongWay = state.wrongWay;
+    this.fx = state.fx;
+    this.fy = state.fy;
+    this.fz = state.fz;
+    this.ux = state.ux;
+    this.uy = state.uy;
+    this.uz = state.uz;
+    this.wallHit = state.wallHit;
+    this.wasSlide = state.wasSlide;
+    this.slideLatched = state.slideLatched;
+    this.airTime = state.airTime;
+    this.landLock = state.landLock;
+    this.airBlend = state.airBlend;
+    this.recoverLock = state.recoverLock;
+    this.boostPunch = state.boostPunch;
+    this.justBoost = false;
+    this.justCp = false;
+    this.justLap = false;
+    this.justFinish = false;
+    this.justTurbo = false;
+    this.justLand = false;
+    this.justRespawn = false;
+    this.skipInterp = true;
+    this.pulseBoost = false;
+    this.pulseTurbo = false;
+    this.pulseLand = false;
   }
 
   snap(out?: CarSnap): CarSnap {

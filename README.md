@@ -12,6 +12,8 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the keyboard, touch, and gamepad bindings that are actually live.
 
+**Rewind** — hold **Backspace** or **LB + Y** to scrub the last few seconds of the run. The race clock and ghost compare walk backward with you. Rewind is allowed in time trial and Rush Cup; it does not wipe a standing personal best — only a finish after rewind can replace it. Toggle **Enable Rewind** in Settings (on by default on desktop).
+
 ## Tracks
 
 | Track | Vibe | Length | Signature |
@@ -55,6 +57,7 @@ Web Audio engine note, tire scrape, countdown / medal stingers, and a ducked men
 | Brake / reverse | S or ↓ | LT / L2 / B |
 | Slide | Space or Shift | LB / L1 / X |
 | Respawn | R | Y / Triangle |
+| Rewind | Hold Backspace | LB + Y |
 | Camera | C | View / Share / RB |
 | Photo mode | F | LB + View |
 | Pause | Esc or P | Menu / Start / Options |
@@ -68,6 +71,7 @@ Stick and triggers use an inner deadzone (16% stick, 8% trigger) so a resting pa
 - **Left pad** — steer (sensitivity and invert live in Settings)
 - **Right cluster** — accel / brake / slide; brake wins if both are held
 - **Respawn** above the cluster; **Pause** top-left
+- If **Enable Rewind** is on, hold the Rewind button next to Respawn (a tap does nothing)
 - Auto-throttle is on by default on touch; Track Assist can pin you to the racing line
 - Photo mode hides the pads so orbit drag and Capture stay clean
 

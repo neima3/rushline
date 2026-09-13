@@ -18,6 +18,7 @@ describe("defaultSettings", () => {
     assert.equal(s.autoThrottle, false);
     assert.equal(s.trackAssist, "off");
     assert.equal(s.motionBlur, false);
+    assert.equal(s.rewindEnabled, true);
   });
 
   it("uses Medium graphics and auto-throttle on touch", () => {
@@ -27,6 +28,7 @@ describe("defaultSettings", () => {
     assert.equal(s.bloom, false);
     assert.equal(s.autoThrottle, true);
     assert.equal(s.trackAssist, "medium");
+    assert.equal(s.rewindEnabled, false);
     assert.ok(qualityProfile("medium").dprCap <= 1.5);
     assert.ok(qualityProfile("medium").particleDensity < 1);
   });
@@ -76,10 +78,11 @@ describe("applyQuality", () => {
   });
 
   it("does not wipe camera, audio, or livery", () => {
-    const s = applyQuality({ ...defaultSettings(false), master: 0.2, fov: 70, livery: "frost" }, "low");
+    const s = applyQuality({ ...defaultSettings(false), master: 0.2, fov: 70, livery: "frost", rewindEnabled: false }, "low");
     assert.equal(s.master, 0.2);
     assert.equal(s.fov, 70);
     assert.equal(s.livery, "frost");
+    assert.equal(s.rewindEnabled, false);
   });
 });
 
@@ -109,6 +112,7 @@ describe("parseSettings", () => {
       showSpeed: false,
       showMinimap: false,
       ghostOpacity: 2,
+      rewindEnabled: false,
     });
     assert.equal(s.quality, "low");
     assert.equal(s.shadows, false);
@@ -125,6 +129,14 @@ describe("parseSettings", () => {
     assert.equal(s.showSpeed, false);
     assert.equal(s.ghostOpacity, 1);
     assert.equal(s.livery, "ivory");
+    assert.equal(s.rewindEnabled, false);
+  });
+
+  it("defaults Enable Rewind on for desktop and keeps a saved off", () => {
+    assert.equal(parseSettings({}, false).rewindEnabled, true);
+    assert.equal(parseSettings({}, true).rewindEnabled, false);
+    assert.equal(parseSettings({ rewindEnabled: true }, true).rewindEnabled, true);
+    assert.equal(parseSettings({ rewindEnabled: false }, false).rewindEnabled, false);
   });
 
   it("keeps a saved livery and falls back on garbage", () => {

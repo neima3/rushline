@@ -37,6 +37,7 @@ export class Input {
   touchThrottle = 0;
   touchBrake = 0;
   touchSlide = 0;
+  touchRewind = 0;
   autoThrottle = false;
   touchMode = false;
   touchSteerSensitivity = 1;
@@ -257,8 +258,10 @@ export class Input {
       Boolean(gp?.slide) ||
       this.touchSlide > 0.5;
 
-    const respawnNow = this.down("KeyR") || Boolean(gp?.y);
-    const restartNow = this.down("Enter") || this.down("Backspace");
+    const rewindPad = Boolean(gp?.lb && gp?.y);
+    const rewind = this.down("Backspace") || rewindPad || this.touchRewind > 0.5;
+    const respawnNow = (this.down("KeyR") || Boolean(gp?.y && !gp?.lb)) && !rewind;
+    const restartNow = this.down("Enter");
     const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
     const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view && !gp?.lb);
     const photoNow = this.down("KeyF") || Boolean(gp?.lb && gp?.view);
@@ -296,6 +299,7 @@ export class Input {
       confirm,
       back,
       photo,
+      rewind,
       menuY,
     };
   }

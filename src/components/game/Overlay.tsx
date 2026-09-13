@@ -186,6 +186,8 @@ export function Overlay({ gameRef }: Props) {
           showSpeed={settings.showSpeed}
           showMinimap={settings.showMinimap}
           cupLabel={cupEvent ? `CUP ${cupEvent.index + 1}/5 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}` : null}
+          rewinding={hud.rewinding}
+          rewindRemainMs={hud.rewindRemainMs}
         />
       ) : null}
 
@@ -465,6 +467,8 @@ function Hud({
   showSpeed,
   showMinimap,
   cupLabel,
+  rewinding,
+  rewindRemainMs,
 }: {
   time: number;
   speed: number;
@@ -489,6 +493,8 @@ function Hud({
   showSpeed: boolean;
   showMinimap: boolean;
   cupLabel?: string | null;
+  rewinding?: boolean;
+  rewindRemainMs?: number;
 }) {
   const clock = formatTimeParts(time);
   return (
@@ -517,6 +523,14 @@ function Hud({
               )}
             >
               {ghostLead === "ahead" ? "▲ AHEAD" : ghostLead === "behind" ? "▼ BEHIND" : "● EVEN"}
+            </p>
+          ) : null}
+          {rewinding ? (
+            <p className="hud-rewind mt-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-medal-gold">
+              Rewind
+              {rewindRemainMs != null && rewindRemainMs > 0 ? (
+                <span className="ml-1.5 tabular-nums tracking-wide text-muted">{(rewindRemainMs / 1000).toFixed(1)}s</span>
+              ) : null}
             </p>
           ) : null}
         </div>

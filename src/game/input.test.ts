@@ -74,6 +74,37 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("holds Backspace as rewind without restarting", () => {
+    const input = new Input();
+    input.setKeys(["Backspace"]);
+    const a = input.sample();
+    assert.equal(a.rewind, true);
+    assert.equal(a.restart, false);
+    assert.equal(a.respawn, false);
+    const held = input.sample();
+    assert.equal(held.rewind, true);
+    assert.equal(held.restart, false);
+    input.detach();
+  });
+
+  it("maps LB+Y as rewind without firing respawn", () => {
+    setPadPoller(() => axes({ lb: true, y: true }));
+    const input = new Input();
+    const a = input.sample();
+    assert.equal(a.rewind, true);
+    assert.equal(a.respawn, false);
+    input.detach();
+  });
+
+  it("still respawns on Y without LB", () => {
+    setPadPoller(() => axes({ y: true }));
+    const input = new Input();
+    const a = input.sample();
+    assert.equal(a.respawn, true);
+    assert.equal(a.rewind, false);
+    input.detach();
+  });
+
   it("maps pad face / shoulder actions without requiring keys", () => {
     setPadPoller(() => axes({ y: true, start: true, rb: true, slide: true, throttle: 0.8 }));
     const input = new Input();

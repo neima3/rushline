@@ -77,6 +77,7 @@ export type Actions = {
   confirm: boolean;
   back: boolean;
   photo: boolean;
+  rewind: boolean;
   menuY: number;
 };
 
@@ -137,6 +138,8 @@ export type HudState = {
   ghostLead: "ahead" | "behind" | "even" | null;
   medalRemain: number | null;
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
+  rewinding: boolean;
+  rewindRemainMs: number;
 };
 
 export type GhostSource = "pb" | "last" | "none";
