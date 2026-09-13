@@ -130,12 +130,20 @@ export type HudState = {
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
 };
 
+export type GhostSource = "pb" | "last" | "none";
+
+export type GhostPref = "auto" | "pb" | "last";
+
 export type ResultsState = {
   time: number;
   best: number | null;
   medal: Medal | null;
   isPb: boolean;
   trackId: TrackId;
+  ghostSaved: boolean;
+  ghostSource: GhostSource;
+  lastTime: number | null;
+  recents: number[];
 };
 
 export type GhostFrame = {

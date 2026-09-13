@@ -16,9 +16,21 @@ import type {
   SaveData,
   TrackId,
 } from "./types";
-const SAVE_KEY = "rushline-v1";
+import {
+  LAST_KEY,
+  SAVE_KEY,
+  commitRun,
+  emptyLast,
+  emptySave,
+  parseLast,
+  parseSave,
+  type LastSave,
+  type RunCommit,
+} from "./persist";
 
 export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix"];
+export { SAVE_KEY, LAST_KEY, commitRun };
+export type { RunCommit };
 
 const emptyHud = (): HudState => ({
   time: 0,
@@ -53,26 +65,33 @@ const emptyPad = (): PadInfo => ({
 
 function loadSave(): SaveData {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { version: 1, best: {}, ghosts: {} };
-    const parsed = JSON.parse(raw) as SaveData;
-    if (parsed?.version !== 1) return { version: 1, best: {}, ghosts: {} };
-    return {
-      version: 1,
-      best: parsed.best ?? {},
-      ghosts: parsed.ghosts ?? {},
-    };
+    return parseSave(localStorage.getItem(SAVE_KEY));
   } catch {
-    return { version: 1, best: {}, ghosts: {} };
+    return emptySave();
+  }
+}
+
+function loadLast(): LastSave {
+  try {
+    return parseLast(localStorage.getItem(LAST_KEY));
+  } catch {
+    return emptyLast();
   }
 }
 
 let saveCache: SaveData | null = null;
+let lastCache: LastSave | null = null;
 
 export function readSave(): SaveData {
-  if (typeof window === "undefined") return { version: 1, best: {}, ghosts: {} };
+  if (typeof window === "undefined") return emptySave();
   if (!saveCache) saveCache = loadSave();
   return saveCache;
+}
+
+export function readLastSave(): LastSave {
+  if (typeof window === "undefined") return emptyLast();
+  if (!lastCache) lastCache = loadLast();
+  return lastCache;
 }
 
 export function writeSave(mutator: (s: SaveData) => void) {
@@ -86,6 +105,16 @@ export function writeSave(mutator: (s: SaveData) => void) {
   }
 }
 
+export function applyRunCommit(trackId: TrackId, time: number, frames: import("./types").GhostFrame[]): RunCommit {
+  const save = readSave();
+  const last = readLastSave();
+  const io = typeof localStorage === "undefined" ? null : localStorage;
+  const result = commitRun(trackId, time, frames, io, save, last);
+  saveCache = save;
+  lastCache = last;
+  return result;
+}
+
 type GameStore = {
   phase: Phase;
   trackId: TrackId;
@@ -97,7 +126,10 @@ type GameStore = {
   ready: boolean;
   touch: boolean;
   pad: PadInfo;
+  padBanner: string | null;
   best: Partial<Record<TrackId, number>>;
+  lastTimes: Partial<Record<TrackId, number>>;
+  recents: Partial<Record<TrackId, number[]>>;
   settings: Settings;
   settingsOpen: boolean;
   fps: number;
@@ -111,6 +143,7 @@ type GameStore = {
   setReady: (v: boolean) => void;
   setTouch: (v: boolean) => void;
   setPad: (p: PadInfo) => void;
+  setPadBanner: (text: string | null) => void;
   setSettingsOpen: (v: boolean) => void;
   hydrateSettings: (s: Settings) => void;
   patchSettings: (p: Partial<Settings>) => void;
@@ -133,7 +166,10 @@ export const useGame = create<GameStore>((set) => ({
   ready: false,
   touch: false,
   pad: emptyPad(),
+  padBanner: null,
   best: {},
+  lastTimes: {},
+  recents: {},
   settings: bootSettings,
   settingsOpen: false,
   fps: 0,
@@ -152,6 +188,7 @@ export const useGame = create<GameStore>((set) => ({
   setReady: (ready) => set({ ready }),
   setTouch: (touch) => set({ touch }),
   setPad: (pad) => set({ pad }),
+  setPadBanner: (padBanner) => set({ padBanner }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   hydrateSettings: (settings) => set({ settings, autoThrottle: settings.autoThrottle }),
   patchSettings: (p) =>
@@ -173,7 +210,16 @@ export const useGame = create<GameStore>((set) => ({
       return { settings, autoThrottle: settings.autoThrottle };
     }),
   setFps: (fps) => set({ fps }),
-  refreshBest: () => set({ best: { ...readSave().best } }),
+  refreshBest: () => {
+    const save = readSave();
+    const last = readLastSave();
+    const lastTimes: Partial<Record<TrackId, number>> = {};
+    for (const id of TRACK_ORDER) {
+      const run = last.runs[id];
+      if (run) lastTimes[id] = run.time;
+    }
+    set({ best: { ...save.best }, lastTimes, recents: { ...last.recents } });
+  },
 }));
 
 export function resetHud(): HudState {
