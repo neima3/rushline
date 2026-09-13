@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allTrackDefs, getTrack, medalFor, medalPace, TRACK_DEFS } from "./track.ts";
+import { allTrackDefs, getTrack, medalFor, medalPace, ribbonSurfaceKinds, TRACK_DEFS } from "./track.ts";
 
 describe("White Pass", () => {
   it("compiles a closed alpine ribbon with checkpoints and boosts", () => {
@@ -93,6 +93,14 @@ describe("White Pass", () => {
     assert.ok(storm.samples.some((s) => s.surface === "ice"));
     assert.ok(storm.samples.some((s) => s.surface === "tech"));
     assert.ok(storm.samples.filter((s) => s.surface === "plastic").length > storm.samples.length * 0.3);
+    assert.deepEqual(ribbonSurfaceKinds(circuit), ["plastic"]);
+    assert.deepEqual(ribbonSurfaceKinds(summit), ["ice"]);
+    assert.deepEqual(ribbonSurfaceKinds(yard), ["tech"]);
+    assert.deepEqual(ribbonSurfaceKinds(canyon), ["plastic", "dirt"]);
+    assert.deepEqual(ribbonSurfaceKinds(mesa), ["plastic", "dirt"]);
+    assert.deepEqual(ribbonSurfaceKinds(hollow), ["dirt", "tech"]);
+    assert.deepEqual(ribbonSurfaceKinds(ember), ["plastic", "dirt"]);
+    assert.deepEqual(ribbonSurfaceKinds(storm), ["plastic", "ice", "tech"]);
   });
 });
 

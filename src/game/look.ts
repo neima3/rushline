@@ -54,6 +54,20 @@ export function themeDefaultSurface(theme: ThemeId): SurfaceKind {
   return "plastic";
 }
 
+/** Canvas albedo seed. Default-surface tracks keep their theme base; foreign
+ *  plastic snaps to stadium charcoal so a mesa table / ridge start reads as asphalt. */
+export function surfaceAlbedoBase(kind: SurfaceKind, theme: ThemeId): [number, number, number] {
+  if (kind === themeDefaultSurface(theme)) return ASPHALT_BASE[theme];
+  if (kind === "plastic") return ASPHALT_BASE.stadium;
+  const arch = SURFACE_ARCHETYPE[kind];
+  const base = ASPHALT_BASE[theme];
+  return [
+    Math.round(base[0] * 0.38 + arch.r * 255 * 0.62),
+    Math.round(base[1] * 0.38 + arch.g * 255 * 0.62),
+    Math.round(base[2] * 0.38 + arch.b * 255 * 0.62),
+  ];
+}
+
 export function roadSurfaceTint(theme: ThemeId, surface: SurfaceKind): { r: number; g: number; b: number } {
   const base = ROAD_TINT[theme];
   if (surface === themeDefaultSurface(theme)) return base;
@@ -81,6 +95,145 @@ export function surfaceBand(surface: SurfaceKind, s: number): number {
   if (surface === "dirt") return -0.05 + 0.07 * Math.sin(s * 0.72);
   if (surface === "tech") return (Math.floor(s / 5.5) % 2 === 0 ? 0.055 : -0.02);
   return 0;
+}
+
+/** Specular / grit per Trackmania surface. Stadium plastic keeps Circuit High locks. */
+export type SurfaceSpec = {
+  roughness: number;
+  metalness: number;
+  emissive: number;
+  emissiveIntensity: number;
+};
+
+export function surfaceSpec(theme: ThemeId, surface: SurfaceKind): SurfaceSpec {
+  if (surface === "dirt") {
+    return {
+      roughness: theme === "mesa" || theme === "ember" ? 0.92 : 0.88,
+      metalness: 0.03,
+      emissive: theme === "ember" ? 0x281008 : theme === "mesa" ? 0x201808 : 0x000000,
+      emissiveIntensity: theme === "ember" ? 0.08 : theme === "mesa" ? 0.04 : 0,
+    };
+  }
+  if (surface === "ice") {
+    return {
+      roughness: 0.26,
+      metalness: 0.36,
+      emissive: theme === "alpine" ? 0x101820 : theme === "storm" ? 0x081018 : 0x102028,
+      emissiveIntensity: theme === "alpine" ? 0.08 : theme === "storm" ? 0.12 : 0.06,
+    };
+  }
+  if (surface === "tech") {
+    return {
+      roughness: 0.34,
+      metalness: 0.3,
+      emissive:
+        theme === "night"
+          ? 0x1c2438
+          : theme === "works"
+            ? 0x181410
+            : theme === "grove"
+              ? 0x081410
+              : theme === "storm"
+                ? 0x081018
+                : 0x101418,
+      emissiveIntensity:
+        theme === "night" ? 0.34 : theme === "works" ? 0.16 : theme === "grove" ? 0.12 : theme === "storm" ? 0.16 : 0.08,
+    };
+  }
+  return {
+    roughness:
+      theme === "night"
+        ? 0.38
+        : theme === "stadium"
+          ? 0.52
+          : theme === "alpine"
+            ? 0.5
+            : theme === "works"
+              ? 0.44
+              : theme === "mesa"
+                ? 0.5
+                : theme === "grove"
+                  ? 0.48
+                  : theme === "ember"
+                    ? 0.5
+                    : theme === "storm"
+                      ? 0.42
+                      : 0.5,
+    metalness:
+      theme === "night"
+        ? 0.16
+        : theme === "stadium"
+          ? 0.08
+          : theme === "alpine"
+            ? 0.12
+            : theme === "works"
+              ? 0.2
+              : theme === "mesa"
+                ? 0.08
+                : theme === "grove"
+                  ? 0.1
+                  : theme === "ember"
+                    ? 0.08
+                    : theme === "storm"
+                      ? 0.18
+                      : 0.08,
+    emissive:
+      theme === "night"
+        ? 0x1c2438
+        : theme === "alpine"
+          ? 0x101820
+          : theme === "works"
+            ? 0x181410
+            : theme === "mesa"
+              ? 0x201808
+              : theme === "grove"
+                ? 0x081410
+                : theme === "ember"
+                  ? 0x281008
+                  : theme === "storm"
+                    ? 0x081018
+                    : 0x000000,
+    emissiveIntensity:
+      theme === "night"
+        ? 0.34
+        : theme === "alpine"
+          ? 0.06
+          : theme === "works"
+            ? 0.12
+            : theme === "mesa"
+              ? 0.06
+              : theme === "grove"
+                ? 0.16
+                : theme === "ember"
+                  ? 0.1
+                  : theme === "storm"
+                    ? 0.18
+                    : 0,
+  };
+}
+
+/** Roughness-map mid gray. Higher = dirtier / more matte. */
+export function surfaceRoughnessMid(theme: ThemeId, surface: SurfaceKind): number {
+  if (surface === "dirt") return 198;
+  if (surface === "ice") return 78;
+  if (surface === "tech") return 108;
+  return theme === "stadium"
+    ? 148
+    : theme === "canyon"
+      ? 168
+      : theme === "alpine"
+        ? 132
+        : theme === "works"
+          ? 118
+          : theme === "mesa"
+            ? 158
+            : theme === "grove"
+              ? 108
+              : theme === "ember"
+                ? 152
+                : theme === "storm"
+                  ? 112
+                  : 96;
 }
 
 export type Rgb = { r: number; g: number; b: number };

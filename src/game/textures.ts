@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import type { ThemeId } from "./types";
-import { ASPHALT_BASE } from "./look";
+import type { SurfaceKind, ThemeId } from "./types";
+import { surfaceAlbedoBase, surfaceRoughnessMid } from "./look";
 import { liveryDef, type LiveryId } from "./livery";
 
 export { ASPHALT_BASE, ROAD_TINT, roadCrown } from "./look";
@@ -94,13 +94,74 @@ export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THRE
   return t;
 }
 
+export function paintSurfaceAlbedo(kind: SurfaceKind, theme: ThemeId, size: number) {
+  const { c, ctx } = canvas(size);
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  const base = surfaceAlbedoBase(kind, theme);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const grit = hash(x * 13 + y * 7) * (kind === "dirt" ? 28 : kind === "ice" ? 12 : kind === "tech" ? 16 : 18);
+      const blotch = hash((x >> 3) + (y >> 2) * 17) * (kind === "dirt" ? 18 : 10);
+      let r = base[0] + grit + blotch;
+      let g = base[1] + grit * 0.88 + blotch * 0.8;
+      let b = base[2] + grit * 0.72 + blotch * 0.6;
+      if (kind === "dirt") {
+        const rut = Math.sin(y * 0.2) * 16 + ((y >> 3) % 3 === 0 ? 8 : -5);
+        const wash = Math.sin(x * 0.09) * 8;
+        r += rut + wash + 4;
+        g += rut * 0.7 + wash * 0.5;
+        b += rut * 0.35 + wash * 0.2;
+      } else if (kind === "ice") {
+        const streak = Math.sin(x * 0.07) * 18 + Math.sin(y * 0.32) * 8;
+        const crack = (x + y * 3) % 64 < 1 ? 22 : 0;
+        r += streak * 0.55 + crack;
+        g += streak * 0.8 + crack;
+        b += streak + crack * 0.7;
+      } else {
+        const panel = x % 48 < 2 || y % 56 < 2 ? 26 : 0;
+        const bolt = hash((x >> 2) + (y >> 2) * 9) > 0.94 ? 18 : 0;
+        r += panel * 0.55 + bolt;
+        g += panel * 0.85 + bolt;
+        b += panel + bolt;
+      }
+      d[i] = Math.max(0, Math.min(255, r));
+      d[i + 1] = Math.max(0, Math.min(255, g));
+      d[i + 2] = Math.max(0, Math.min(255, b));
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.globalAlpha = kind === "ice" ? 0.2 : kind === "tech" ? 0.18 : 0.22;
+  ctx.fillStyle =
+    kind === "ice" ? "#d8eefc" : kind === "tech" ? (theme === "night" ? "#6ec8ff" : "#1a2824") : "#3a2410";
+  const strokes = kind === "dirt" ? 56 : kind === "ice" ? 28 : 36;
+  for (let i = 0; i < strokes; i++) {
+    const w = kind === "dirt" ? 6 + hash(i) * 18 : kind === "ice" ? 1 + hash(i) * 3 : 8 + hash(i) * 20;
+    const h = kind === "ice" ? 18 + hash(i + 3) * 28 : kind === "dirt" ? 1.4 : 1.2;
+    ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, w, h);
+  }
+  ctx.globalAlpha = 1;
+  return c;
+}
+
+export function makeSurfaceTexture(kind: SurfaceKind, theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
+  if (kind === "plastic") return makeAsphaltTexture(theme, opts);
+  const size = opts?.size ?? 256;
+  const c = paintSurfaceAlbedo(kind, theme, size);
+  const t = tex(c, kind === "ice" ? 12 : 16, opts?.anisotropy ?? 8);
+  t.repeat.set(1, 1);
+  return t;
+}
+
 /** Roughness variation so High-quality asphalt reads grit vs oil, not a flat slab. */
 export function makeAsphaltRoughness(theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
   const size = opts?.size ?? 256;
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
-  const mid = theme === "stadium" ? 148 : theme === "canyon" ? 168 : theme === "alpine" ? 132 : theme === "works" ? 118 : theme === "mesa" ? 158 : theme === "grove" ? 108 : theme === "ember" ? 152 : theme === "storm" ? 112 : 96;
+  const mid = surfaceRoughnessMid(theme, "plastic");
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -108,6 +169,37 @@ export function makeAsphaltRoughness(theme: ThemeId, opts?: TextureMakeOpts): TH
       const oil = Math.sin((x + y) * 0.07) * (theme === "night" ? 10 : theme === "storm" ? 16 : 22);
       const groove = theme === "stadium" && x % 32 < 2 ? 18 : 0;
       const v = Math.max(40, Math.min(220, mid + grit - oil + groove));
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = tex(c, 16, opts?.anisotropy ?? 8);
+  t.colorSpace = THREE.NoColorSpace;
+  t.repeat.set(1, 1);
+  return t;
+}
+
+export function makeSurfaceRoughness(kind: SurfaceKind, theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
+  if (kind === "plastic") return makeAsphaltRoughness(theme, opts);
+  const size = opts?.size ?? 256;
+  const { c, ctx } = canvas(size);
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  const mid = surfaceRoughnessMid(theme, kind);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const grit = hash(x * 19 + y * 11) * (kind === "ice" ? 22 : 40);
+      const feature =
+        kind === "dirt"
+          ? Math.sin(y * 0.2) * 18
+          : kind === "ice"
+            ? -Math.sin(x * 0.07) * 24
+            : x % 48 < 2 || y % 56 < 2
+              ? 28
+              : -10;
+      const v = Math.max(28, Math.min(230, mid + grit + feature));
       d[i] = d[i + 1] = d[i + 2] = v;
       d[i + 3] = 255;
     }

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { customDefFromSave, readActiveCustom } from "./editor.ts";
 import type { BuiltTrack, Medal, Sample, SurfaceKind, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
-import { TRACK_ORDER, type StockTrackId } from "./types.ts";
+import { SURFACE_ORDER, TRACK_ORDER, type StockTrackId } from "./types.ts";
 import { defaultSurface } from "./feel.ts";
 import {
   curbBlockHigh,
@@ -15,8 +15,9 @@ import {
   surfaceBand,
   surfaceDashColor,
   surfaceShowsDash,
+  surfaceSpec,
 } from "./look";
-import { makeAsphaltRoughness, makeAsphaltTexture, makeCheckerTexture } from "./textures";
+import { makeCheckerTexture, makeSurfaceRoughness, makeSurfaceTexture } from "./textures";
 import type { TextureBudget } from "./quality";
 
 const TAU = Math.PI * 2;
@@ -644,14 +645,28 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
   return (p < g1 && q >= g1) || (p < g2 && q >= g2) || (p < g0 && q >= g0);
 }
 
+export function ribbonSurfaceKinds(track: BuiltTrack): SurfaceKind[] {
+  const seen = new Set<SurfaceKind>();
+  for (const sample of track.samples) seen.add(sample.surface);
+  return SURFACE_ORDER.filter((kind) => seen.has(kind));
+}
+
+type RoadBuf = { pos: number[]; nrm: number[]; col: number[]; uv: number[] };
+
+function emptyRoad(): RoadBuf {
+  return { pos: [], nrm: [], col: [], uv: [] };
+}
+
 export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: TextureBudget) {
   const samples = track.samples;
   const closed = track.def.closed;
   const count = closed ? samples.length : samples.length - 1;
-  const roadPos: number[] = [];
-  const roadNrm: number[] = [];
-  const roadUv: number[] = [];
-  const roadCol: number[] = [];
+  const roads: Record<SurfaceKind, RoadBuf> = {
+    plastic: emptyRoad(),
+    dirt: emptyRoad(),
+    ice: emptyRoad(),
+    tech: emptyRoad(),
+  };
   const curbPos: number[] = [];
   const curbNrm: number[] = [];
   const curbCol: number[] = [];
@@ -762,8 +777,9 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     const bmx = (blx + brx) * 0.5;
     const bmy = (bly + bry) * 0.5;
     const bmz = (blz + brz) * 0.5;
-    strip(roadPos, roadNrm, roadCol, roadUv, alx, aly, alz, amx, amy, amz, blx, bly, blz, bmx, bmy, bmz, a.ux, a.uy, a.uz, colL, u0, u1);
-    strip(roadPos, roadNrm, roadCol, roadUv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
+    const road = roads[a.surface];
+    strip(road.pos, road.nrm, road.col, road.uv, alx, aly, alz, amx, amy, amz, blx, bly, blz, bmx, bmy, bmz, a.ux, a.uy, a.uz, colL, u0, u1);
+    strip(road.pos, road.nrm, road.col, road.uv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
 
     const sausage = curbBlockHigh(theme, (a.s + b.s) * 0.5);
     const { width: cw, height: ch, lift } = curbDims(theme, sausage);
@@ -949,18 +965,45 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   }
 
   const texOpts = { size: budget?.size ?? 256, anisotropy: budget?.anisotropy ?? 8 };
-  const asphalt = makeAsphaltTexture(theme, texOpts);
-  asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
-  asphalt.repeat.set(1, 1);
-  const asphaltRough = budget?.roughnessMap === false ? null : makeAsphaltRoughness(theme, texOpts);
-
-  const roadGeo = new THREE.BufferGeometry();
-  roadGeo.setAttribute("position", new THREE.Float32BufferAttribute(roadPos, 3));
-  roadGeo.setAttribute("normal", new THREE.Float32BufferAttribute(roadNrm, 3));
-  roadGeo.setAttribute("uv", new THREE.Float32BufferAttribute(roadUv, 2));
-  roadGeo.setAttribute("color", new THREE.Float32BufferAttribute(roadCol, 3));
-  // Keep authored ribbon normals. computeVertexNormals() follows triangle
-  // winding, which faces down and paints the driving surface black at night.
+  const usedSurfaces = ribbonSurfaceKinds(track);
+  const roadMats: THREE.MeshStandardMaterial[] = [];
+  const roadGeos: THREE.BufferGeometry[] = [];
+  const roadTexs: THREE.Texture[] = [];
+  const roadMeshes: THREE.Mesh[] = [];
+  for (const kind of usedSurfaces) {
+    const buf = roads[kind];
+    if (!buf.pos.length) continue;
+    const albedo = makeSurfaceTexture(kind, theme, texOpts);
+    albedo.wrapS = albedo.wrapT = THREE.RepeatWrapping;
+    albedo.repeat.set(1, 1);
+    const rough = budget?.roughnessMap === false ? null : makeSurfaceRoughness(kind, theme, texOpts);
+    const spec = surfaceSpec(theme, kind);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(buf.pos, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(buf.nrm, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(buf.uv, 2));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(buf.col, 3));
+    // Keep authored ribbon normals. computeVertexNormals() follows triangle
+    // winding, which faces down and paints the driving surface black at night.
+    const mat = new THREE.MeshStandardMaterial({
+      map: albedo,
+      roughnessMap: rough ?? undefined,
+      vertexColors: true,
+      roughness: spec.roughness,
+      metalness: spec.metalness,
+      emissive: spec.emissive,
+      emissiveIntensity: spec.emissiveIntensity,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.userData.surface = kind;
+    roadMeshes.push(mesh);
+    roadMats.push(mat);
+    roadGeos.push(geo);
+    roadTexs.push(albedo);
+    if (rough) roadTexs.push(rough);
+  }
 
   const curbGeo = new THREE.BufferGeometry();
   curbGeo.setAttribute("position", new THREE.Float32BufferAttribute(curbPos, 3));
@@ -985,16 +1028,6 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   railGeo.setAttribute("color", new THREE.Float32BufferAttribute(railCol, 3));
   railGeo.computeVertexNormals();
 
-  const roadMat = new THREE.MeshStandardMaterial({
-    map: asphalt,
-    roughnessMap: asphaltRough ?? undefined,
-    vertexColors: true,
-    roughness: theme === "night" ? 0.38 : theme === "stadium" ? 0.52 : theme === "alpine" ? 0.58 : theme === "works" ? 0.44 : theme === "mesa" ? 0.7 : theme === "grove" ? 0.48 : theme === "ember" ? 0.68 : theme === "storm" ? 0.42 : 0.74,
-    metalness: theme === "night" ? 0.16 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.12 : theme === "works" ? 0.2 : theme === "mesa" ? 0.06 : theme === "grove" ? 0.1 : theme === "ember" ? 0.08 : theme === "storm" ? 0.18 : 0.05,
-    emissive: theme === "night" ? 0x1c2438 : theme === "alpine" ? 0x101820 : theme === "works" ? 0x181410 : theme === "mesa" ? 0x201808 : theme === "grove" ? 0x081410 : theme === "ember" ? 0x281008 : theme === "storm" ? 0x081018 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.34 : theme === "alpine" ? 0.06 : theme === "works" ? 0.12 : theme === "mesa" ? 0.08 : theme === "grove" ? 0.16 : theme === "ember" ? 0.14 : theme === "storm" ? 0.18 : 0,
-    side: THREE.DoubleSide,
-  });
   const curbMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: theme === "stadium" ? 0.22 : theme === "alpine" ? 0.26 : theme === "works" ? 0.28 : theme === "mesa" ? 0.36 : theme === "ember" ? 0.34 : theme === "storm" ? 0.3 : 0.32,
@@ -1034,8 +1067,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   for (let i = 0; i < postMats.length; i++) posts.setMatrixAt(i, postMats[i]!);
 
   const group = new THREE.Group();
-  const road = new THREE.Mesh(roadGeo, roadMat);
-  road.receiveShadow = true;
+  for (const road of roadMeshes) group.add(road);
   const curb = new THREE.Mesh(curbGeo, curbMat);
   curb.receiveShadow = true;
   curb.castShadow = true;
@@ -1044,7 +1076,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   const marks = new THREE.Mesh(markGeo, markMat);
   const rails = new THREE.Mesh(railGeo, railMat);
   rails.castShadow = true;
-  group.add(road, curb, wall, marks, rails, posts);
+  group.add(curb, wall, marks, rails, posts);
 
   const checker = makeCheckerTexture();
   checker.repeat.set(4, 1);
@@ -1118,9 +1150,9 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
 
   return {
     group,
-    materials: [roadMat, curbMat, wallMat, markMat, railMat, postMat, boostMat, boostPadMat, gridMat],
-    geos: [roadGeo, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, padGeo, grid.geometry as THREE.BufferGeometry],
-    textures: asphaltRough ? [asphalt, asphaltRough, checker] : [asphalt, checker],
+    materials: [...roadMats, curbMat, wallMat, markMat, railMat, postMat, boostMat, boostPadMat, gridMat],
+    geos: [...roadGeos, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, padGeo, grid.geometry as THREE.BufferGeometry],
+    textures: [...roadTexs, checker],
   };
 }
 

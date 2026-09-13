@@ -13,6 +13,9 @@ import {
   roadCrown,
   roadSurfaceTint,
   SURFACE_ARCHETYPE,
+  surfaceAlbedoBase,
+  surfaceRoughnessMid,
+  surfaceSpec,
   themeDefaultSurface,
 } from "./look.ts";
 
@@ -51,6 +54,33 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.works.r < ROAD_TINT.night.b);
     const crown = roadCrown("works");
     assert.ok(crown.edge > crown.mid);
+  });
+
+  it("gives dirt / ice / tech their own specular so mixed ribbons do not share one asphalt slab", () => {
+    const stadiumPlastic = surfaceSpec("stadium", "plastic");
+    assert.equal(stadiumPlastic.roughness, 0.52);
+    assert.equal(stadiumPlastic.metalness, 0.08);
+    assert.equal(stadiumPlastic.emissiveIntensity, 0);
+    const canyonDirt = surfaceSpec("canyon", "dirt");
+    const canyonPlastic = surfaceSpec("canyon", "plastic");
+    assert.ok(canyonDirt.roughness > canyonPlastic.roughness + 0.2, "dirt should read matte vs paved start");
+    assert.ok(canyonDirt.metalness < canyonPlastic.metalness);
+    const alpineIce = surfaceSpec("alpine", "ice");
+    assert.ok(alpineIce.roughness < stadiumPlastic.roughness);
+    assert.ok(alpineIce.metalness > stadiumPlastic.metalness + 0.15);
+    const helixTech = surfaceSpec("night", "tech");
+    assert.ok(helixTech.metalness > stadiumPlastic.metalness);
+    assert.ok(helixTech.roughness < canyonDirt.roughness);
+    assert.ok(surfaceRoughnessMid("canyon", "dirt") > surfaceRoughnessMid("stadium", "plastic"));
+    assert.ok(surfaceRoughnessMid("alpine", "ice") < surfaceRoughnessMid("stadium", "plastic"));
+    const mesaPlastic = surfaceAlbedoBase("plastic", "mesa");
+    const mesaDirt = surfaceAlbedoBase("dirt", "mesa");
+    assert.deepEqual(mesaPlastic, ASPHALT_BASE.stadium);
+    assert.deepEqual(mesaDirt, ASPHALT_BASE.mesa);
+    assert.ok(mesaDirt[0] > mesaDirt[2], "mesa dirt stays warm");
+    assert.ok(mesaPlastic[2] >= mesaPlastic[0], "plastic table is cool charcoal, not mesa clay");
+    const stormIce = surfaceAlbedoBase("ice", "storm");
+    assert.ok(stormIce[2] > stormIce[0], "storm plaza ice should read cooler than wet streets");
   });
 
   it("keeps Circuit plastic on the stadium tint and pulls mixed surfaces toward their archetype", () => {
