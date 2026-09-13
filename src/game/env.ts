@@ -800,14 +800,14 @@ function buildGrove(
 ) {
   const ring = trackOutRadius(track) + 28;
   const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 4.2, 6);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x1a1610, roughness: 0.94 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.94 });
   const leafGeo = new THREE.ConeGeometry(1.7, 5.2, 7);
-  const leafDark = new THREE.MeshStandardMaterial({ color: 0x0e2418, roughness: 0.9 });
+  const leafDark = new THREE.MeshStandardMaterial({ color: 0x1a3c28, roughness: 0.9 });
   const leafLite = new THREE.MeshStandardMaterial({
-    color: 0x1a3a28,
+    color: 0x2a5840,
     roughness: 0.86,
-    emissive: 0x081810,
-    emissiveIntensity: 0.18,
+    emissive: 0x143820,
+    emissiveIntensity: 0.28,
   });
   const n = 64;
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, n);
@@ -822,7 +822,7 @@ function buildGrove(
   for (let i = 0; i < n; i++) {
     const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
-    const d = sm.width * 0.5 + 5.4 + hash(i) * 7;
+    const d = sm.width * 0.5 + 3.8 + hash(i) * 5;
     const x = sm.x + sm.rx * side * d;
     const z = sm.z + sm.rz * side * d;
     if (overlapsTrack(track, x, z, 3.2)) continue;
@@ -844,7 +844,7 @@ function buildGrove(
   geos.push(trunkGeo, leafGeo);
   mats.push(trunkMat, leafDark, leafLite);
 
-  addTrees(group, geos, mats, 40, ring + 6, ring + 58, 0x163424);
+  addTrees(group, geos, mats, 40, ring + 6, ring + 58, 0x245438);
 
   const mossGeo = new THREE.IcosahedronGeometry(0.9, 0);
   const moss = new THREE.MeshStandardMaterial({ color: 0x1c3a24, roughness: 0.96 });
@@ -877,7 +877,7 @@ function buildGrove(
     const sm = sampleAt(track, ((i + 0.3) / 8) * track.length);
     const side = i % 2 === 0 ? 1 : -1;
     const d = sm.width * 0.5 + 4.2;
-    const pl = new THREE.PointLight(i % 2 === 0 ? 0xa8e070 : 0x70d0a0, 0.55, 22, 2);
+    const pl = new THREE.PointLight(i % 2 === 0 ? 0xa8e070 : 0x70d0a0, 0.72, 26, 2);
     pl.position.set(sm.x + sm.rx * side * d + sm.ux * 2.4, sm.y + sm.uy * 2.4, sm.z + sm.rz * side * d + sm.uz * 2.4);
     group.add(pl);
     lights.push(pl);
@@ -962,7 +962,7 @@ function decorateTrackside(
       realLights++;
     }
     if (theme === "grove" && realLights < 6) {
-      const pl = new THREE.PointLight(0x88d898, 0.7, 28, 2);
+      const pl = new THREE.PointLight(0x88d898, 0.88, 32, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);

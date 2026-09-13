@@ -298,11 +298,11 @@ export function themeLightLevels(
   if (theme === "grove") {
     // Moonlit canopy. Own fog + lights — never reuse Helix 88/460 or Circuit High.
     return {
-      sun: 0.68,
-      hemi: 0.9,
-      exposure: 1.06,
-      env: quality.environment ? 0.18 : 0,
-      bloomMul: 0.36,
+      sun: 0.82,
+      hemi: 1.05,
+      exposure: 1.14,
+      env: quality.environment ? 0.22 : 0,
+      bloomMul: 0.4,
       bloomThreshold: Math.min(quality.bloomThreshold, 0.84),
     };
   }

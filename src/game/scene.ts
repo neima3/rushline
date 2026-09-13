@@ -260,15 +260,15 @@ const THEMES: Record<ThemeId, ThemePack> = {
     skyTint: 0xfff4d8,
   },
   grove: {
-    fog: 0x14261c,
-    ground: 0x142018,
-    hemiSky: 0x4a7860,
-    hemiGround: 0x1a2a1c,
-    sun: 0xc8e8d4,
+    fog: 0x1e3a2c,
+    ground: 0x1a2a1e,
+    hemiSky: 0x6a9878,
+    hemiGround: 0x243828,
+    sun: 0xd8f0e4,
     sunPos: [-16, 54, -28],
-    exposure: 1.06,
+    exposure: 1.14,
     sky: "",
-    skyTint: 0xd8f0e4,
+    skyTint: 0xe0f6ea,
   },
 };
 
@@ -1146,7 +1146,7 @@ export class World {
                 ? 0x68a878
                 : 0x8ab4d8,
     );
-    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : worksFill ? 0.22 : mesaFill ? 0.18 : groveFill ? 0.32 : 0;
+    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : worksFill ? 0.22 : mesaFill ? 0.18 : groveFill ? 0.42 : 0;
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
     this.fill2.color.set(
@@ -1162,7 +1162,7 @@ export class World {
                 ? 0xa8e0b8
                 : 0xb8c8dc,
     );
-    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : worksFill ? 0.14 : mesaFill ? 0.1 : groveFill ? 0.18 : 0;
+    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : worksFill ? 0.14 : mesaFill ? 0.1 : groveFill ? 0.24 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {
