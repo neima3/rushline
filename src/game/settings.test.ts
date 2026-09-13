@@ -4,6 +4,7 @@ import {
   applyQuality,
   applySteerSettings,
   defaultSettings,
+  loadSettings,
   parseSettings,
   qualityProfile,
 } from "./settings.ts";
@@ -119,6 +120,8 @@ describe("parseSettings", () => {
     assert.equal(parseSettings({ livery: "hazard" }, false).livery, "hazard");
     assert.equal(parseSettings({ livery: "turbo" }, true).livery, "ivory");
     assert.equal(defaultSettings(false).livery, "ivory");
+    assert.equal(loadSettings(false, "carbon").livery, "carbon");
+    assert.equal(loadSettings(false, "nope").livery, "ivory");
   });
 });
 

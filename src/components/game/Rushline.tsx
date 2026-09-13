@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { Game } from "@/game/Game";
 import { muteFromSearch } from "@/game/audio";
 import { loadSettings } from "@/game/settings";
-import { useGame } from "@/game/store";
+import { readSave, useGame } from "@/game/store";
 import { GameErrorBoundary } from "./GameErrorBoundary";
 import { Overlay } from "./Overlay";
 import { TouchPad } from "./TouchPad";
@@ -30,7 +30,7 @@ export function Rushline() {
   const [bootGen, setBootGen] = useState(0);
 
   useLayoutEffect(() => {
-    useGame.getState().hydrateSettings(loadSettings());
+    useGame.getState().hydrateSettings(loadSettings(isTouchPlay(), readSave().livery));
     if (muteFromSearch(window.location.search)) useGame.getState().setMuted(true);
     applyTouchDefaults();
   }, []);

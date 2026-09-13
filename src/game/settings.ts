@@ -1,5 +1,4 @@
-import { DEFAULT_LIVERY, liveryId, parseLivery, type LiveryId } from "./livery";
-import { parseSave, SAVE_KEY } from "./persist";
+import { DEFAULT_LIVERY, liveryId, parseLivery, type LiveryId } from "./livery.ts";
 
 export const SETTINGS_KEY = "rushline-settings-v1";
 
@@ -168,33 +167,27 @@ export function parseSettings(raw: unknown, touch = false): Settings {
   };
 }
 
-export function loadSettings(touch = isTouchDevice()): Settings {
-  if (typeof window === "undefined") return defaultSettings(touch);
+export function loadSettings(touch = isTouchDevice(), saveLivery?: unknown): Settings {
+  if (typeof window === "undefined") {
+    const fresh = defaultSettings(touch);
+    const fallback = parseLivery(saveLivery);
+    if (fallback) fresh.livery = fallback;
+    return fresh;
+  }
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
+    const fallback = parseLivery(saveLivery);
     if (!raw) {
       const fresh = defaultSettings(touch);
-      const fromSave = readSaveLivery();
-      if (fromSave) fresh.livery = fromSave;
+      if (fallback) fresh.livery = fallback;
       persistSettings(fresh);
       return fresh;
     }
     const parsed = parseSettings(JSON.parse(raw), touch);
-    if (!hasOwnLivery(raw)) {
-      const fromSave = readSaveLivery();
-      if (fromSave) parsed.livery = fromSave;
-    }
+    if (!hasOwnLivery(raw) && fallback) parsed.livery = fallback;
     return parsed;
   } catch {
     return defaultSettings(touch);
-  }
-}
-
-function readSaveLivery() {
-  try {
-    return parseLivery(parseSave(window.localStorage.getItem(SAVE_KEY)).livery);
-  } catch {
-    return undefined;
   }
 }
 
