@@ -83,12 +83,16 @@ export function ghostQuality(frames: GhostFrame[] | null | undefined): "none" | 
 export function pickRaceGhost(
   pb: GhostFrame[] | null | undefined,
   last: GhostFrame[] | null | undefined,
-  prefer: "auto" | "pb" | "last" = "auto",
+  prefer: "auto" | "pb" | "last" | "import" = "auto",
+  imported?: GhostFrame[] | null,
 ): { frames: GhostFrame[] | null; source: GhostSource } {
   const pbFrames = sanitizeFrames(pb);
   const lastFrames = sanitizeFrames(last);
+  const importedFrames = sanitizeFrames(imported);
+  if (prefer === "import" && importedFrames) return { frames: importedFrames, source: "import" };
   if (prefer === "pb" && pbFrames) return { frames: pbFrames, source: "pb" };
   if (prefer === "last" && lastFrames) return { frames: lastFrames, source: "last" };
+  if (prefer === "auto" && importedFrames) return { frames: importedFrames, source: "import" };
 
   const pbQ = ghostQuality(pbFrames);
   const lastQ = ghostQuality(lastFrames);

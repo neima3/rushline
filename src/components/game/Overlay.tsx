@@ -8,9 +8,10 @@ import { cameraLabel } from "@/game/camera";
 import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel, SURFACE_LABEL } from "@/game/feel";
+import { ghostHudTag } from "@/game/ghost-share";
 import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
-import type { CameraMode, Medal, SurfaceKind, TrackId } from "@/game/types";
+import type { CameraMode, GhostSource, Medal, SurfaceKind, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
@@ -120,6 +121,11 @@ export function Overlay({ gameRef }: Props) {
             g()?.uiClick();
             g()?.beginTrial(id);
           }}
+          onRaceRival={(id) => {
+            g()?.uiClick();
+            g()?.beginTrial(id, "import");
+          }}
+          onUiClick={() => g()?.uiClick()}
           onMute={() => {
             const next = !muted;
             g()?.setMuted(next);
@@ -174,6 +180,7 @@ export function Overlay({ gameRef }: Props) {
           medalRemain={hud.medalRemain}
           ghostDelta={hud.ghostDelta}
           ghostLead={hud.ghostLead}
+          ghostKind={hud.ghostKind ?? "none"}
           ghostS={hud.ghostS}
           ghostN={hud.ghostN}
           cpFlash={hud.cpFlash}
@@ -355,6 +362,15 @@ export function Overlay({ gameRef }: Props) {
             g()?.uiClick();
             g()?.enterPhoto();
           }}
+          onRaceRival={
+            results.cup
+              ? undefined
+              : () => {
+                  g()?.uiClick();
+                  g()?.beginTrial(results.trackId, "import");
+                }
+          }
+          onUiClick={() => g()?.uiClick()}
         />
       ) : null}
 
@@ -463,6 +479,7 @@ function Hud({
   medalRemain,
   ghostDelta,
   ghostLead,
+  ghostKind,
   ghostS,
   ghostN,
   cpFlash,
@@ -490,6 +507,7 @@ function Hud({
   medalRemain: number | null;
   ghostDelta: number | null;
   ghostLead: "ahead" | "behind" | "even" | null;
+  ghostKind: GhostSource;
   ghostS: number | null;
   ghostN: number | null;
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
@@ -522,7 +540,7 @@ function Hud({
                 ghostDelta > 20 ? "text-danger" : ghostDelta < -20 ? "text-ok" : "text-muted",
               )}
             >
-              <span className="hud-ghost-tag">GHOST</span>
+              <span className="hud-ghost-tag">{ghostHudTag(ghostKind)}</span>
               {formatDelta(ghostDelta)}
             </p>
           ) : null}

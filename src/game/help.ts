@@ -67,6 +67,14 @@ export const COPY = {
     "The HUD hides for the still. Capture saves a PNG to your downloads.",
     "On a finished run you can follow the ghost and scrub the replay.",
   ],
+  ghostTitle: "Ghost share",
+  ghostBlurb: "Trackmania-style rival tapes. Export and import stay on this device — no account.",
+  ghostNotes: [
+    "Results and Tracks can export your last run or personal-best ghost as a JSON file.",
+    "Import a friend's .json on that circuit to race their tape as a rival ghost.",
+    "A rival is local only. It never overwrites your PB, last run, Cup, or Garage paint.",
+    "Clear the rival from Tracks when you want the usual PB / last-run ghost back.",
+  ],
   playNotes: [
     "Time trial — any track, any medal, personal-best ghost.",
     "Rush Cup — Gold on all seven, then Author. Next challenge unlocks in order.",
@@ -75,6 +83,7 @@ export const COPY = {
     "C cycles Chase → Far → Hood → Cabin. All four stay usable at speed.",
     "Garage paint is cosmetic only. Steering Slow/Normal/Fast and audio mix live under Settings.",
     "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
+    "Ghost share — export a PB or last-run JSON from Results or Tracks, then import a rival to race that circuit.",
   ],
   noMedal: "No medal this run. Bronze is the next target.",
   overlayError: "Overlay error",

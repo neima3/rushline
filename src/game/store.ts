@@ -30,6 +30,7 @@ import {
   type LastSave,
   type RunCommit,
 } from "./persist";
+import { SHARE_KEY, parseShare, type ShareSave } from "./ghost-share";
 import {
   commitCupRun,
   emptyCup,
@@ -41,7 +42,7 @@ import {
 } from "./cup";
 
 export { TRACK_ORDER };
-export { SAVE_KEY, LAST_KEY, CUP_KEY, commitRun };
+export { SAVE_KEY, LAST_KEY, CUP_KEY, SHARE_KEY, commitRun };
 export type { RunCommit };
 
 const emptyHud = (): HudState => ({
@@ -64,6 +65,7 @@ const emptyHud = (): HudState => ({
   ghostN: null,
   ghostDelta: null,
   ghostLead: null,
+  ghostKind: "none",
   medalRemain: null,
   cpFlash: null,
   rewinding: false,
@@ -97,6 +99,7 @@ function loadLast(): LastSave {
 let saveCache: SaveData | null = null;
 let lastCache: LastSave | null = null;
 let cupCache: CupProgress | null = null;
+let shareCache: ShareSave | null = null;
 
 export function readSave(): SaveData {
   if (typeof window === "undefined") return emptySave();
@@ -108,6 +111,24 @@ export function readLastSave(): LastSave {
   if (typeof window === "undefined") return emptyLast();
   if (!lastCache) lastCache = loadLast();
   return lastCache;
+}
+
+function loadShare(): ShareSave {
+  try {
+    return parseShare(localStorage.getItem(SHARE_KEY));
+  } catch {
+    return { imports: {} };
+  }
+}
+
+export function readShareSave(): ShareSave {
+  if (typeof window === "undefined") return { imports: {} };
+  if (!shareCache) shareCache = loadShare();
+  return shareCache;
+}
+
+export function writeShareCache(next: ShareSave) {
+  shareCache = next;
 }
 
 function persistLiverySave(livery: LiveryId) {
@@ -173,6 +194,7 @@ type GameStore = {
   best: Partial<Record<TrackId, number>>;
   lastTimes: Partial<Record<TrackId, number>>;
   recents: Partial<Record<TrackId, number[]>>;
+  imports: Partial<Record<TrackId, number>>;
   settings: Settings;
   settingsOpen: boolean;
   helpOpen: boolean;
@@ -233,6 +255,7 @@ export const useGame = create<GameStore>((set) => ({
   best: {},
   lastTimes: {},
   recents: {},
+  imports: {},
   settings: bootSettings,
   settingsOpen: false,
   helpOpen: false,
@@ -303,12 +326,16 @@ export const useGame = create<GameStore>((set) => ({
   refreshBest: () => {
     const save = readSave();
     const last = readLastSave();
+    const share = readShareSave();
     const lastTimes: Partial<Record<TrackId, number>> = {};
+    const imports: Partial<Record<TrackId, number>> = {};
     for (const id of TRACK_ORDER) {
       const run = last.runs[id];
       if (run) lastTimes[id] = run.time;
+      const rival = share.imports[id];
+      if (rival) imports[id] = rival.time;
     }
-    set({ best: { ...save.best }, lastTimes, recents: { ...last.recents } });
+    set({ best: { ...save.best }, lastTimes, recents: { ...last.recents }, imports });
   },
   refreshCup: () => set({ cupProgress: { ...readCupProgress() } }),
 }));

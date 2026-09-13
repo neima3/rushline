@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Car, CircleHelp, Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
 import { allTrackDefs, medalFor, TRACK_DEFS } from "@/game/track";
@@ -8,6 +9,7 @@ import { useGame } from "@/game/store";
 import type { TrackId } from "@/game/types";
 import { cn, formatTime } from "@/lib/utils";
 import { keepPlayFocus, MedalRow } from "./chrome";
+import { GhostShare } from "./GhostShare";
 
 type Props = {
   ready: boolean;
@@ -23,6 +25,8 @@ type Props = {
   cupLabel: string;
   onBack: () => void;
   onRace: (id: TrackId) => void;
+  onRaceRival?: (id: TrackId) => void;
+  onUiClick?: () => void;
   onMute: () => void;
   onAuto: () => void;
   onSettings: () => void;
@@ -46,6 +50,8 @@ export function MenuScreen({
   cupLabel,
   onBack,
   onRace,
+  onRaceRival,
+  onUiClick,
   onMute,
   onAuto,
   onSettings,
@@ -56,6 +62,7 @@ export function MenuScreen({
 }: Props) {
   const trackId = useGame((s) => s.trackId);
   const featured = TRACK_DEFS[trackId];
+  const imports = useGame((s) => s.imports);
 
   return (
     <div
@@ -197,12 +204,22 @@ export function MenuScreen({
                         <span>Best {formatTime(pb ?? -1)}</span>
                         {last != null && last !== pb ? <span>· Last {formatTime(last)}</span> : null}
                       </span>
+                      {imports[t.id] != null ? (
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
+                          Rival {formatTime(imports[t.id]!)}
+                        </span>
+                      ) : null}
                       <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
                     </span>
                   </span>
                 </button>
               );
             })}
+            <TrackGhostShare
+              trackId={trackId}
+              onRaceRival={onRaceRival}
+              onUiClick={onUiClick}
+            />
             <button
               type="button"
               onClick={onBack}
@@ -265,6 +282,43 @@ function GaragePicker({ onBack }: { onBack: () => void }) {
       >
         Back
       </button>
+    </div>
+  );
+}
+
+function TrackGhostShare({
+  trackId,
+  onRaceRival,
+  onUiClick,
+}: {
+  trackId: TrackId;
+  onRaceRival?: (id: TrackId) => void;
+  onUiClick?: () => void;
+}) {
+  const [shareId, setShareId] = useState(trackId);
+  return (
+    <div className="rounded-xl border border-border bg-surface/90 p-4">
+      <label className="mb-3 flex flex-col gap-1.5">
+        <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Circuit</span>
+        <select
+          value={shareId}
+          onChange={(e) => setShareId(e.target.value as TrackId)}
+          className="h-11 rounded-md border border-border bg-bg-elevated px-3 text-sm text-fg"
+        >
+          {allTrackDefs().map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <GhostShare
+        trackId={shareId}
+        allowImport
+        allowRaceRival={Boolean(onRaceRival)}
+        onRaceRival={onRaceRival ? () => onRaceRival(shareId) : undefined}
+        onUiClick={onUiClick}
+      />
     </div>
   );
 }

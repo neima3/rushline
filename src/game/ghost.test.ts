@@ -47,6 +47,8 @@ describe("pickRaceGhost", () => {
     assert.equal(pickRaceGhost(null, last).source, "last");
     assert.equal(pickRaceGhost(null, null).source, "none");
     assert.equal(pickRaceGhost(pb, last, "last").source, "last");
+    assert.equal(pickRaceGhost(pb, last, "import", last).source, "import");
+    assert.equal(pickRaceGhost(pb, last, "auto", last).source, "import");
   });
 });
 

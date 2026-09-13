@@ -5,6 +5,7 @@ import { medalPace, TRACK_DEFS } from "@/game/track";
 import type { Medal, ResultsState, TrackId } from "@/game/types";
 import { cn, formatDelta, formatTime } from "@/lib/utils";
 import { keepPlayFocus, MedalRow } from "./chrome";
+import { GhostShare } from "./GhostShare";
 
 type Props = {
   results: ResultsState;
@@ -16,6 +17,8 @@ type Props = {
   onCup?: () => void;
   onMenu: () => void;
   onPhoto?: () => void;
+  onRaceRival?: () => void;
+  onUiClick?: () => void;
 };
 
 export function ResultsScreen({
@@ -28,6 +31,8 @@ export function ResultsScreen({
   onCup,
   onMenu,
   onPhoto,
+  onRaceRival,
+  onUiClick,
 }: Props) {
   const track = TRACK_DEFS[results.trackId];
   const cup = results.cup;
@@ -41,7 +46,10 @@ export function ResultsScreen({
       data-overlay="results"
       className="pointer-events-auto absolute inset-0 flex items-end justify-center bg-gradient-to-t from-bg via-bg/80 to-bg/35 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] md:items-center"
     >
-      <div className="hud-chrome hud-pause-card overlay-enter results-card w-full max-w-md overflow-hidden p-6">
+      <div
+        data-allow-scroll
+        className="hud-chrome hud-pause-card overlay-enter results-card max-h-full w-full max-w-md overflow-y-auto overscroll-contain p-6"
+      >
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
           {cup
             ? `${cup.cupName} · ${cup.eventIndex + 1}/${cup.eventTotal} · ${track.name}`
@@ -84,6 +92,17 @@ export function ResultsScreen({
         <MedalCelebrate medal={results.medal} />
         <MedalBoard trackId={results.trackId} time={results.time} earned={results.medal} />
         <GhostTimes results={results} />
+
+        <div className="mt-5">
+          <GhostShare
+            trackId={results.trackId}
+            exportLastLabel="Export this run"
+            allowImport
+            allowRaceRival={!cup && Boolean(onRaceRival)}
+            onRaceRival={onRaceRival}
+            onUiClick={onUiClick}
+          />
+        </div>
 
         <div className="mt-6 flex flex-col gap-2">
           {cup?.nextEventId && onNextChallenge ? (
@@ -283,7 +302,9 @@ function GhostTimes({ results }: { results: ResultsState }) {
       ? "Last run is your ghost (PB ghost missing or thin)"
       : results.ghostSource === "pb"
         ? "Racing your PB ghost · Retry vs last run to chase this lap"
-        : "No ghost yet — this run is saved locally";
+        : results.ghostSource === "import"
+          ? "Imported rival is ready — next time trial uses that tape"
+          : "No ghost yet — this run is saved locally";
   return (
     <div className="mt-3 space-y-2 text-sm">
       <p className="text-muted">

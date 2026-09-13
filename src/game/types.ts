@@ -145,6 +145,7 @@ export type HudState = {
   ghostN: number | null;
   ghostDelta: number | null;
   ghostLead: "ahead" | "behind" | "even" | null;
+  ghostKind: GhostSource;
   medalRemain: number | null;
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
   rewinding: boolean;
@@ -152,9 +153,9 @@ export type HudState = {
   surface: SurfaceKind;
 };
 
-export type GhostSource = "pb" | "last" | "none";
+export type GhostSource = "pb" | "last" | "import" | "none";
 
-export type GhostPref = "auto" | "pb" | "last";
+export type GhostPref = "auto" | "pb" | "last" | "import";
 
 export type CupId = "gold" | "author";
 
