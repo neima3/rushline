@@ -304,7 +304,9 @@ function GhostTimes({ results }: { results: ResultsState }) {
         ? "Racing your PB ghost · Retry vs last run to chase this lap"
         : results.ghostSource === "import"
           ? "Imported rival is ready — next time trial uses that tape"
-          : "No ghost yet — this run is saved locally";
+          : results.ghostSource === "author"
+            ? "Author ghost is ready — medal-pace rival until you set a PB"
+            : "No ghost yet — this run is saved locally";
   return (
     <div className="mt-3 space-y-2 text-sm">
       <p className="text-muted">

@@ -263,6 +263,7 @@ export function ghostDecodeMessage(error: GhostDecodeError): string {
 
 export function ghostHudTag(source: GhostSource): string {
   if (source === "import") return "RIVAL";
+  if (source === "author") return "AUTH";
   if (source === "last") return "LAST";
   if (source === "pb") return "GHOST";
   return "GHOST";

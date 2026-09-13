@@ -50,6 +50,18 @@ describe("pickRaceGhost", () => {
     assert.equal(pickRaceGhost(pb, last, "import", last).source, "import");
     assert.equal(pickRaceGhost(pb, last, "auto", last).source, "import");
   });
+
+  it("loads an author ghost only when PB and import are missing", () => {
+    const pb = frames(40);
+    const last = frames(36, 40, 2.1);
+    const author = frames(30, 160, 4);
+    assert.equal(pickRaceGhost(null, null, "auto", null, author).source, "author");
+    assert.equal(pickRaceGhost(null, last, "auto", null, author).source, "last");
+    assert.equal(pickRaceGhost(pb, last, "auto", null, author).source, "pb");
+    assert.equal(pickRaceGhost(pb, last, "auto", last, author).source, "import");
+    assert.equal(pickRaceGhost(pb, last, "author", last, author).source, "author");
+    assert.equal(pickRaceGhost(null, null, "auto", null, null).source, "none");
+  });
 });
 
 describe("sampleGhost", () => {
