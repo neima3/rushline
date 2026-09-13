@@ -72,6 +72,7 @@ const emptyHud = (): HudState => ({
   ghostKind: "none",
   medalRemain: null,
   cpFlash: null,
+  ghostPass: null,
   rewinding: false,
   rewindRemainMs: 0,
   surface: "plastic",

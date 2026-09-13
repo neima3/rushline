@@ -104,7 +104,7 @@ export const FEATURE_MAP: FeatureMapRow[] = [
     id: "author-ghosts",
     name: "Author ghosts",
     blurb:
-      "Every stock circuit ships an author-line ghost at medal pace. A personal-best or imported rival replaces it.",
+      "Every stock circuit ships an author-line ghost at medal pace. A personal-best or imported rival replaces it. The rival hides through lights-out, fades when you overlap, and toasts PASSED / OVERTAKEN when the lead flips.",
   },
   {
     id: "editor",
@@ -209,6 +209,7 @@ export const COPY = {
   ghostBlurb: "Trackmania-style rival tapes. Export and import stay on this device — no account.",
   ghostNotes: [
     "Stock tracks ship an author-line ghost at medal pace so you always have a rival before a PB.",
+    "The rival stays hidden through lights-out, fades when you overlap, and toasts PASSED / OVERTAKEN when the lead flips.",
     "Results and Tracks can export your last run or personal-best ghost as a JSON file.",
     "Import a friend's .json on that circuit to race their tape as a rival ghost.",
     "A rival is local only. It never overwrites your PB, last run, Cup, or Garage paint.",
@@ -227,6 +228,7 @@ export const COPY = {
     "Garage paint is cosmetic only. Steering Slow/Normal/Fast and audio mix live under Settings.",
     "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
     "Ghost share — export a PB or last-run JSON from Results or Tracks, then import a rival to race that circuit.",
+    "Race the ghost like a rival: it hides through lights-out, fades when you overlap, and toasts PASSED / OVERTAKEN when the lead flips.",
     "After a finish, Watch replay plays that tape as a spectator — last run, shipped author ghost, PB, imported rival, or a hotseat tape.",
   ],
   noMedal: "No medal this run. Bronze is the next target.",

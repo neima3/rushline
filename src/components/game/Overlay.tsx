@@ -223,6 +223,7 @@ export function Overlay({ gameRef }: Props) {
           ghostS={hud.ghostS}
           ghostN={hud.ghostN}
           cpFlash={hud.cpFlash}
+          ghostPass={hud.ghostPass}
           wrongWay={hud.wrongWay}
           countdown={phase === "countdown" ? hud.countdown : null}
           boost={hud.boost}
@@ -586,6 +587,7 @@ function Hud({
   ghostS,
   ghostN,
   cpFlash,
+  ghostPass,
   wrongWay,
   countdown,
   boost,
@@ -614,6 +616,7 @@ function Hud({
   ghostS: number | null;
   ghostN: number | null;
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
+  ghostPass: { kind: "gained" | "lost"; label: string } | null;
   wrongWay: boolean;
   countdown: number | null;
   boost: number;
@@ -666,6 +669,14 @@ function Hud({
             </p>
           ) : null}
         </div>
+        {ghostPass ? (
+          <p
+            key={`pass-${ghostPass.kind}-${ghostPass.label}`}
+            className={cn("hud-ghost-pass", ghostPass.kind === "gained" ? "text-ok" : "text-danger")}
+          >
+            {ghostPass.label}
+          </p>
+        ) : null}
         {cpFlash ? (
           <p
             key={`${cpFlash.kind}-${cpFlash.label}-${cpFlash.delta ?? "x"}`}

@@ -827,13 +827,22 @@ export class World {
     this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
-  applyGhost(track: BuiltTrack, frames: GhostFrame[] | null, time: number, playerS = 0, splitMs: number | null = null) {
+  applyGhost(
+    track: BuiltTrack,
+    frames: GhostFrame[] | null,
+    time: number,
+    playerS = 0,
+    splitMs: number | null = null,
+    liveMul = 1,
+  ) {
     const pose = sampleGhost(frames, time, track.length, track.def.closed);
-    if (!pose || this.ghostOpacity <= 0.01) {
+    const opacity = this.ghostOpacity * Math.max(0, Math.min(1, liveMul));
+    if (!pose || opacity <= 0.01) {
       this.ghost.group.visible = false;
       return;
     }
     this.ghost.group.visible = true;
+    this.ghost.setOpacity(opacity);
     const s = pose.s;
     const n = pose.n;
     const heading = pose.heading;

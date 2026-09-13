@@ -38,6 +38,16 @@ import {
   ghostSplitMs,
   ghostTimeAtS,
 } from "./feel";
+import {
+  alongDelta,
+  ghostLightsOutMul,
+  ghostPassHoldMs,
+  ghostPassKind,
+  ghostPassLabel,
+  ghostProximityMul,
+  nextDecisiveLead,
+  type DecisiveLead,
+} from "./ghost-race";
 import { authorGhostFor } from "./author-ghost";
 import { compactFrames, pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
 import {
@@ -136,6 +146,9 @@ export class Game {
   private ghostSource: GhostSource = "none";
   private ghostPref: GhostPref = "auto";
   private ghostSmooth: number | null = null;
+  private ghostDecisive: DecisiveLead | null = null;
+  private ghostPass: { kind: "gained" | "lost"; label: string } | null = null;
+  private ghostPassUntil = 0;
   private cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null = null;
   private cpFlashUntil = 0;
   private reduced = false;
@@ -666,6 +679,9 @@ export class Game {
     this.usedRewind = false;
     this.input.touchRewind = 0;
     this.ghostSmooth = null;
+    this.ghostDecisive = null;
+    this.ghostPass = null;
+    this.ghostPassUntil = 0;
     this.cpFlash = null;
     this.cpFlashUntil = 0;
     this.phase = "countdown";
@@ -689,6 +705,7 @@ export class Game {
       ghostLead: null,
       ghostKind: this.ghostSource,
       cpFlash: null,
+      ghostPass: null,
       wrongWay: false,
       rewinding: false,
       rewindRemainMs: 0,
@@ -923,13 +940,51 @@ export class Game {
     this.world.applyCar(camSnap, freezeCar && !this.replayMode ? 0 : dt, freezeCar ? 0 : actions.steer, freezeCar ? 0 : actions.brake);
     this.car.clearFeelPulses();
     const ghostTime = this.photoGhostTime() ?? this.time;
+    const ghostPose = this.replayMode
+      ? null
+      : sampleGhost(this.ghost, ghostTime, this.track.length, this.track.def.closed);
+    const racingGhost =
+      !this.photoMode &&
+      !this.replayMode &&
+      (this.phase === "race" || this.phase === "countdown" || this.phase === "paused");
+    const lightsOut = racingGhost
+      ? ghostLightsOutMul(this.phase === "countdown" ? this.countdown : null, this.time)
+      : 1;
+    const proximity =
+      racingGhost && ghostPose
+        ? ghostProximityMul(
+            alongDelta(ghostPose.s, this.car.s, this.track.length, this.track.def.closed),
+            ghostPose.n - this.car.n,
+          )
+        : 1;
     this.world.applyGhost(
       this.track,
       this.replayMode ? null : this.ghost,
       ghostTime,
       this.car.s,
       this.replayMode ? null : this.ghostSmooth,
+      lightsOut * proximity,
     );
+    if (racingGhost && this.phase === "race" && ghostPose) {
+      const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
+      let rawSplit = ghostRaceSplitMs(this.time, atS);
+      if (rawSplit == null) {
+        rawSplit = ghostSplitMs(ghostPose.s, this.car.s, vis.speed, this.track.length, this.track.def.closed);
+      }
+      const lead = ghostLead(rawSplit);
+      if (!this.rewinding) {
+        const pass = ghostPassKind(this.ghostDecisive, lead);
+        if (pass) {
+          this.ghostPass = { kind: pass, label: ghostPassLabel(pass) };
+          this.ghostPassUntil = now + ghostPassHoldMs();
+          this.audio.ghostPass(pass);
+          this.world.addTrauma(pass === "gained" ? 0.08 : 0.05);
+        }
+      }
+      this.ghostDecisive = nextDecisiveLead(this.ghostDecisive, lead);
+    } else if (this.phase === "countdown") {
+      this.ghostDecisive = null;
+    }
     this.world.stepParticles(this.photoMode || this.replayMode ? 0 : dt);
     const attract = !this.photoMode && !this.replayMode && isLobbyPhase(this.phase);
     if (this.photoMode) {
@@ -1019,6 +1074,7 @@ export class Game {
         ghostKind: this.ghostSource,
         medalRemain: pace.remain,
         cpFlash: flash,
+        ghostPass: now < this.ghostPassUntil ? this.ghostPass : null,
         rewinding: this.rewinding,
         rewindRemainMs: this.rewinding ? Math.max(0, this.time - this.rewind.oldestT()) : this.rewind.spanMs(),
         surface: vis.surface,

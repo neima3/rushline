@@ -15,7 +15,7 @@ The TM-depth set now on this build. Help (menu, pause, or Settings) opens the sa
 | **Cameras** | **C** cycles Chase → Far → Hood → Cabin. All four stay usable at speed. |
 | **Checkpoint respawn** | **R** (or **Y**) returns you to the last checkpoint. Hold **R** / **Y**, or press **Delete**, to restart from lights-out. |
 | **Ghost share** | Export a last-run or PB tape as JSON from Results or Tracks, then import a friend's file as a rival. Local download / pick-a-file only. A rival never overwrites your PB, last run, Rush Cup, or Garage paint. |
-| **Author ghosts** | Every stock circuit ships an author-line ghost paced to the Author medal. A personal-best or imported rival replaces it. |
+| **Author ghosts** | Every stock circuit ships an author-line ghost paced to the Author medal. A personal-best or imported rival replaces it. The rival hides through lights-out, fades when you overlap, and toasts PASSED / OVERTAKEN when the lead flips. |
 | **Editor 1.1** | **Edit ribbon** on Custom — control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough. Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Time trial only. |
 | **Hotseat** | Two players on one device. P1 drives, then P2 races P1's ghost on the same circuit. A local scoreboard compares the times. |
 | **Validated** | Finish without rewind and results shows a soft Validated badge. Rewind still counts for PB and medals. Local only — not online anti-cheat. |
@@ -46,7 +46,7 @@ Each stock track has author / gold / silver / bronze times, checkpoints, boost p
 
 **Surfaces** change how the car grips. Plastic (Circuit, Mesa table, Storm streets) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines, Ember ash) enters a slide earlier and pulls accel. Ice (White Pass, Storm plaza) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing, Storm pier) sticks later and stops harder.
 
-A personal-best ghost is saved with the time and replaces the author line. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
+A personal-best ghost is saved with the time and replaces the author line. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card. The rival hides through lights-out so it does not sit on your grid car, fades when you overlap, and toasts **PASSED** / **OVERTAKEN** when the live split flips.
 
 **Ghost share** files live in `localStorage` under `rushline-ghost-share-v1`. Clear the rival from Tracks when you want the usual ghost back.
 

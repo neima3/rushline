@@ -152,14 +152,19 @@ export type HudState = {
   ghostS: number | null;
   ghostN: number | null;
   ghostDelta: number | null;
-  ghostLead: "ahead" | "behind" | "even" | null;
+  ghostLead: GhostLead;
   ghostKind: GhostSource;
   medalRemain: number | null;
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
+  ghostPass: { kind: GhostPassKind; label: string } | null;
   rewinding: boolean;
   rewindRemainMs: number;
   surface: SurfaceKind;
 };
+
+export type GhostLead = "ahead" | "behind" | "even" | null;
+
+export type GhostPassKind = "gained" | "lost";
 
 export type GhostSource = "pb" | "last" | "import" | "author" | "hotseat" | "none";
 

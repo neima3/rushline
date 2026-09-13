@@ -1,5 +1,5 @@
 import type { TrackAssist } from "./settings";
-import type { Medal, SurfaceKind, TrackId } from "./types";
+import type { GhostLead, Medal, SurfaceKind, TrackId } from "./types";
 
 export type { TrackAssist };
 
@@ -501,7 +501,7 @@ export function ghostDeltaSmooth(prev: number | null, next: number | null, dt: n
   return prev + (next - prev) * k;
 }
 
-export function ghostLead(deltaMs: number | null): "ahead" | "behind" | "even" | null {
+export function ghostLead(deltaMs: number | null): GhostLead {
   if (deltaMs == null || !Number.isFinite(deltaMs)) return null;
   if (deltaMs > 48) return "behind";
   if (deltaMs < -48) return "ahead";
