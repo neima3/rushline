@@ -34,9 +34,13 @@ import {
   plantLateral,
   residualAlign,
   shapeTouchSteer,
+  landHeadingMix,
   slideCommitted,
+  slideCounterAlign,
   slideReleaseSnap,
+  slideSteerMul,
   slideYawLimit,
+  steerHoldAlign,
   defaultSurface,
   stayPlanted,
   surfaceFeel,
@@ -247,10 +251,21 @@ describe("land / air / boost feel helpers", () => {
   it("damps steer on plant and keeps air pitch signed", () => {
     assert.equal(landSteerScale(0), 1);
     assert.ok(landSteerScale(0.2) < 0.7);
+    assert.ok(landSteerScale(0.2) > 0.55);
     assert.ok(airPitchAccel(1, 0) > 8);
     assert.ok(airPitchAccel(0, 1) < -8);
     assert.ok(magnetLandHeight() < 1.2);
     assert.ok(magnetLandHeight() > 0.6);
+  });
+
+  it("plants idle air to velocity and keeps an aimed nose", () => {
+    const idle = landHeadingMix(0, false);
+    const aimed = landHeadingMix(1, false);
+    const magnet = landHeadingMix(0.8, true);
+    assert.ok(idle.fromVel > idle.keep);
+    assert.ok(aimed.keep > idle.keep);
+    assert.equal(magnet.keep, 0.72);
+    assert.equal(magnet.fromVel, 0);
   });
 
   it("keeps landing speed instead of the old 0.72 dump", () => {
@@ -280,9 +295,18 @@ describe("steer response (TM snap, analog ease)", () => {
     assert.equal(steerFilter(0, 1, 1 / 60, false), 1);
     const analog = steerFilter(0, 1, 1 / 60, true);
     assert.ok(analog > 0.2 && analog < 0.45, `analog step ${analog}`);
+    const release = steerFilter(1, 0, 1 / 60, true);
+    assert.ok(1 - release > analog, `release ${1 - release} should beat lock ${analog}`);
     assert.ok(steerBite(0.2) > steerBite(0.8));
     assert.ok(steerBite(0.2) > 1.1);
     assert.ok(steerBite(0.9) >= 1);
+  });
+
+  it("stops heading-return from fighting a committed steer", () => {
+    assert.equal(steerHoldAlign(0, false), 1);
+    assert.ok(steerHoldAlign(0.2, false) < 0.8);
+    assert.equal(steerHoldAlign(0.8, false), 0);
+    assert.equal(steerHoldAlign(0.2, true), 1);
   });
 });
 
@@ -295,6 +319,13 @@ describe("slide commit / exit", () => {
     assert.ok(slideYawLimit(true, true) > slideYawLimit(false, true));
     assert.ok(slideReleaseSnap(true, 0) > 6);
     assert.equal(slideReleaseSnap(false, 0), 0);
+    assert.ok(slideReleaseSnap(true, 0, 1.1) > slideReleaseSnap(true, 0, 0.34));
+    assert.ok(slideReleaseSnap(true, 0.4, 0.34) < slideReleaseSnap(true, 0, 0.34));
+    assert.ok(slideSteerMul(1, 0.4, true) > 1);
+    assert.ok(slideSteerMul(-1, 0.4, true) < 1);
+    assert.equal(slideSteerMul(1, 0.4, false), 1);
+    assert.ok(slideCounterAlign(-1, 0.4, true) > 2);
+    assert.equal(slideCounterAlign(1, 0.4, true), 0);
   });
 });
 

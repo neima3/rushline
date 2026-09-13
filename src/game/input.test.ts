@@ -54,6 +54,20 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("applies D-pad steer instantly like WASD, and eases a stick", () => {
+    setPadPoller(() => axes({ steer: 1, dpadX: -1 }));
+    const dpad = new Input();
+    const digital = dpad.sample();
+    assert.ok(digital.steer > 0.95, `dpad ${digital.steer}`);
+    dpad.detach();
+
+    setPadPoller(() => axes({ steer: 1, dpadX: 0 }));
+    const stick = new Input();
+    const analog = stick.sample();
+    assert.ok(analog.steer > 0.2 && analog.steer < 0.5, `stick ${analog.steer}`);
+    stick.detach();
+  });
+
   it("maps LB+View as photo without also firing camera", () => {
     setPadPoller(() => axes({ lb: true, view: true }));
     const input = new Input();
