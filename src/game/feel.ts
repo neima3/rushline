@@ -59,6 +59,8 @@ const SURFACE_FEEL: Record<SurfaceKind, SurfaceFeel> = {
 export function defaultSurface(id: TrackId): SurfaceKind {
   switch (id) {
     case "canyon":
+    case "mesa":
+    case "hollow":
       return "dirt";
     case "summit":
       return "ice";

@@ -1,6 +1,6 @@
 # Rushline
 
-A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on five hand-built tracks — or run **Rush Cup**. Desktop, touch, and gamepad.
+A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on seven hand-built tracks — or run **Rush Cup**. Desktop, touch, and gamepad.
 
 **Live stack:** React 19 · TanStack Start · Three.js r185 · Zustand · Tailwind v4 · Web Audio
 
@@ -8,7 +8,7 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 **Time trial** — pick any circuit, hunt Author / Gold / Silver / Bronze, and race your personal-best ghost.
 
-**Rush Cup** — a short local campaign. Clear **Gold** (or better) on all five tracks in order, then **Author Cup** unlocks on the same five. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
+**Rush Cup** — a short local campaign. Clear **Gold** (or better) on all seven tracks in order, then **Author Cup** unlocks on the same seven. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
 
 Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the keyboard, touch, and gamepad bindings that are actually live.
 
@@ -25,10 +25,12 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 | **Night Helix** | Night tech | ~727 m | Full loop, sticky metal helix, night lights |
 | **White Pass** | Alpine ice | ~948 m | Switchbacks, packed ice, long descent |
 | **Arc Yard** | Works tech | ~952 m | Metal docks, gantry climb, freight drop |
+| **Red Mesa** | Desert dirt | ~1118 m | Dirt climb, plastic table, dirt edge drop |
+| **Black Hollow** | Forest dirt | ~819 m | Moonlit dirt pines, then a tech clearing sprint |
 
 Each track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost.
 
-**Surfaces** change how the car grips. Plastic (Circuit) is the stadium baseline — slide-friendly but readable. Dirt (Ridge) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard) sticks later and stops harder. The HUD chip names the ribbon under the car.
+**Surfaces** change how the car grips. Plastic (Circuit, Mesa table) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
 A personal-best ghost is saved with the time. If that ghost is missing or too thin, the last finished run is used instead. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 

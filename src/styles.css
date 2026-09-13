@@ -426,6 +426,16 @@ body {
   background: linear-gradient(160deg, #1c2434 0%, #5a3040 46%, #ff8a48 100%);
 }
 
+.track-card[data-track="mesa"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #e8a040;
+  background: linear-gradient(160deg, #ffe8a8 0%, #e07828 48%, #8a3a10 100%);
+}
+
+.track-card[data-track="hollow"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #7ee090;
+  background: linear-gradient(160deg, #0c1814 0%, #1a3a28 50%, #6ad080 100%);
+}
+
 .livery-card {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }

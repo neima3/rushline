@@ -51,6 +51,22 @@ describe("parseCup", () => {
     assert.equal(parsed.unlocked.author, 0);
     assert.equal(parsed.medals["gold-circuit"], "gold");
   });
+
+  it("reopens Gold after a five-track save so Red Mesa and Black Hollow stay in order", () => {
+    const medals = {
+      "gold-circuit": "gold",
+      "gold-canyon": "gold",
+      "gold-helix": "gold",
+      "gold-summit": "gold",
+      "gold-yard": "gold",
+    };
+    const parsed = parseCup(JSON.stringify({ version: 1, medals, goldComplete: true, unlocked: { gold: 4, author: 0 } }));
+    assert.equal(parsed.goldComplete, false);
+    assert.equal(parsed.unlocked.gold, 5);
+    assert.equal(continueEvent(parsed)?.id, "gold-mesa");
+    assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[5]!), true);
+    assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[6]!), false);
+  });
 });
 
 describe("applyCupFinish", () => {
@@ -109,7 +125,7 @@ describe("commitCupRun", () => {
     assert.equal(result.nextEventId, "gold-canyon");
     assert.equal(result.nextTrackId, "canyon");
     assert.equal(result.eventIndex, 0);
-    assert.equal(result.eventTotal, 5);
+    assert.equal(result.eventTotal, 7);
     assert.equal(progress.unlocked.gold, 1);
     assert.ok(io.getItem(CUP_KEY)?.includes("gold-circuit"));
 
@@ -123,10 +139,10 @@ describe("commitCupRun", () => {
   it("announces a finished Gold Cup and feeds Author as the next challenge", () => {
     const io = memoryIo();
     let progress = emptyCup();
-    for (const ev of CUP_EVENTS.gold.slice(0, 4)) {
+    for (const ev of CUP_EVENTS.gold.slice(0, 6)) {
       progress = commitCupRun(ev, 40_000, "gold", io, progress).progress;
     }
-    const last = commitCupRun(CUP_EVENTS.gold[4]!, 40_000, "gold", io, progress);
+    const last = commitCupRun(CUP_EVENTS.gold[6]!, 40_000, "gold", io, progress);
     assert.equal(last.result.cupComplete, true);
     assert.equal(last.result.nextEventId, "author-circuit");
     assert.equal(cupHeadline(last.result, "gold"), "Gold Cup cleared");
@@ -137,6 +153,8 @@ describe("getCupEvent", () => {
   it("resolves campaign ids", () => {
     assert.equal(getCupEvent("gold-helix")?.trackId, "helix");
     assert.equal(getCupEvent("author-yard")?.target, "author");
+    assert.equal(getCupEvent("gold-mesa")?.trackId, "mesa");
+    assert.equal(getCupEvent("author-hollow")?.trackId, "hollow");
     assert.equal(getCupEvent("nope"), null);
   });
 });

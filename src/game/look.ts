@@ -8,6 +8,8 @@ export const ROAD_TINT: Record<ThemeId, { r: number; g: number; b: number }> = {
   night: { r: 0.3, g: 0.32, b: 0.44 },
   alpine: { r: 0.58, g: 0.64, b: 0.74 },
   works: { r: 0.26, g: 0.24, b: 0.22 },
+  mesa: { r: 0.46, g: 0.34, b: 0.22 },
+  grove: { r: 0.2, g: 0.26, b: 0.22 },
 };
 
 /** Canvas asphalt base RGB — stadium midtones stay below washed gray (~158). */
@@ -17,6 +19,8 @@ export const ASPHALT_BASE: Record<ThemeId, [number, number, number]> = {
   night: [22, 24, 36],
   alpine: [78, 88, 104],
   works: [36, 34, 32],
+  mesa: [78, 58, 38],
+  grove: [22, 28, 26],
 };
 
 export function roadCrown(theme: ThemeId) {
@@ -24,6 +28,8 @@ export function roadCrown(theme: ThemeId) {
   if (theme === "canyon") return { edge: 1.1, mid: 0.8 };
   if (theme === "alpine") return { edge: 1.12, mid: 0.82 };
   if (theme === "works") return { edge: 1.1, mid: 0.78 };
+  if (theme === "mesa") return { edge: 1.12, mid: 0.76 };
+  if (theme === "grove") return { edge: 1.06, mid: 0.82 };
   return { edge: 1.08, mid: 0.84 };
 }
 
@@ -36,7 +42,7 @@ export const SURFACE_ARCHETYPE: Record<SurfaceKind, { r: number; g: number; b: n
 };
 
 export function themeDefaultSurface(theme: ThemeId): SurfaceKind {
-  if (theme === "canyon") return "dirt";
+  if (theme === "canyon" || theme === "mesa" || theme === "grove") return "dirt";
   if (theme === "alpine") return "ice";
   if (theme === "night" || theme === "works") return "tech";
   return "plastic";

@@ -54,6 +54,17 @@ describe("look polish 3 presentation locks", () => {
     assert.deepEqual(fogWindow("night", { fogNearMul: 0.4, fogFarMul: 0.4 }), NIGHT_FOG);
   });
 
+  it("gives mesa heat and grove night their own grades without rewriting Circuit or Helix", () => {
+    assert.equal(GRADE.mesa.tint, 0xfff0c4);
+    assert.ok(GRADE.mesa.saturation > GRADE.stadium.saturation);
+    assert.ok(GRADE.grove.vignette > GRADE.stadium.vignette);
+    assert.ok(GRADE.grove.saturation < GRADE.stadium.saturation);
+    assert.ok(SKY_LOOK.mesa.sunGlow > SKY_LOOK.stadium.sunGlow);
+    assert.ok(SKY_LOOK.grove.haze > SKY_LOOK.night.haze);
+    assert.equal(themeLightLevels("stadium", QUALITY_PRESETS.high).sun, CIRCUIT_HIGH_LOCK.sun);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.4, fogFarMul: 0.4 }), NIGHT_FOG);
+  });
+
   it("keeps car paint in a clearcoat / low-roughness range", () => {
     assert.ok(CAR_PAINT.clearcoat >= 0.9);
     assert.ok(CAR_PAINT.clearcoatRoughness <= 0.06);

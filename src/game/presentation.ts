@@ -23,6 +23,8 @@ export const CAR_PAINT = {
   envDay: 3.7,
   envCanyon: 1.38,
   envNight: 1.46,
+  envMesa: 1.62,
+  envGrove: 1.22,
 } as const;
 
 /**
@@ -42,6 +44,8 @@ export const GRADE: Record<ThemeId, GradeLook> = {
   night: { vignette: 0.3, contrast: 1.08, saturation: 1.1, tint: 0xf2e8ff },
   alpine: { vignette: 0.2, contrast: 1.05, saturation: 0.98, tint: 0xe8f4ff },
   works: { vignette: 0.24, contrast: 1.065, saturation: 1.06, tint: 0xffe4c8 },
+  mesa: { vignette: 0.22, contrast: 1.06, saturation: 1.12, tint: 0xfff0c4 },
+  grove: { vignette: 0.32, contrast: 1.07, saturation: 0.96, tint: 0xd4f0dc },
 };
 
 export type SkyLook = {
@@ -57,6 +61,8 @@ export const SKY_LOOK: Record<ThemeId, SkyLook> = {
   night: { horizon: 0x4a3878, zenith: 0x1a1438, haze: 0.34, sunGlow: 0.05 },
   alpine: { horizon: 0xd4e6f4, zenith: 0xf4f8fc, haze: 0.36, sunGlow: 0.11 },
   works: { horizon: 0xff8a48, zenith: 0x2a3040, haze: 0.42, sunGlow: 0.18 },
+  mesa: { horizon: 0xffd070, zenith: 0xffe8b4, haze: 0.46, sunGlow: 0.28 },
+  grove: { horizon: 0x1a3a2c, zenith: 0x0c1814, haze: 0.58, sunGlow: 0.04 },
 };
 
 export const GATE_LOOK = {

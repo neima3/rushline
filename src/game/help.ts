@@ -41,7 +41,7 @@ export const COPY = {
   padIdle: "Connect a controller — RT accel, LT brake, Y last CP, hold Y restart, LB+Y rewind, RB camera",
   menuHint: "WASD to drive · Space to slide · Backspace rewind · Esc to pause · Help for the full sheet",
   garageBlurb: "Choose a livery. Paint stays on the car across every track.",
-  cupBlurb: "A five-track medal campaign. Clear Gold, then Author. Progress stays on this device.",
+  cupBlurb: "A seven-track medal campaign. Clear Gold, then Author. Progress stays on this device.",
   settingsBlurb: "Graphics, audio, camera, steering, Track Assist, and Rewind. Changes apply immediately.",
   garageTitle: "Garage",
   cupEyebrow: "Campaign",
@@ -69,7 +69,7 @@ export const COPY = {
   ],
   playNotes: [
     "Time trial — any track, any medal, personal-best ghost.",
-    "Rush Cup — Gold on all five, then Author. Next challenge unlocks in order.",
+    "Rush Cup — Gold on all seven, then Author. Next challenge unlocks in order.",
     "R (or Y) returns you to the last checkpoint. Hold R / Y, or press Delete, to restart the whole run.",
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
     "C cycles Chase → Far → Hood → Cabin. All four stay usable at speed.",
