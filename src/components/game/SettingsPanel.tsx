@@ -210,6 +210,19 @@ export function SettingsPanel({
                 patch({ invertSteer });
               }}
             />
+            <Toggle
+              label="Enable Rewind"
+              hint={
+                touch
+                  ? "Hold the Rewind button next to Respawn. Off by default on touch."
+                  : "Hold Backspace or LB+Y to scrub the last few seconds. Finish after rewind can still be a PB."
+              }
+              on={s.rewindEnabled}
+              onChange={(rewindEnabled) => {
+                click();
+                patch({ rewindEnabled });
+              }}
+            />
             <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5 text-xs leading-relaxed text-muted">
               <p className="text-sm font-medium text-fg">Keyboard, touch, and gamepad</p>
               <p className="mt-1">

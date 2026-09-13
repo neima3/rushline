@@ -23,6 +23,7 @@ import { pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
 import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
+import { nextRewindTime, pinRaceClock, RewindTape, trimRecording, type RewindFrame } from "./rewind";
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, copySnap, emptySnap, lerpSnap } from "./physics";
 import { pageIsHidden, shouldPauseForBackground } from "./lifecycle";
 import { World } from "./scene";
@@ -122,6 +123,8 @@ export class Game {
   private photoOrbit: PhotoOrbit = defaultPhotoOrbit();
   private photoScrub = 1;
   private photoFollowGhost = false;
+  private rewind = new RewindTape();
+  private rewinding = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -209,6 +212,11 @@ export class Game {
     this.input.invertSteer = s.invertSteer;
     this.input.autoThrottle = s.autoThrottle;
     this.car.trackAssist = s.trackAssist;
+    this.rewind.configure(this.input.touchMode);
+    if (!s.rewindEnabled) {
+      this.input.touchRewind = 0;
+      if (this.rewinding) this.releaseRewind(performance.now());
+    }
   }
 
   private bindPad() {
@@ -372,7 +380,12 @@ export class Game {
 
   setTouch(v: boolean) {
     this.input.touchMode = v;
+    this.rewind.configure(v);
     useGame.getState().setTouch(v);
+  }
+
+  setTouchRewind(v: number) {
+    this.input.touchRewind = v > 0.05 ? 1 : 0;
   }
 
   capturePlayFocus() {
@@ -462,6 +475,9 @@ export class Game {
     this.countdownAt = performance.now();
     this.pausedFrom = null;
     this.recording = [];
+    this.rewind.clear();
+    this.rewinding = false;
+    this.input.touchRewind = 0;
     this.ghostSmooth = null;
     this.cpFlash = null;
     this.cpFlashUntil = 0;
@@ -486,6 +502,8 @@ export class Game {
       ghostLead: null,
       cpFlash: null,
       wrongWay: false,
+      rewinding: false,
+      rewindRemainMs: 0,
     });
     this.audio.unlock();
     this.audio.setScene("countdown");
@@ -496,6 +514,7 @@ export class Game {
 
   pause() {
     if (this.phase !== "race" && this.phase !== "countdown") return;
+    if (this.rewinding) this.releaseRewind(performance.now());
     this.pausedFrom = this.phase;
     if (this.phase === "race") this.timeHold = this.time;
     if (this.phase === "countdown") {
@@ -600,7 +619,26 @@ export class Game {
       if (actions.respawn && (this.phase === "race" || this.phase === "countdown")) this.applyRespawn();
     }
 
-    const simulate = !this.photoMode && (this.phase === "race" || this.phase === "countdown");
+    const rewindEnabled = store.settings.rewindEnabled;
+    const wantRewind =
+      rewindEnabled &&
+      actions.rewind &&
+      this.phase === "race" &&
+      !this.photoMode &&
+      !store.settingsOpen &&
+      !store.helpOpen &&
+      (this.rewind.canRewind() || this.rewinding);
+
+    if (wantRewind) {
+      this.rewinding = true;
+      const target = nextRewindTime(this.time, dt, this.rewind.oldestT());
+      const frame = this.rewind.sample(target);
+      if (frame) this.applyRewindFrame(frame);
+    } else if (this.rewinding) {
+      this.releaseRewind(now);
+    }
+
+    const simulate = !this.photoMode && (this.phase === "race" || this.phase === "countdown") && !this.rewinding;
     if (!this.photoMode && this.phase === "countdown") {
       const prevC = Math.ceil(this.countdown);
       this.countdown = countdownRemaining(this.countdownAt, now);
@@ -676,6 +714,7 @@ export class Game {
         this.time = wallClockMs(this.timeHold, this.raceClockAt, now);
         const frame = { t: this.time, s: this.car.s, n: this.car.n, heading: this.car.heading };
         if (shouldRecord(this.recording[this.recording.length - 1], frame)) this.recording.push(frame);
+        this.rewind.record(this.time, this.car.captureSim());
       }
     } else if (isLobbyPhase(this.phase)) {
       this.attractS += dt * 22;
@@ -708,7 +747,7 @@ export class Game {
     }
 
     this.hudAcc += dt;
-    if (this.hudAcc > 0.08) {
+    if (this.hudAcc > (this.rewinding ? 0.016 : 0.08)) {
       this.hudAcc = 0;
       const pace =
         this.phase === "race" || this.phase === "countdown"
@@ -751,6 +790,8 @@ export class Game {
         ghostLead: ghostLead(ghostDelta),
         medalRemain: pace.remain,
         cpFlash: flash,
+        rewinding: this.rewinding,
+        rewindRemainMs: this.rewinding ? Math.max(0, this.time - this.rewind.oldestT()) : this.rewind.spanMs(),
       });
     }
   };
@@ -822,6 +863,7 @@ export class Game {
 
   enterPhoto() {
     if (this.photoMode) return;
+    if (this.rewinding) this.releaseRewind(performance.now());
     if (useGame.getState().settingsOpen || useGame.getState().helpOpen) return;
     if (this.phase !== "race" && this.phase !== "countdown" && this.phase !== "paused" && this.phase !== "results") {
       return;
@@ -1039,6 +1081,31 @@ export class Game {
 
   respawn() {
     if (this.phase === "race" || this.phase === "countdown") this.applyRespawn();
+  }
+
+  private applyRewindFrame(frame: RewindFrame) {
+    this.car.restoreSim(frame.car);
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
+    this.acc = 0;
+    this.time = frame.t;
+    this.timeHold = frame.t;
+    this.rewind.truncateTo(frame.t);
+    this.recording = trimRecording(this.recording, frame.t);
+    this.ghostSmooth = null;
+    this.world.snapCamera(this.curr, this.camera);
+  }
+
+  private releaseRewind(now: number) {
+    if (!this.rewinding) return;
+    this.rewinding = false;
+    const pin = pinRaceClock(this.time, now);
+    this.timeHold = pin.hold;
+    this.raceClockAt = pin.startedAt;
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
+    this.acc = 0;
+    this.world.snapCamera(this.curr, this.camera);
   }
 
   private applyRespawn() {

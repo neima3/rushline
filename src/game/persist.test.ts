@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { commitRun, emptySave, memoryIo, parseSave, pushRecent } from "./persist.ts";
+import { trimRecording } from "./rewind.ts";
 import type { GhostFrame } from "./types.ts";
 
 function rec(n = 40): GhostFrame[] {
@@ -38,6 +39,21 @@ describe("commitRun", () => {
     assert.equal(result.savedBest, false);
     assert.equal(result.savedLast, true);
     assert.ok(io.getItem("rushline-last-v1"));
+  });
+});
+
+describe("commitRun after rewind", () => {
+  it("keeps the standing PB until a faster finish", () => {
+    const io = memoryIo();
+    const first = commitRun("circuit", 52_000, rec(50), io);
+    assert.equal(first.isPb, true);
+    const rewound = trimRecording(rec(80), 1600);
+    const slower = commitRun("circuit", 55_000, rewound, io);
+    assert.equal(slower.isPb, false);
+    assert.equal(parseSave(io.getItem("rushline-v1")).best.circuit, 52_000);
+    const faster = commitRun("circuit", 49_500, rewound, io);
+    assert.equal(faster.isPb, true);
+    assert.equal(parseSave(io.getItem("rushline-v1")).best.circuit, 49_500);
   });
 });
 

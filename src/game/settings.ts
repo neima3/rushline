@@ -27,6 +27,7 @@ export type Settings = {
   showMinimap: boolean;
   ghostOpacity: number;
   livery: LiveryId;
+  rewindEnabled: boolean;
 };
 
 export type QualityProfile = {
@@ -121,6 +122,7 @@ export function defaultSettings(touch = false): Settings {
     showMinimap: true,
     ghostOpacity: 0.46,
     livery: DEFAULT_LIVERY,
+    rewindEnabled: !touch,
   };
 }
 
@@ -176,6 +178,7 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     showMinimap: bool(o.showMinimap, base.showMinimap),
     ghostOpacity: num(o.ghostOpacity, base.ghostOpacity, 0, 1),
     livery: liveryId(o.livery, base.livery),
+    rewindEnabled: bool(o.rewindEnabled, base.rewindEnabled),
   };
 }
 

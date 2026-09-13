@@ -96,6 +96,7 @@ export function Rushline() {
   const onBrake = useCallback((v: number) => gameRef.current?.setTouchBrake(v), []);
   const onSlide = useCallback((v: number) => gameRef.current?.setTouchSlide(v), []);
   const onRespawn = useCallback(() => gameRef.current?.respawn(), []);
+  const onRewind = useCallback((v: number) => gameRef.current?.setTouchRewind(v), []);
 
   return (
     <main className="game-root relative h-dvh w-full overflow-hidden bg-bg">
@@ -130,6 +131,7 @@ export function Rushline() {
           onBrake={onBrake}
           onSlide={onSlide}
           onRespawn={onRespawn}
+          onRewind={onRewind}
         />
       </GameErrorBoundary>
     </main>

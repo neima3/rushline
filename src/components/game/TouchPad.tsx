@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { shapeTouchSteer } from "@/game/feel";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
   onSteer: (v: number) => void;
@@ -10,12 +10,14 @@ type Props = {
   onBrake: (v: number) => void;
   onSlide: (v: 0 | 1) => void;
   onRespawn: () => void;
+  onRewind: (v: number) => void;
 };
 
-export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: Props) {
+export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onRewind }: Props) {
   const phase = useGame((s) => s.phase);
   const touch = useGame((s) => s.touch);
   const photoMode = useGame((s) => s.photoMode);
+  const rewindEnabled = useGame((s) => s.settings.rewindEnabled);
   const racing = phase === "race" || phase === "countdown";
   // Never gate on padActive — a phantom gamepad unmounts Accel and zeros throttle.
   // Photo mode hides the pads so orbit drag and Capture stay clean.
@@ -23,11 +25,16 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!rewindEnabled) onRewind(0);
+  }, [rewindEnabled, onRewind]);
+
+  useEffect(() => {
     if (!visible) {
       onSteer(0);
       onThrottle(0);
       onBrake(0);
       onSlide(0);
+      onRewind(0);
       return;
     }
     const el = steerRef.current;
@@ -67,7 +74,7 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
       window.removeEventListener("pointercancel", up);
       onSteer(0);
     };
-  }, [onSteer, onThrottle, onBrake, onSlide, visible]);
+  }, [onSteer, onThrottle, onBrake, onSlide, onRewind, visible]);
 
   if (!visible) return null;
 
@@ -91,20 +98,45 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn }: P
         </div>
       </div>
       <div className="pointer-events-auto flex flex-col items-end gap-2.5">
-        <button
-          type="button"
-          aria-label="Respawn"
-          data-play-control="1"
-          className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
-          onContextMenu={(e) => e.preventDefault()}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRespawn();
-          }}
-        >
-          <RotateCcw className="size-5" strokeWidth={1.75} />
-        </button>
+        <div className="flex items-center gap-2">
+          {rewindEnabled ? (
+            <button
+              type="button"
+              aria-label="Rewind"
+              data-play-control="1"
+              className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+              onContextMenu={(e) => e.preventDefault()}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                onRewind(1);
+              }}
+              onPointerUp={(e) => {
+                e.preventDefault();
+                onRewind(0);
+              }}
+              onPointerCancel={() => onRewind(0)}
+              onLostPointerCapture={() => onRewind(0)}
+            >
+              <Undo2 className="size-5" strokeWidth={1.75} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-label="Respawn"
+            data-play-control="1"
+            className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+            onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRespawn();
+            }}
+          >
+            <RotateCcw className="size-5" strokeWidth={1.75} />
+          </button>
+        </div>
         <DriveCluster onThrottle={onThrottle} onBrake={onBrake} onSlide={onSlide} />
       </div>
     </div>

@@ -66,6 +66,8 @@ const emptyHud = (): HudState => ({
   ghostLead: null,
   medalRemain: null,
   cpFlash: null,
+  rewinding: false,
+  rewindRemainMs: 0,
 });
 
 const emptyPad = (): PadInfo => ({

@@ -33,6 +33,7 @@ export const PAD_MAP = {
   brake: "LT / L2 / B",
   slide: "LB / L1 / X",
   respawn: "Y / Triangle",
+  rewind: "LB + Y",
   pause: "Menu / Start / Options",
   camera: "View / Share / RB",
   photo: "LB + View",
@@ -182,8 +183,8 @@ export function padInfoFrom(axes: PadAxes | null, recentlyUsed: boolean): PadInf
 
 export function padRaceHint(xbox: boolean): string {
   return xbox
-    ? "LT brake · RT accel · L-stick steer · X slide · Y respawn · RB camera · Menu pause"
-    : "L2 brake · R2 accel · L-stick steer · □ slide · △ respawn · R1 camera · Options pause";
+    ? "LT brake · RT accel · L-stick steer · X slide · Y respawn · LB+Y rewind · RB camera · Menu pause"
+    : "L2 brake · R2 accel · L-stick steer · □ slide · △ respawn · L1+△ rewind · R1 camera · Options pause";
 }
 
 export function padConnectCopy(info: PadInfo): string {
