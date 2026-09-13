@@ -7,14 +7,15 @@ import {
   type Quality,
   type Settings,
 } from "./settings";
-import type {
-  CameraMode,
-  HudState,
-  PadInfo,
-  Phase,
-  ResultsState,
-  SaveData,
-  TrackId,
+import {
+  TRACK_ORDER,
+  type CameraMode,
+  type HudState,
+  type PadInfo,
+  type Phase,
+  type ResultsState,
+  type SaveData,
+  type TrackId,
 } from "./types";
 import {
   LAST_KEY,
@@ -28,7 +29,7 @@ import {
   type RunCommit,
 } from "./persist";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit"];
+export { TRACK_ORDER };
 export { SAVE_KEY, LAST_KEY, commitRun };
 export type { RunCommit };
 
