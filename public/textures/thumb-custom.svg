@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14141a"/>
+      <stop offset="1" stop-color="#2a2a33"/>
+    </linearGradient>
+  </defs>
+  <rect width="280" height="200" fill="url(#sky)"/>
+  <rect x="18" y="22" width="38" height="6" fill="#3a3a44"/>
+  <rect x="18" y="34" width="22" height="4" fill="#2c2c33"/>
+  <path d="M46 150 C 70 108, 108 78, 148 70 S 214 86, 228 118 S 214 162, 168 170 S 88 168, 46 150 Z" fill="none" stroke="#2c2c33" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M46 150 C 70 108, 108 78, 148 70 S 214 86, 228 118 S 214 162, 168 170 S 88 168, 46 150 Z" fill="none" stroke="#e8e9ed" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M46 150 C 70 108, 108 78, 148 70 S 214 86, 228 118 S 214 162, 168 170 S 88 168, 46 150 Z" fill="none" stroke="#09090b" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <circle cx="46" cy="150" r="5" fill="#f4f4f2"/>
+  <circle cx="108" cy="86" r="4.2" fill="#8dccad"/>
+  <circle cx="188" cy="78" r="4.2" fill="#c4a574"/>
+  <circle cx="228" cy="118" r="4.2" fill="#8dccad"/>
+  <circle cx="188" cy="164" r="4.2" fill="#9a9aa3"/>
+  <circle cx="88" cy="166" r="4.2" fill="#c4a574"/>
+  <rect x="40" y="146" width="10" height="6" fill="#111113"/>
+  <rect x="50" y="146" width="10" height="6" fill="#f4f4f2"/>
+</svg>

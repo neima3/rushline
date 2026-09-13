@@ -9,6 +9,7 @@ import {
   type Settings,
 } from "./settings";
 import {
+  PLAYABLE_ORDER,
   TRACK_ORDER,
   type CameraMode,
   type HudState,
@@ -329,7 +330,7 @@ export const useGame = create<GameStore>((set) => ({
     const share = readShareSave();
     const lastTimes: Partial<Record<TrackId, number>> = {};
     const imports: Partial<Record<TrackId, number>> = {};
-    for (const id of TRACK_ORDER) {
+    for (const id of PLAYABLE_ORDER) {
       const run = last.runs[id];
       if (run) lastTimes[id] = run.time;
       const rival = share.imports[id];

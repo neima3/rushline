@@ -1,7 +1,7 @@
 import { compactFrames, sanitizeFrames } from "./ghost";
 import { downloadBlob } from "./photo";
 import { LAST_KEY, SAVE_KEY, parseLast, parseSave, type PersistIo } from "./persist";
-import { TRACK_ORDER, type GhostFrame, type GhostSource, type TrackId } from "./types";
+import { PLAYABLE_ORDER, type GhostFrame, type GhostSource, type TrackId } from "./types";
 
 export const GHOST_KIND = "rushline-ghost";
 export const GHOST_FILE_VERSION = 1;
@@ -56,7 +56,7 @@ export function emptyShare(): ShareSave {
 }
 
 export function isTrackId(id: unknown): id is TrackId {
-  return typeof id === "string" && (TRACK_ORDER as readonly string[]).includes(id);
+  return typeof id === "string" && (PLAYABLE_ORDER as readonly string[]).includes(id);
 }
 
 function quant(n: number, digits: number): number {

@@ -7,7 +7,7 @@ import {
   readShare,
 } from "@/game/ghost-share";
 import { COPY } from "@/game/help";
-import { TRACK_DEFS } from "@/game/track";
+import { getTrackDef } from "@/game/track";
 import { writeShareCache, useGame } from "@/game/store";
 import type { TrackId } from "@/game/types";
 import { formatTime } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function GhostShare({
   const rivalTime = imports[trackId];
   const hasPb = best[trackId] != null;
   const hasLast = lastTimes[trackId] != null;
-  const trackName = TRACK_DEFS[trackId].name;
+  const trackName = getTrackDef(trackId).name;
 
   const click = () => onUiClick?.();
 
@@ -70,7 +70,7 @@ export function GhostShare({
         return;
       }
       refresh();
-      const name = TRACK_DEFS[result.file.trackId].name;
+      const name = getTrackDef(result.file.trackId).name;
       setNote(
         result.file.trackId === trackId
           ? `Rival loaded · ${formatTime(result.file.time)}`

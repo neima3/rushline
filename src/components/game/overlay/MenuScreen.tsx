@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Car, CircleHelp, Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
+import { Car, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
-import { allTrackDefs, medalFor, TRACK_DEFS } from "@/game/track";
+import { allTrackDefs, getTrackDef, medalFor } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
 import { COPY } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
@@ -27,6 +27,7 @@ type Props = {
   onRace: (id: TrackId) => void;
   onRaceRival?: (id: TrackId) => void;
   onUiClick?: () => void;
+  onEditCustom: () => void;
   onMute: () => void;
   onAuto: () => void;
   onSettings: () => void;
@@ -52,6 +53,7 @@ export function MenuScreen({
   onRace,
   onRaceRival,
   onUiClick,
+  onEditCustom,
   onMute,
   onAuto,
   onSettings,
@@ -61,7 +63,7 @@ export function MenuScreen({
   garage,
 }: Props) {
   const trackId = useGame((s) => s.trackId);
-  const featured = TRACK_DEFS[trackId];
+  const featured = getTrackDef(trackId);
   const imports = useGame((s) => s.imports);
 
   return (
@@ -169,26 +171,19 @@ export function MenuScreen({
               const last = lastTimes[t.id];
               const medal = medalFor(t.id, pb ?? Number.POSITIVE_INFINITY);
               const selected = t.id === trackId;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onMouseDown={keepPlayFocus}
-                  onClick={() => onRace(t.id)}
-                  data-track={t.id}
-                  style={{ animationDelay: `${80 + i * 55}ms` }}
-                  className={cn(
-                    "track-card overlay-card-in flex overflow-hidden rounded-xl border text-left transition-[transform,border-color,background-color] duration-150",
-                    selected ? "border-fg/45 bg-surface" : "border-border bg-surface/90 hover:border-border",
-                  )}
-                >
+              const body = (
+                <>
                   <span className="track-card-thumb relative h-[6.5rem] w-28 shrink-0 overflow-hidden sm:w-32">
                     <img src={t.thumb} alt="" className="size-full object-cover" crossOrigin="anonymous" />
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
                     <span className="flex items-center gap-2">
                       <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
-                      {selected ? (
+                      {t.id === "custom" ? (
+                        <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                          Custom
+                        </span>
+                      ) : selected ? (
                         <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">
                           Ready
                         </span>
@@ -211,15 +206,58 @@ export function MenuScreen({
                       ) : null}
                       <TrackMedalTimes trackId={t.id} recents={recents[t.id]} />
                     </span>
+                    {t.id === "custom" ? (
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          data-editor-open
+                          onMouseDown={keepPlayFocus}
+                          onClick={onEditCustom}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-elevated px-2.5 text-[11px] font-medium uppercase tracking-widest text-fg"
+                        >
+                          <Pencil className="size-3" />
+                          Edit ribbon
+                        </button>
+                        <button
+                          type="button"
+                          data-custom-drive
+                          onMouseDown={keepPlayFocus}
+                          onClick={() => onRace("custom")}
+                          className="inline-flex h-8 items-center rounded-md bg-accent px-2.5 text-[11px] font-medium uppercase tracking-widest text-accent-fg"
+                        >
+                          Drive
+                        </button>
+                      </span>
+                    ) : null}
                   </span>
+                </>
+              );
+              const cardClass = cn(
+                "track-card overlay-card-in flex overflow-hidden rounded-xl border text-left transition-[transform,border-color,background-color] duration-150",
+                selected ? "border-fg/45 bg-surface" : "border-border bg-surface/90 hover:border-border",
+              );
+              if (t.id === "custom") {
+                return (
+                  <div key={t.id} data-track={t.id} style={{ animationDelay: `${80 + i * 55}ms` }} className={cardClass}>
+                    {body}
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onMouseDown={keepPlayFocus}
+                  onClick={() => onRace(t.id)}
+                  data-track={t.id}
+                  style={{ animationDelay: `${80 + i * 55}ms` }}
+                  className={cardClass}
+                >
+                  {body}
                 </button>
               );
             })}
-            <TrackGhostShare
-              trackId={trackId}
-              onRaceRival={onRaceRival}
-              onUiClick={onUiClick}
-            />
+            <TrackGhostShare trackId={trackId} onRaceRival={onRaceRival} onUiClick={onUiClick} />
             <button
               type="button"
               onClick={onBack}
@@ -324,7 +362,7 @@ function TrackGhostShare({
 }
 
 function TrackMedalTimes({ trackId, recents }: { trackId: TrackId; recents?: number[] }) {
-  const medals = TRACK_DEFS[trackId].medals;
+  const medals = getTrackDef(trackId).medals;
   return (
     <span className="flex flex-wrap gap-x-2 text-[10px] uppercase tracking-widest text-subtle">
       <span>A {formatTime(medals.author)}</span>

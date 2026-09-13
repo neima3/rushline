@@ -18,7 +18,7 @@ import {
   pickExportGhost,
 } from "./ghost-share.ts";
 import { LAST_KEY, SAVE_KEY, commitRun, memoryIo, parseSave } from "./persist.ts";
-import { TRACK_ORDER, type GhostFrame } from "./types.ts";
+import { PLAYABLE_ORDER, TRACK_ORDER, type GhostFrame } from "./types.ts";
 
 function rec(n = 40, step = 40): GhostFrame[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -96,6 +96,7 @@ describe("ghost file encode/decode", () => {
     assert.equal(isTrackId("mesa"), true);
     assert.equal(isTrackId("hollow"), true);
     assert.equal(isTrackId("red-mesa"), false);
+    assert.equal(isTrackId("custom"), true);
     for (const trackId of ["mesa", "hollow"] as const) {
       const file = encodeGhostFile({ trackId, time: 36_000, source: "last", frames: rec(20) });
       assert.equal(file.trackId, trackId);
@@ -105,6 +106,17 @@ describe("ghost file encode/decode", () => {
       assert.equal(decoded.file.trackId, trackId);
       assert.equal(ghostFilename(file), `rushline-${trackId}-last-36000.json`);
     }
+  });
+
+  it("encodes and decodes a Custom ribbon ghost", () => {
+    assert.deepEqual(PLAYABLE_ORDER.at(-1), "custom");
+    const file = encodeGhostFile({ trackId: "custom", time: 44_000, source: "pb", frames: rec(24) });
+    assert.equal(file.trackId, "custom");
+    const decoded = decodeGhostFile(file);
+    assert.equal(decoded.ok, true);
+    if (!decoded.ok) return;
+    assert.equal(decoded.file.trackId, "custom");
+    assert.equal(ghostFilename(file), "rushline-custom-pb-44000.json");
   });
 });
 

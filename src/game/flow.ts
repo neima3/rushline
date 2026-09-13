@@ -32,6 +32,7 @@ export const MEDAL_LABEL: Record<Medal, string> = {
 };
 
 export function nextTrackId(id: TrackId): TrackId {
+  if (id === "custom") return TRACK_ORDER[0]!;
   const i = TRACK_ORDER.indexOf(id);
   const idx = i < 0 ? 0 : (i + 1) % TRACK_ORDER.length;
   return TRACK_ORDER[idx]!;

@@ -46,6 +46,7 @@ export const COPY = {
   garageTitle: "Garage",
   cupEyebrow: "Campaign",
   selectEyebrow: "Select circuit",
+  editorEyebrow: "Track editor lite",
   helpTitle: "Controls",
   helpEyebrow: "Help",
   helpBlurb: "Desktop, touch, and gamepad — the bindings that are actually live.",
@@ -76,7 +77,7 @@ export const COPY = {
     "Clear the rival from Tracks when you want the usual PB / last-run ghost back.",
   ],
   playNotes: [
-    "Time trial — any track, any medal, personal-best ghost.",
+    "Time trial — any track, any medal, personal-best ghost. Custom is a closed ribbon you build in the lite editor.",
     "Rush Cup — Gold on all seven, then Author. Next challenge unlocks in order.",
     "R (or Y) returns you to the last checkpoint. Hold R / Y, or press Delete, to restart the whole run.",
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
