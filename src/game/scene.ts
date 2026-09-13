@@ -201,8 +201,8 @@ const THEMES: Record<ThemeId, ThemePack> = {
     skyTint: 0xeef6fc,
   },
   works: {
-    fog: 0x3a2c2a,
-    ground: 0x2a2622,
+    fog: 0x5a3834,
+    ground: 0x322c28,
     hemiSky: 0xffb080,
     hemiGround: 0x3a2818,
     sun: 0xffa060,

@@ -582,7 +582,7 @@ function buildWorks(
   for (let i = 0; i < crateN; i++) {
     const sm = track.samples[Math.floor((i / crateN) * track.samples.length)]!;
     const side = i % 2 === 0 ? 1 : -1;
-    const d = sm.width * 0.5 + 8 + hash(i) * 7;
+    const d = sm.width * 0.5 + 5.6 + hash(i) * 5;
     const stack = 1 + (i % 3);
     _dummy.position.set(sm.x + sm.rx * side * d, sm.y + stack * 0.85, sm.z + sm.rz * side * d);
     _dummy.scale.set(2.4, 1.6 * stack, 1.15);

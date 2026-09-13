@@ -56,7 +56,7 @@ export const SKY_LOOK: Record<ThemeId, SkyLook> = {
   canyon: { horizon: 0xffa060, zenith: 0xffc8a0, haze: 0.52, sunGlow: 0.2 },
   night: { horizon: 0x4a3878, zenith: 0x1a1438, haze: 0.34, sunGlow: 0.05 },
   alpine: { horizon: 0xd4e6f4, zenith: 0xf4f8fc, haze: 0.36, sunGlow: 0.11 },
-  works: { horizon: 0xff8a48, zenith: 0x1c2434, haze: 0.4, sunGlow: 0.16 },
+  works: { horizon: 0xff8a48, zenith: 0x2a3040, haze: 0.42, sunGlow: 0.18 },
 };
 
 export const GATE_LOOK = {
