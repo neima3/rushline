@@ -18,6 +18,8 @@ Each track has author / gold / silver / bronze medal times, checkpoints, boost p
 
 **Garage** — six liveries (Ivory, Violet, Sun, Frost, Carbon, Hazard). Pick one from the menu; the car on track updates live and the choice is saved.
 
+**Rush Cup** is a short local campaign: Gold on all five tracks, then Author. Clearing an event unlocks the next challenge. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
+
 ## Controls
 
 ### Desktop
@@ -56,7 +58,7 @@ npm run build      # production bundle
 npm run typecheck  # tsc --noEmit
 ```
 
-No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`.
+No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`. Cup campaign progress is stored separately in `rushline-cup-v1`.
 
 ## Project map
 

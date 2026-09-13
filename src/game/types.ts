@@ -4,10 +4,10 @@ export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
-export type Phase = "menu" | "select" | "garage" | "countdown" | "race" | "paused" | "results";
+export type Phase = "menu" | "select" | "garage" | "cup" | "countdown" | "race" | "paused" | "results";
 
 export function isLobbyPhase(phase: Phase): boolean {
-  return phase === "menu" || phase === "select" || phase === "garage";
+  return phase === "menu" || phase === "select" || phase === "garage" || phase === "cup";
 }
 
 export type CameraMode = "chase" | "hood";
@@ -143,6 +143,25 @@ export type GhostSource = "pb" | "last" | "none";
 
 export type GhostPref = "auto" | "pb" | "last";
 
+export type CupId = "gold" | "author";
+
+export type CupTarget = "gold" | "author";
+
+export type CupResult = {
+  eventId: string;
+  cupId: CupId;
+  cupName: string;
+  target: CupTarget;
+  cleared: boolean;
+  firstClear: boolean;
+  cupComplete: boolean;
+  campaignComplete: boolean;
+  nextEventId: string | null;
+  nextTrackId: TrackId | null;
+  eventIndex: number;
+  eventTotal: number;
+};
+
 export type ResultsState = {
   time: number;
   best: number | null;
@@ -157,6 +176,7 @@ export type ResultsState = {
   ghostDelta: number | null;
   hadGhost: boolean;
   nextTrackId: TrackId;
+  cup?: CupResult | null;
 };
 
 export type GhostFrame = {

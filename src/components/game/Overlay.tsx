@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { Camera, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
+import { continueEvent, cupContinueLabel, getCupEvent } from "@/game/cup";
 import { loadHints } from "@/game/flow";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
@@ -11,6 +12,7 @@ import type { Medal, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
+import { CupScreen } from "./overlay/CupScreen";
 import { FirstRunHint } from "./overlay/FirstRunHint";
 import { MenuScreen } from "./overlay/MenuScreen";
 import { PhotoScreen } from "./overlay/PhotoScreen";
@@ -41,13 +43,16 @@ export function Overlay({ gameRef }: Props) {
   const touch = useGame((s) => s.touch);
   const trackId = useGame((s) => s.trackId);
   const photoMode = useGame((s) => s.photoMode);
+  const cupProgress = useGame((s) => s.cupProgress);
+  const cupEventId = useGame((s) => s.cupEventId);
+  const cupEvent = getCupEvent(cupEventId);
   const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
   const hideHud = photoMode;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
-      {phase === "menu" || phase === "select" || phase === "garage" ? (
+      {phase === "menu" || phase === "select" || phase === "garage" || phase === "cup" ? (
         <button
           type="button"
           className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
@@ -71,9 +76,10 @@ export function Overlay({ gameRef }: Props) {
           pad={pad}
           lastTimes={lastTimes}
           recents={recents}
+          cupLabel={cupContinueLabel(cupProgress)}
           onStart={() => {
             g()?.uiClick();
-            g()?.startRace(trackId);
+            g()?.beginTrial(trackId);
           }}
           onTracks={() => {
             g()?.uiClick();
@@ -83,13 +89,17 @@ export function Overlay({ gameRef }: Props) {
             g()?.uiClick();
             g()?.setPhase("garage");
           }}
+          onCup={() => {
+            g()?.uiClick();
+            g()?.openCup();
+          }}
           onBack={() => {
             g()?.uiClick();
             g()?.menu();
           }}
           onRace={(id) => {
             g()?.uiClick();
-            g()?.startRace(id);
+            g()?.beginTrial(id);
           }}
           onMute={() => {
             const next = !muted;
@@ -106,6 +116,26 @@ export function Overlay({ gameRef }: Props) {
           }}
           select={phase === "select"}
           garage={phase === "garage"}
+        />
+      ) : null}
+
+      {phase === "cup" ? (
+        <CupScreen
+          ready={ready}
+          onContinue={() => {
+            const next = continueEvent(cupProgress);
+            if (!next) return;
+            g()?.uiClick();
+            g()?.beginCup(next.id);
+          }}
+          onEvent={(id) => {
+            g()?.uiClick();
+            g()?.beginCup(id);
+          }}
+          onBack={() => {
+            g()?.uiClick();
+            g()?.menu();
+          }}
         />
       ) : null}
 
@@ -133,6 +163,7 @@ export function Overlay({ gameRef }: Props) {
           n={hud.n}
           showSpeed={settings.showSpeed}
           showMinimap={settings.showMinimap}
+          cupLabel={cupEvent ? `CUP ${cupEvent.index + 1}/5 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}` : null}
         />
       ) : null}
 
@@ -198,9 +229,11 @@ export function Overlay({ gameRef }: Props) {
           chrome
           extra={
             <p className="mt-3 text-xs leading-relaxed text-muted">
-              {touch
-                ? "Options opens graphics, camera, and Track Assist. Resume keeps your run."
-                : "Esc resumes. Options opens graphics, camera, and Track Assist."}
+              {cupEvent
+                ? `${cupEvent.cupId === "author" ? "Author" : "Gold"} Cup · Event ${cupEvent.index + 1}/5 on ${TRACK_DEFS[trackId].name}.`
+                : touch
+                  ? "Options opens graphics, camera, and Track Assist. Resume keeps your run."
+                  : "Esc resumes. Options opens graphics, camera, and Track Assist."}
             </p>
           }
           actions={[
@@ -262,7 +295,19 @@ export function Overlay({ gameRef }: Props) {
           }
           onNext={() => {
             g()?.uiClick();
-            g()?.startRace(results.nextTrackId);
+            g()?.beginTrial(results.nextTrackId);
+          }}
+          onNextChallenge={
+            results.cup?.nextEventId
+              ? () => {
+                  g()?.uiClick();
+                  g()?.beginCup(results.cup!.nextEventId!);
+                }
+              : undefined
+          }
+          onCup={() => {
+            g()?.uiClick();
+            g()?.openCup();
           }}
           onMenu={() => {
             g()?.uiClick();
@@ -384,6 +429,7 @@ function Hud({
   n,
   showSpeed,
   showMinimap,
+  cupLabel,
 }: {
   time: number;
   speed: number;
@@ -407,6 +453,7 @@ function Hud({
   n: number;
   showSpeed: boolean;
   showMinimap: boolean;
+  cupLabel?: string | null;
 }) {
   const clock = formatTimeParts(time);
   return (
@@ -457,6 +504,7 @@ function Hud({
           </div>
         ) : null}
         <div className="hud-pace mt-1.5 flex flex-col items-center gap-1">
+          {cupLabel ? <span className="hud-pace-chip text-muted">{cupLabel}</span> : null}
           <span className={cn("hud-pace-chip tabular-nums tracking-wide", medal ? "text-fg" : "text-subtle")}>
             {medalPaceLabel(medal)}
             {medal && medalRemain != null ? ` ${formatPaceRemain(medalRemain)}` : ""}

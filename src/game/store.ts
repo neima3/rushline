@@ -12,6 +12,7 @@ import {
   TRACK_ORDER,
   type CameraMode,
   type HudState,
+  type Medal,
   type PadInfo,
   type Phase,
   type ResultsState,
@@ -29,9 +30,18 @@ import {
   type LastSave,
   type RunCommit,
 } from "./persist";
+import {
+  commitCupRun,
+  emptyCup,
+  parseCup,
+  CUP_KEY,
+  type CupEvent,
+  type CupProgress,
+  type CupResult,
+} from "./cup";
 
 export { TRACK_ORDER };
-export { SAVE_KEY, LAST_KEY, commitRun };
+export { SAVE_KEY, LAST_KEY, CUP_KEY, commitRun };
 export type { RunCommit };
 
 const emptyHud = (): HudState => ({
@@ -83,6 +93,7 @@ function loadLast(): LastSave {
 
 let saveCache: SaveData | null = null;
 let lastCache: LastSave | null = null;
+let cupCache: CupProgress | null = null;
 
 export function readSave(): SaveData {
   if (typeof window === "undefined") return emptySave();
@@ -123,6 +134,27 @@ export function applyRunCommit(trackId: TrackId, time: number, frames: import(".
   return result;
 }
 
+function loadCup(): CupProgress {
+  try {
+    return parseCup(localStorage.getItem(CUP_KEY));
+  } catch {
+    return emptyCup();
+  }
+}
+
+export function readCupProgress(): CupProgress {
+  if (typeof window === "undefined") return emptyCup();
+  if (!cupCache) cupCache = loadCup();
+  return cupCache;
+}
+
+export function applyCupCommit(event: CupEvent, time: number, medal: Medal | null): CupResult {
+  const io = typeof localStorage === "undefined" ? null : localStorage;
+  const out = commitCupRun(event, time, medal, io, readCupProgress());
+  cupCache = out.progress;
+  return out.result;
+}
+
 type GameStore = {
   phase: Phase;
   trackId: TrackId;
@@ -146,6 +178,10 @@ type GameStore = {
   photoGhost: boolean;
   photoScrub: number;
   photoFollowGhost: boolean;
+  playMode: "trial" | "cup";
+  cupEventId: string | null;
+  cupFocusId: string;
+  cupProgress: CupProgress;
   setPhase: (p: Phase) => void;
   setTrack: (id: TrackId) => void;
   setHud: (h: Partial<HudState>) => void;
@@ -169,7 +205,10 @@ type GameStore = {
   setPhotoGhost: (v: boolean) => void;
   setPhotoScrub: (v: number) => void;
   setPhotoFollowGhost: (v: boolean) => void;
+  setCupSession: (eventId: string | null) => void;
+  setCupFocus: (id: string) => void;
   refreshBest: () => void;
+  refreshCup: () => void;
 };
 
 const bootSettings = defaultSettings(false);
@@ -197,6 +236,10 @@ export const useGame = create<GameStore>((set) => ({
   photoGhost: false,
   photoScrub: 1,
   photoFollowGhost: false,
+  playMode: "trial",
+  cupEventId: null,
+  cupFocusId: "gold-circuit",
+  cupProgress: emptyCup(),
   setPhase: (phase) => set({ phase }),
   setTrack: (trackId) => set({ trackId }),
   setHud: (h) => set((s) => ({ hud: { ...s.hud, ...h } })),
@@ -248,6 +291,8 @@ export const useGame = create<GameStore>((set) => ({
   setPhotoGhost: (photoGhost) => set({ photoGhost }),
   setPhotoScrub: (photoScrub) => set({ photoScrub: Math.max(0, Math.min(1, photoScrub)) }),
   setPhotoFollowGhost: (photoFollowGhost) => set({ photoFollowGhost }),
+  setCupSession: (cupEventId) => set({ playMode: cupEventId ? "cup" : "trial", cupEventId }),
+  setCupFocus: (cupFocusId) => set({ cupFocusId }),
   refreshBest: () => {
     const save = readSave();
     const last = readLastSave();
@@ -258,6 +303,7 @@ export const useGame = create<GameStore>((set) => ({
     }
     set({ best: { ...save.best }, lastTimes, recents: { ...last.recents } });
   },
+  refreshCup: () => set({ cupProgress: { ...readCupProgress() } }),
 }));
 
 export function resetHud(): HudState {
