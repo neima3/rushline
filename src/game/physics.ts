@@ -669,42 +669,101 @@ export class CarSim {
     }
   }
 
-  snap(): CarSnap {
-    return {
-      s: this.s,
-      n: this.n,
-      heading: this.heading,
-      speed: this.speed,
-      airborne: this.airborne,
-      px: this.px,
-      py: this.py,
-      pz: this.pz,
-      qx: this.qx,
-      qy: this.qy,
-      qz: this.qz,
-      qw: this.qw,
-      yaw: this.yaw,
-      boost: this.boost,
-      slide: this.slideAmt,
-      driftCharge: this.driftCharge,
-      justTurbo: this.justTurbo || this.pulseTurbo,
-      justLand: this.justLand || this.pulseLand,
-      justBoost: this.justBoost || this.pulseBoost,
-      fx: this.fx,
-      fy: this.fy,
-      fz: this.fz,
-      ux: this.ux,
-      uy: this.uy,
-      uz: this.uz,
-    };
+  snap(out?: CarSnap): CarSnap {
+    const dst = out ?? emptySnap();
+    dst.s = this.s;
+    dst.n = this.n;
+    dst.heading = this.heading;
+    dst.speed = this.speed;
+    dst.airborne = this.airborne;
+    dst.px = this.px;
+    dst.py = this.py;
+    dst.pz = this.pz;
+    dst.qx = this.qx;
+    dst.qy = this.qy;
+    dst.qz = this.qz;
+    dst.qw = this.qw;
+    dst.yaw = this.yaw;
+    dst.boost = this.boost;
+    dst.slide = this.slideAmt;
+    dst.driftCharge = this.driftCharge;
+    dst.justTurbo = this.justTurbo || this.pulseTurbo;
+    dst.justLand = this.justLand || this.pulseLand;
+    dst.justBoost = this.justBoost || this.pulseBoost;
+    dst.fx = this.fx;
+    dst.fy = this.fy;
+    dst.fz = this.fz;
+    dst.ux = this.ux;
+    dst.uy = this.uy;
+    dst.uz = this.uz;
+    return dst;
   }
 }
 
-export function lerpSnap(a: CarSnap, b: CarSnap, t: number): CarSnap {
+export function emptySnap(): CarSnap {
+  return {
+    s: 0,
+    n: 0,
+    heading: 0,
+    speed: 0,
+    airborne: false,
+    px: 0,
+    py: 0,
+    pz: 0,
+    qx: 0,
+    qy: 0,
+    qz: 0,
+    qw: 1,
+    yaw: 0,
+    boost: 0,
+    slide: 0,
+    driftCharge: 0,
+    justTurbo: false,
+    justLand: false,
+    justBoost: false,
+    fx: 0,
+    fy: 0,
+    fz: 1,
+    ux: 0,
+    uy: 1,
+    uz: 0,
+  };
+}
+
+export function copySnap(dst: CarSnap, src: CarSnap): CarSnap {
+  dst.s = src.s;
+  dst.n = src.n;
+  dst.heading = src.heading;
+  dst.speed = src.speed;
+  dst.airborne = src.airborne;
+  dst.px = src.px;
+  dst.py = src.py;
+  dst.pz = src.pz;
+  dst.qx = src.qx;
+  dst.qy = src.qy;
+  dst.qz = src.qz;
+  dst.qw = src.qw;
+  dst.yaw = src.yaw;
+  dst.boost = src.boost;
+  dst.slide = src.slide;
+  dst.driftCharge = src.driftCharge;
+  dst.justTurbo = src.justTurbo;
+  dst.justLand = src.justLand;
+  dst.justBoost = src.justBoost;
+  dst.fx = src.fx;
+  dst.fy = src.fy;
+  dst.fz = src.fz;
+  dst.ux = src.ux;
+  dst.uy = src.uy;
+  dst.uz = src.uz;
+  return dst;
+}
+
+export function lerpSnap(a: CarSnap, b: CarSnap, t: number, out?: CarSnap): CarSnap {
   const u = clamp(t, 0, 1);
   const jump =
     (b.px - a.px) ** 2 + (b.py - a.py) ** 2 + (b.pz - a.pz) ** 2;
-  if (b.airborne !== a.airborne && jump > 6) return b;
+  if (b.airborne !== a.airborne && jump > 6) return out ? copySnap(out, b) : b;
   _quat.set(a.qx, a.qy, a.qz, a.qw);
   _qb.set(b.qx, b.qy, b.qz, b.qw);
   _quat.slerp(_qb, u);
@@ -716,33 +775,33 @@ export function lerpSnap(a: CarSnap, b: CarSnap, t: number): CarSnap {
   const uy = lerp(a.uy, b.uy, u);
   const uz = lerp(a.uz, b.uz, u);
   const ul = Math.hypot(ux, uy, uz) || 1;
-  return {
-    s: lerp(a.s, b.s, u),
-    n: lerp(a.n, b.n, u),
-    heading: lerp(a.heading, b.heading, u),
-    speed: lerp(a.speed, b.speed, u),
-    airborne: b.airborne,
-    px: lerp(a.px, b.px, u),
-    py: lerp(a.py, b.py, u),
-    pz: lerp(a.pz, b.pz, u),
-    qx: _quat.x,
-    qy: _quat.y,
-    qz: _quat.z,
-    qw: _quat.w,
-    yaw: lerp(a.yaw, b.yaw, u),
-    boost: lerp(a.boost, b.boost, u),
-    slide: lerp(a.slide, b.slide, u),
-    driftCharge: lerp(a.driftCharge, b.driftCharge, u),
-    justTurbo: b.justTurbo,
-    justLand: b.justLand,
-    justBoost: b.justBoost,
-    fx: fx / fl,
-    fy: fy / fl,
-    fz: fz / fl,
-    ux: ux / ul,
-    uy: uy / ul,
-    uz: uz / ul,
-  };
+  const dst = out ?? emptySnap();
+  dst.s = lerp(a.s, b.s, u);
+  dst.n = lerp(a.n, b.n, u);
+  dst.heading = lerp(a.heading, b.heading, u);
+  dst.speed = lerp(a.speed, b.speed, u);
+  dst.airborne = b.airborne;
+  dst.px = lerp(a.px, b.px, u);
+  dst.py = lerp(a.py, b.py, u);
+  dst.pz = lerp(a.pz, b.pz, u);
+  dst.qx = _quat.x;
+  dst.qy = _quat.y;
+  dst.qz = _quat.z;
+  dst.qw = _quat.w;
+  dst.yaw = lerp(a.yaw, b.yaw, u);
+  dst.boost = lerp(a.boost, b.boost, u);
+  dst.slide = lerp(a.slide, b.slide, u);
+  dst.driftCharge = lerp(a.driftCharge, b.driftCharge, u);
+  dst.justTurbo = b.justTurbo;
+  dst.justLand = b.justLand;
+  dst.justBoost = b.justBoost;
+  dst.fx = fx / fl;
+  dst.fy = fy / fl;
+  dst.fz = fz / fl;
+  dst.ux = ux / ul;
+  dst.uy = uy / ul;
+  dst.uz = uz / ul;
+  return dst;
 }
 
 function lerp(a: number, b: number, t: number) {

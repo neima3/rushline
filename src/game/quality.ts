@@ -6,7 +6,8 @@ import type { ThemeId } from "./types";
  *
  * Store key: `rushline-settings-v1`
  * Fields we read: `quality`, `shadows`, `bloom`
- * Tier cost we apply: `particleDensity`, `dprCap`, `fogNearMul`, `fogFarMul`, `shadowMap`
+ * Tier cost we apply: `particleDensity`, `dprCap`, `fogNearMul`, `fogFarMul`, `shadowMap`,
+ * `shadowExtent`, `texSize`, `anisotropy`. Grade / MSAA are High-only.
  *
  * Scene API (`Game` / `World`):
  *   applySettings(s)          full Settings-shaped slice
@@ -26,6 +27,8 @@ export type QualityProfile = {
   /** 0–1 multiplier for tire-smoke spawn counts. */
   smokeScale: number;
   shadowMap: number;
+  /** Directional shadow ortho half-extent. High stays 70. */
+  shadowExtent: number;
   shadows: boolean;
   bloom: boolean;
   bloomStrength: number;
@@ -34,7 +37,33 @@ export type QualityProfile = {
   pixelRatioCap: number;
   environment: boolean;
   nightFills: boolean;
+  /** Color-grade composer. High only — Low/Med skip the extra RT. */
+  grade: boolean;
+  /** Canvas procedural maps. High stays 256. */
+  texSize: number;
+  anisotropy: number;
 };
+
+/** GPU / RAM budget for procedural + ground maps. High stays 256 / 8. */
+export type TextureBudget = {
+  size: number;
+  anisotropy: number;
+  roughnessMap: boolean;
+};
+
+export function textureBudget(tier: QualityTier): TextureBudget {
+  if (tier === "low") return { size: 128, anisotropy: 1, roughnessMap: false };
+  if (tier === "medium") return { size: 128, anisotropy: 2, roughnessMap: true };
+  return { size: 256, anisotropy: 8, roughnessMap: true };
+}
+
+export function wantsGrade(tier: QualityTier) {
+  return tier === "high";
+}
+
+export function wantsMsaa(tier: QualityTier) {
+  return tier === "high";
+}
 
 /** Duck-typed slice of Settings PR #17 `Settings` + `qualityProfile`. */
 export type GraphicsKnobs = {
@@ -56,11 +85,51 @@ export const DAY_FOG = { near: 80, far: 440 } as const;
 /** Settings #17 tier cost — particles / DPR / day fog scale. Night fog ignores muls. */
 export const SETTINGS_TIER_COST: Record<
   QualityTier,
-  { particleDensity: number; dprCap: number; fogNearMul: number; fogFarMul: number; shadowMap: number; cameraFar: number }
+  {
+    particleDensity: number;
+    dprCap: number;
+    fogNearMul: number;
+    fogFarMul: number;
+    shadowMap: number;
+    shadowExtent: number;
+    cameraFar: number;
+    texSize: number;
+    anisotropy: number;
+  }
 > = {
-  low: { particleDensity: 0.22, dprCap: 1, fogNearMul: 0.52, fogFarMul: 0.5, shadowMap: 512, cameraFar: 280 },
-  medium: { particleDensity: 0.55, dprCap: 1.5, fogNearMul: 0.78, fogFarMul: 0.72, shadowMap: 1024, cameraFar: 520 },
-  high: { particleDensity: 1, dprCap: 2, fogNearMul: 1, fogFarMul: 1, shadowMap: 1536, cameraFar: 900 },
+  low: {
+    particleDensity: 0.22,
+    dprCap: 1,
+    fogNearMul: 0.52,
+    fogFarMul: 0.5,
+    shadowMap: 512,
+    shadowExtent: 40,
+    cameraFar: 280,
+    texSize: 128,
+    anisotropy: 1,
+  },
+  medium: {
+    particleDensity: 0.55,
+    dprCap: 1.5,
+    fogNearMul: 0.78,
+    fogFarMul: 0.72,
+    shadowMap: 512,
+    shadowExtent: 48,
+    cameraFar: 520,
+    texSize: 128,
+    anisotropy: 2,
+  },
+  high: {
+    particleDensity: 1,
+    dprCap: 2,
+    fogNearMul: 1,
+    fogFarMul: 1,
+    shadowMap: 1536,
+    shadowExtent: 70,
+    cameraFar: 900,
+    texSize: 256,
+    anisotropy: 8,
+  },
 };
 
 /** Mirrors Settings #17 `qualityProfile` for shadows / bloom / particles / DPR. */
@@ -70,6 +139,7 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
     sparkScale: 0.22,
     smokeScale: 0.22,
     shadowMap: 512,
+    shadowExtent: 40,
     shadows: false,
     bloom: false,
     bloomStrength: 0,
@@ -78,12 +148,16 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
     pixelRatioCap: 1,
     environment: false,
     nightFills: false,
+    grade: false,
+    texSize: 128,
+    anisotropy: 1,
   },
   medium: {
     tier: "medium",
     sparkScale: 0.55,
     smokeScale: 0.55,
-    shadowMap: 1024,
+    shadowMap: 512,
+    shadowExtent: 48,
     shadows: true,
     bloom: false,
     bloomStrength: 0.12,
@@ -92,12 +166,16 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
     pixelRatioCap: 1.5,
     environment: true,
     nightFills: true,
+    grade: false,
+    texSize: 128,
+    anisotropy: 2,
   },
   high: {
     tier: "high",
     sparkScale: 1,
     smokeScale: 1,
     shadowMap: 1536,
+    shadowExtent: 70,
     shadows: true,
     bloom: true,
     bloomStrength: 0.16,
@@ -106,6 +184,9 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityProfile> = {
     pixelRatioCap: 2,
     environment: true,
     nightFills: true,
+    grade: true,
+    texSize: 256,
+    anisotropy: 8,
   },
 };
 
@@ -287,6 +368,10 @@ export function applyGraphicsKnobs(base: QualityProfile, knobs: GraphicsKnobs): 
     smokeScale: density ?? base.smokeScale,
     pixelRatioCap: knobs.dprCap ?? base.pixelRatioCap,
     shadowMap: SETTINGS_TIER_COST[knobs.quality].shadowMap,
+    shadowExtent: SETTINGS_TIER_COST[knobs.quality].shadowExtent,
+    texSize: SETTINGS_TIER_COST[knobs.quality].texSize,
+    anisotropy: SETTINGS_TIER_COST[knobs.quality].anisotropy,
+    grade: wantsGrade(knobs.quality),
     nightFills: knobs.quality !== "low",
     environment: knobs.quality !== "low" && knobs.bloom,
   };

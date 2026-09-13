@@ -10,7 +10,10 @@ import {
   SETTINGS_KEY,
   SETTINGS_TIER_COST,
   resolveQuality,
+  textureBudget,
   themeLightLevels,
+  wantsGrade,
+  wantsMsaa,
 } from "./quality.ts";
 
 describe("quality presets", () => {
@@ -56,6 +59,27 @@ describe("quality presets", () => {
     assert.equal(QUALITY_PRESETS.high.sparkScale, SETTINGS_TIER_COST.high.particleDensity);
   });
 
+  it("caps Low/Med GPU work and keeps High shadow / texture / grade", () => {
+    assert.equal(QUALITY_PRESETS.low.grade, false);
+    assert.equal(QUALITY_PRESETS.medium.grade, false);
+    assert.equal(QUALITY_PRESETS.high.grade, true);
+    assert.equal(wantsGrade("high"), true);
+    assert.equal(wantsGrade("medium"), false);
+    assert.equal(wantsMsaa("high"), true);
+    assert.equal(wantsMsaa("low"), false);
+    assert.ok(QUALITY_PRESETS.medium.shadowMap <= 512);
+    assert.equal(QUALITY_PRESETS.high.shadowMap, 1536);
+    assert.equal(QUALITY_PRESETS.high.shadowExtent, 70);
+    assert.ok(QUALITY_PRESETS.medium.shadowExtent < QUALITY_PRESETS.high.shadowExtent);
+    assert.ok(textureBudget("low").size <= 128);
+    assert.ok(textureBudget("medium").size <= 128);
+    assert.equal(textureBudget("low").roughnessMap, false);
+    assert.equal(textureBudget("high").size, 256);
+    assert.equal(textureBudget("high").anisotropy, 8);
+    assert.equal(SETTINGS_TIER_COST.high.shadowMap, QUALITY_PRESETS.high.shadowMap);
+    assert.equal(SETTINGS_TIER_COST.medium.texSize, QUALITY_PRESETS.medium.texSize);
+  });
+
   it("maps Settings store fields onto scene knobs", () => {
     const low = SETTINGS_TIER_COST.low;
     const profile = applyGraphicsKnobs(QUALITY_PRESETS.high, {
@@ -70,6 +94,8 @@ describe("quality presets", () => {
     assert.equal(profile.bloom, false);
     assert.equal(profile.pixelRatioCap, 1);
     assert.equal(profile.smokeScale, low.particleDensity);
+    assert.equal(profile.grade, false);
+    assert.equal(profile.texSize, 128);
     assert.equal(SETTINGS_KEY, "rushline-settings-v1");
   });
 

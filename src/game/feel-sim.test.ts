@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTrack, medalPace, sampleAt } from "./track.ts";
-import { CarSim, helixNearGate, pickSafeRespawnS } from "./physics.ts";
+import { CarSim, copySnap, emptySnap, helixNearGate, lerpSnap, pickSafeRespawnS } from "./physics.ts";
 
 const idle = {
   throttle: 0,
@@ -270,5 +270,25 @@ describe("mobile feel sims", () => {
     car.vz = sm.tz * 18;
     car.step(circuit, cruise, 1 / 60);
     assert.equal(car.airborne, true, "magnet must not teleport from ~1.8m");
+  });
+});
+
+describe("snap reuse", () => {
+  it("writes into the same CarSnap object", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    const a = emptySnap();
+    const b = car.snap(a);
+    assert.equal(a, b);
+    assert.ok(a.px !== 0 || a.pz !== 0 || a.py !== 0);
+    const vis = emptySnap();
+    const prev = emptySnap();
+    copySnap(prev, a);
+    car.step(circuit, cruise, 1 / 60);
+    const curr = car.snap(emptySnap());
+    const out = lerpSnap(prev, curr, 0.5, vis);
+    assert.equal(out, vis);
+    assert.ok(Math.abs(vis.px - (prev.px + curr.px) * 0.5) < 0.05);
   });
 });

@@ -23,7 +23,8 @@ import { pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
 import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
-import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
+import { CarSim, FIXED_DT, MAX_PHYS_STEPS, copySnap, emptySnap, lerpSnap } from "./physics";
+import { pageIsHidden, shouldPauseForBackground } from "./lifecycle";
 import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio, muteFromSearch } from "./audio";
@@ -78,8 +79,9 @@ export class Game {
   private input = new Input();
   private audio = new GameAudio();
   private car = new CarSim();
-  private prev: CarSnap;
-  private curr: CarSnap;
+  private prev: CarSnap = emptySnap();
+  private curr: CarSnap = emptySnap();
+  private vis: CarSnap = emptySnap();
   private track: BuiltTrack;
   private trackId: TrackId = "circuit";
   private running = true;
@@ -114,6 +116,7 @@ export class Game {
   private frames = 0;
   private fpsAt = 0;
   private tabHidden = false;
+  private pageFrozen = false;
   private photoMode = false;
   private photoFrom: Phase | null = null;
   private photoOrbit: PhotoOrbit = defaultPhotoOrbit();
@@ -126,8 +129,8 @@ export class Game {
     this.track = getTrack("circuit");
     this.world.loadTrack(this.track, this.track.def.env);
     this.car.reset(this.track);
-    this.curr = this.car.snap();
-    this.prev = this.car.snap();
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
     this.canvas.tabIndex = 0;
     this.canvas.style.outline = "none";
     this.input.attach(this.canvas);
@@ -162,6 +165,10 @@ export class Game {
     window.visualViewport?.addEventListener("resize", this.onViewport);
     window.addEventListener("orientationchange", this.onViewport);
     document.addEventListener("visibilitychange", this.onVis);
+    window.addEventListener("pagehide", this.onPageHide);
+    window.addEventListener("pageshow", this.onPageShow);
+    document.addEventListener("freeze", this.onFreeze);
+    document.addEventListener("resume", this.onResume);
     this.fit();
 
     window.__controlsTest = {
@@ -231,7 +238,38 @@ export class Game {
   private onViewport = () => this.fit();
 
   private onVis = () => {
-    if (document.hidden) {
+    this.setBackgrounded(shouldPauseForBackground(document, this.pageFrozen));
+  };
+
+  private onPageHide = () => {
+    this.pageFrozen = true;
+    this.setBackgrounded(true);
+  };
+
+  private onPageShow = () => {
+    this.pageFrozen = false;
+    this.setBackgrounded(pageIsHidden(document));
+  };
+
+  private onFreeze = () => {
+    this.pageFrozen = true;
+    this.setBackgrounded(true);
+  };
+
+  private onResume = () => {
+    this.pageFrozen = false;
+    this.setBackgrounded(pageIsHidden(document));
+  };
+
+  private setBackgrounded(hidden: boolean) {
+    if (hidden) {
+      if (this.tabHidden) {
+        if (this.raf) {
+          cancelAnimationFrame(this.raf);
+          this.raf = 0;
+        }
+        return;
+      }
       this.tabHidden = true;
       if (this.phase === "race") this.timeHold = this.time;
       if (this.phase === "countdown") {
@@ -241,6 +279,7 @@ export class Game {
       this.raf = 0;
       return;
     }
+    if (!this.tabHidden && this.raf !== 0) return;
     this.tabHidden = false;
     const now = performance.now();
     this.lastT = now;
@@ -349,8 +388,8 @@ export class Game {
     this.world.loadTrack(this.track, this.track.def.env);
     this.applyGhostChoice(id);
     this.car.reset(this.track);
-    this.curr = this.car.snap();
-    this.prev = this.car.snap();
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
     this.attractS = 0;
     this.acc = 0;
     this.world.snapCamera(this.curr, this.camera);
@@ -405,8 +444,8 @@ export class Game {
     if (id) this.load(id);
     else this.load(this.trackId);
     this.car.reset(this.track);
-    this.curr = this.car.snap();
-    this.prev = this.car.snap();
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
     this.time = 0;
     this.timeHold = 0;
     this.raceClockAt = 0;
@@ -479,8 +518,8 @@ export class Game {
     this.countdown = -1;
     this.acc = 0;
     this.car.reset(this.track);
-    this.curr = this.car.snap();
-    this.prev = this.car.snap();
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
     this.world.snapCamera(this.curr, this.camera);
     useGame.getState().setPhase("menu");
     useGame.getState().setHud({ countdown: null });
@@ -488,7 +527,7 @@ export class Game {
 
   private loop = (now: number) => {
     if (!this.running) return;
-    if (this.tabHidden || document.hidden) {
+    if (this.tabHidden || this.pageFrozen || pageIsHidden(document)) {
       this.raf = 0;
       return;
     }
@@ -572,7 +611,7 @@ export class Game {
       this.acc = Math.min(this.acc + dt, MAX_PHYS_STEPS * FIXED_DT);
       let steps = 0;
       while (this.acc >= FIXED_DT && steps < MAX_PHYS_STEPS) {
-        this.prev = this.car.snap();
+        this.car.snap(this.prev);
         this.car.step(this.track, actions, FIXED_DT);
         this.car.speed = clampTouchSpeed(this.car.speed, this.input.touchMode);
         if (this.car.justBoost) {
@@ -617,9 +656,9 @@ export class Game {
         this.afterSimRespawn();
         this.camSnapAfterSim = false;
       }
-      this.curr = this.car.snap();
+      this.car.snap(this.curr);
       if (this.car.skipInterp || this.car.justRespawn || Math.abs(this.curr.s - this.prev.s) > 40) {
-        this.prev = this.curr;
+        copySnap(this.prev, this.curr);
         this.car.skipInterp = false;
       }
       if (this.phase === "race") {
@@ -633,7 +672,7 @@ export class Game {
     }
 
     const alpha = Math.max(0, Math.min(1, this.acc / FIXED_DT));
-    const vis = lerpSnap(this.prev, this.curr, alpha);
+    const vis = lerpSnap(this.prev, this.curr, alpha, this.vis);
     this.world.applyCar(vis, this.photoMode ? 0 : dt, this.photoMode ? 0 : actions.steer, this.photoMode ? 0 : actions.brake);
     this.car.clearFeelPulses();
     const ghostTime = this.photoGhostTime() ?? this.time;
@@ -998,8 +1037,8 @@ export class Game {
   }
 
   private afterSimRespawn() {
-    this.curr = this.car.snap();
-    this.prev = this.curr;
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
     this.acc = 0;
     this.world.snapCamera(this.curr, this.camera);
   }
@@ -1015,6 +1054,10 @@ export class Game {
     window.visualViewport?.removeEventListener("resize", this.onViewport);
     window.removeEventListener("orientationchange", this.onViewport);
     document.removeEventListener("visibilitychange", this.onVis);
+    window.removeEventListener("pagehide", this.onPageHide);
+    window.removeEventListener("pageshow", this.onPageShow);
+    document.removeEventListener("freeze", this.onFreeze);
+    document.removeEventListener("resume", this.onResume);
     this.input.detach();
     this.audio.dispose();
     this.world.dispose();

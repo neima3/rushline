@@ -2,8 +2,27 @@ import * as THREE from "three";
 import type { BuiltTrack, Medal, Sample, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
 import { ROAD_TINT, roadCrown } from "./look";
 import { makeAsphaltRoughness, makeAsphaltTexture, makeCheckerTexture } from "./textures";
+import type { TextureBudget } from "./quality";
 
 const TAU = Math.PI * 2;
+const _hintSample: Sample = {
+  x: 0,
+  y: 0,
+  z: 0,
+  tx: 0,
+  ty: 0,
+  tz: -1,
+  ux: 0,
+  uy: 1,
+  uz: 0,
+  rx: 1,
+  ry: 0,
+  rz: 0,
+  width: 12,
+  s: 0,
+  boost: false,
+  checkpoint: false,
+};
 
 function wrapPi(a: number) {
   while (a > Math.PI) a -= TAU;
@@ -408,12 +427,30 @@ export function compileTrack(def: TrackDef): BuiltTrack {
   return { def, samples, length, checkpoints, boosts };
 }
 
-export function sampleAt(track: BuiltTrack, s: number): Sample {
+function writeEmptySample(dst: Sample): Sample {
+  dst.x = 0;
+  dst.y = 0;
+  dst.z = 0;
+  dst.tx = 0;
+  dst.ty = 0;
+  dst.tz = -1;
+  dst.ux = 0;
+  dst.uy = 1;
+  dst.uz = 0;
+  dst.rx = 1;
+  dst.ry = 0;
+  dst.rz = 0;
+  dst.width = 12;
+  dst.s = 0;
+  dst.boost = false;
+  dst.checkpoint = false;
+  return dst;
+}
+
+export function sampleAt(track: BuiltTrack, s: number, out?: Sample): Sample {
   const { samples, length, def } = track;
   if (samples.length === 0) {
-    return {
-      x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: -1, ux: 0, uy: 1, uz: 0, rx: 1, ry: 0, rz: 0, width: 12, s: 0, boost: false, checkpoint: false,
-    };
+    return writeEmptySample(out ?? ({} as Sample));
   }
   let ss = s;
   if (def.closed) {
@@ -467,24 +504,24 @@ export function sampleAt(track: BuiltTrack, s: number): Sample {
   ux = ry * tz - rz * ty;
   uy = rz * tx - rx * tz;
   uz = rx * ty - ry * tx;
-  return {
-    x: lerp(a.x, b.x, t),
-    y: lerp(a.y, b.y, t),
-    z: lerp(a.z, b.z, t),
-    tx,
-    ty,
-    tz,
-    ux,
-    uy,
-    uz,
-    rx,
-    ry,
-    rz,
-    width: lerp(a.width, b.width, t),
-    s: ss,
-    boost: a.boost || b.boost,
-    checkpoint: false,
-  };
+  const dst = out ?? ({} as Sample);
+  dst.x = lerp(a.x, b.x, t);
+  dst.y = lerp(a.y, b.y, t);
+  dst.z = lerp(a.z, b.z, t);
+  dst.tx = tx;
+  dst.ty = ty;
+  dst.tz = tz;
+  dst.ux = ux;
+  dst.uy = uy;
+  dst.uz = uz;
+  dst.rx = rx;
+  dst.ry = ry;
+  dst.rz = rz;
+  dst.width = lerp(a.width, b.width, t);
+  dst.s = ss;
+  dst.boost = a.boost || b.boost;
+  dst.checkpoint = false;
+  return dst;
 }
 
 export function nearestSample(
@@ -498,9 +535,15 @@ export function nearestSample(
   const { samples } = track;
   const n = samples.length;
   if (!n) return sampleAt(track, 0);
-  const hint = samples.findIndex((sm) => sm.s >= hintS);
-  const start = Math.max(0, hint < 0 ? 0 : hint);
-  const hintSm = sampleAt(track, hintS);
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid]!.s < hintS) lo = mid + 1;
+    else hi = mid;
+  }
+  const start = Math.max(0, lo);
+  const hintSm = sampleAt(track, hintS, _hintSample);
   let best = samples[start]!;
   let bestD = Infinity;
   let fallback = best;
@@ -555,7 +598,7 @@ export function crossedGate(prev: number, next: number, gate: number, length: nu
   return (p < g1 && q >= g1) || (p < g2 && q >= g2) || (p < g0 && q >= g0);
 }
 
-export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
+export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: TextureBudget) {
   const samples = track.samples;
   const closed = track.def.closed;
   const count = closed ? samples.length : samples.length - 1;
@@ -865,10 +908,11 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     }
   }
 
-  const asphalt = makeAsphaltTexture(theme);
+  const texOpts = { size: budget?.size ?? 256, anisotropy: budget?.anisotropy ?? 8 };
+  const asphalt = makeAsphaltTexture(theme, texOpts);
   asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
   asphalt.repeat.set(1, 1);
-  const asphaltRough = makeAsphaltRoughness(theme);
+  const asphaltRough = budget?.roughnessMap === false ? null : makeAsphaltRoughness(theme, texOpts);
 
   const roadGeo = new THREE.BufferGeometry();
   roadGeo.setAttribute("position", new THREE.Float32BufferAttribute(roadPos, 3));
@@ -903,7 +947,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
 
   const roadMat = new THREE.MeshStandardMaterial({
     map: asphalt,
-    roughnessMap: asphaltRough,
+    roughnessMap: asphaltRough ?? undefined,
     vertexColors: true,
     roughness: theme === "night" ? 0.38 : theme === "stadium" ? 0.52 : theme === "alpine" ? 0.58 : theme === "works" ? 0.44 : 0.74,
     metalness: theme === "night" ? 0.16 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.12 : theme === "works" ? 0.2 : 0.05,
@@ -1016,7 +1060,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId) {
     group,
     materials: [roadMat, curbMat, wallMat, markMat, railMat, postMat, boostMat, gridMat],
     geos: [roadGeo, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, grid.geometry as THREE.BufferGeometry],
-    textures: [asphalt, asphaltRough, checker],
+    textures: asphaltRough ? [asphalt, asphaltRough, checker] : [asphalt, checker],
   };
 }
 

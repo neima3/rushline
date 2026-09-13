@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./types";
+import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, Sample, ThemeId } from "./types";
 import { DEFAULT_LIVERY, type LiveryId } from "./livery";
 import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
@@ -17,7 +17,9 @@ import {
   QUALITY_PRESETS,
   resolveQuality,
   SETTINGS_TIER_COST,
+  textureBudget,
   themeLightLevels,
+  wantsGrade,
   type GraphicsKnobs,
   type QualityProfile,
   type QualityTier,
@@ -25,7 +27,7 @@ import {
 import { camBoostPull, camFollowRate, camFovTarget, camFwdRate, camLandDrop, camLookAhead } from "./feel";
 import { sampleGhost } from "./ghost";
 import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
-import { bindContextLoss, clampDrawingPixelRatio, isGlContextLost, preferMsaa } from "./webgl";
+import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -52,6 +54,29 @@ const _snapLook = new THREE.Vector3();
 const _snapFwd = new THREE.Vector3();
 const _snapUp = new THREE.Vector3();
 const _snapRight = new THREE.Vector3();
+const _lookX = new THREE.Vector3();
+const _lookY = new THREE.Vector3();
+const _lookFwd = new THREE.Vector3();
+const _lookM = new THREE.Matrix4();
+const _roadSample: Sample = {
+  x: 0,
+  y: 0,
+  z: 0,
+  tx: 0,
+  ty: 0,
+  tz: -1,
+  ux: 0,
+  uy: 1,
+  uz: 0,
+  rx: 1,
+  ry: 0,
+  rz: 0,
+  width: 12,
+  s: 0,
+  boost: false,
+  checkpoint: false,
+};
+const _ghostSample: Sample = { ..._roadSample };
 
 /** Chase/hood snap pose used by World.snapCamera — exported so respawn tests
  *  can prove Helix post-CP R keeps the camera above the ribbon on portrait. */
@@ -123,7 +148,7 @@ export function clearChaseCamera(
     }
   };
 
-  const road = sampleAt(track, snap.s);
+  const road = sampleAt(track, snap.s, _roadSample);
   const roadFloor = (mode === "hood" ? 1.1 : 2.25) + steep * (helix ? 0.35 : 1.35);
   liftAlong(road.ux, road.uy, road.uz, road.x, road.y, road.z, roadFloor);
 
@@ -269,12 +294,14 @@ export class World {
   private prevBoost = 0;
   private glLost = false;
   private unbindContext: (() => void) | null = null;
+  private coarsePointer = false;
+  private shadowBeat = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    this.coarsePointer = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: preferMsaa(window.devicePixelRatio || 1, coarse),
+      antialias: preferMsaa(window.devicePixelRatio || 1, this.coarsePointer, this.quality.tier),
       powerPreference: "high-performance",
       alpha: false,
       stencil: false,
@@ -284,7 +311,13 @@ export class World {
     this.viewW = canvas.clientWidth || 800;
     this.viewH = canvas.clientHeight || 600;
     this.renderer.setPixelRatio(
-      clampDrawingPixelRatio(window.devicePixelRatio || 1, this.quality.pixelRatioCap, this.viewW, this.viewH),
+      clampDrawingPixelRatio(
+        window.devicePixelRatio || 1,
+        this.quality.pixelRatioCap,
+        this.viewW,
+        this.viewH,
+        drawingPixelBudget(this.coarsePointer),
+      ),
     );
     this.renderer.setSize(this.viewW, this.viewH, false);
     this.unbindContext = bindContextLoss(canvas, {
@@ -305,7 +338,8 @@ export class World {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = this.quality.shadows;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.autoUpdate = this.quality.shadows;
+    this.renderer.shadowMap.type = this.quality.tier === "high" ? THREE.PCFShadowMap : THREE.BasicShadowMap;
 
     this.scene.background = new THREE.Color(0x8eb8dc);
     this.scene.fog = new THREE.Fog(0x8eb8dc, 80, 400);
@@ -321,12 +355,7 @@ export class World {
     this.fill2.castShadow = false;
     this.sun.castShadow = this.quality.shadows;
     this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
-    this.sun.shadow.camera.near = 10;
-    this.sun.shadow.camera.far = 280;
-    this.sun.shadow.camera.left = -70;
-    this.sun.shadow.camera.right = 70;
-    this.sun.shadow.camera.top = 70;
-    this.sun.shadow.camera.bottom = -70;
+    this.applyShadowFrustum(this.quality.shadowExtent);
     this.sun.shadow.bias = -0.00028;
     this.sun.shadow.normalBias = 0.028;
     this.scene.add(this.hemi, this.sun, this.sun.target, this.fill, this.fill.target, this.fill2, this.fill2.target);
@@ -401,14 +430,18 @@ export class World {
     this.vfx.setQuality(this.quality);
     this.vfx.density = this.knobs.particleDensity ?? this.quality.sparkScale;
     this.renderer.shadowMap.enabled = s.shadows;
+    this.renderer.shadowMap.autoUpdate = s.shadows;
+    this.renderer.shadowMap.type = this.quality.tier === "high" ? THREE.PCFShadowMap : THREE.BasicShadowMap;
     this.sun.castShadow = s.shadows;
     if (this.sun.shadow.mapSize.x !== this.quality.shadowMap) {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
       this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     }
+    this.applyShadowFrustum(this.quality.shadowExtent);
+    this.applyTextureAnisotropy();
     this.applyFog();
-    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false, this.quality.tier !== "low");
+    this.post.configure(s.bloom, "motionBlur" in s ? Boolean(full.motionBlur) : false, wantsGrade(this.quality.tier));
     this.tuneBloom(this.theme);
     this.post.setGrade(this.theme);
     this.applyEnvironmentMap();
@@ -507,7 +540,13 @@ export class World {
     if (w < 1 || h < 1) return;
     this.viewW = w;
     this.viewH = h;
-    const dpr = clampDrawingPixelRatio(window.devicePixelRatio || 1, this.dprCap, w, h);
+    const dpr = clampDrawingPixelRatio(
+      window.devicePixelRatio || 1,
+      this.dprCap,
+      w,
+      h,
+      drawingPixelBudget(this.coarsePointer),
+    );
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -551,9 +590,10 @@ export class World {
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y =
       theme === "canyon" ? -18 : theme === "night" ? -8 : theme === "alpine" ? -1.1 : theme === "works" ? -8 : -0.6;
-    applyGroundMaterial(this.ground, theme, this.textures);
+    const budget = textureBudget(this.quality.tier);
+    applyGroundMaterial(this.ground, theme, this.textures, budget);
 
-    const built = buildTrackMeshes(track, theme);
+    const built = buildTrackMeshes(track, theme, budget);
     this.trackRoot.add(built.group);
     this.disposables.push(...built.geos, ...built.materials);
     if ("textures" in built && Array.isArray(built.textures)) {
@@ -643,7 +683,7 @@ export class World {
       url,
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 6;
+        tex.anisotropy = Math.min(6, this.quality.anisotropy);
         this.skyTex = tex;
         this.sky?.setMap(tex);
         this.textures.push(tex);
@@ -697,7 +737,7 @@ export class World {
     this.car.setBoostVisual(
       Math.max(snap.boost > 0.05 ? 0.7 + snap.boost * 0.5 : 0, snap.driftCharge * 0.4, this.boostJuice * 0.85),
     );
-    const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s).width : 12;
+    const width = this.builtTrack ? sampleAt(this.builtTrack, snap.s, _roadSample).width : 12;
     const curb = isOnCurb(snap.n, width, snap.airborne);
     if (snap.boost > 0.05) this.vfx.emitTrail(snap, 9);
     if (snap.boost > 0.05 || snap.airborne) {
@@ -721,7 +761,7 @@ export class World {
     const s = pose.s;
     const n = pose.n;
     const heading = pose.heading;
-    const sm = sampleAt(track, s);
+    const sm = sampleAt(track, s, _ghostSample);
     const ch = Math.cos(heading);
     const sh = Math.sin(heading);
     const fx = sm.tx * ch - sm.rx * sh;
@@ -754,7 +794,7 @@ export class World {
   ) {
     this.clockT += dt;
     if (attract && track) {
-      const sm = sampleAt(track, attractS);
+      const sm = sampleAt(track, attractS, _roadSample);
       _desired.set(sm.x + sm.ux * 8 - sm.tx * 16, sm.y + 6.5, sm.z + sm.uz * 8 - sm.tz * 16);
       _look.set(sm.x, sm.y + 1.1, sm.z);
       const k = 1 - Math.exp(-1.4 * dt);
@@ -902,7 +942,6 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.sun.target.position.set(snap.px, snap.py, snap.pz);
     this.sun.position.set(snap.px + 60, snap.py + 95, snap.pz + 36);
-    this.sun.shadow.camera.updateProjectionMatrix();
     if (this.fill.intensity > 0) {
       this.fill.target.position.set(snap.px, snap.py, snap.pz);
       this.fill.position.set(snap.px + 10, snap.py - 36, snap.pz + 16);
@@ -936,7 +975,6 @@ export class World {
     this.camera.updateProjectionMatrix();
     this.sun.target.position.set(target.px, target.py, target.pz);
     this.sun.position.set(target.px + 60, target.py + 95, target.pz + 36);
-    this.sun.shadow.camera.updateProjectionMatrix();
     if (this.fill.intensity > 0) {
       this.fill.target.position.set(target.px, target.py, target.pz);
       this.fill.position.set(target.px + 10, target.py - 36, target.pz + 16);
@@ -963,11 +1001,38 @@ export class World {
 
   render() {
     if (this.glLost || isGlContextLost(this.renderer.getContext())) return;
+    if (this.quality.shadows && this.quality.tier !== "high") {
+      this.shadowBeat++;
+      this.renderer.shadowMap.autoUpdate = this.shadowBeat % 2 === 0;
+    } else {
+      this.renderer.shadowMap.autoUpdate = this.quality.shadows;
+    }
     if (this.sky) this.sky.mesh.position.copy(this.camera.position);
     try {
       this.post.render();
     } catch {
       this.glLost = true;
+    }
+  }
+
+  private applyShadowFrustum(extent: number) {
+    const cam = this.sun.shadow.camera;
+    cam.near = 10;
+    cam.far = Math.max(180, extent * 4);
+    cam.left = -extent;
+    cam.right = extent;
+    cam.top = extent;
+    cam.bottom = -extent;
+    cam.updateProjectionMatrix();
+  }
+
+  private applyTextureAnisotropy() {
+    const aniso = this.quality.anisotropy;
+    for (const t of this.textures) {
+      if (t.anisotropy !== aniso) {
+        t.anisotropy = aniso;
+        t.needsUpdate = true;
+      }
     }
   }
 
@@ -1081,11 +1146,13 @@ export class World {
 }
 
 function _lookMat(fwd: THREE.Vector3, up: THREE.Vector3) {
-  const m = new THREE.Matrix4();
-  const x = new THREE.Vector3().crossVectors(up, fwd);
-  if (x.lengthSq() < 1e-8) x.set(1, 0, 0);
-  x.normalize();
-  const y = new THREE.Vector3().crossVectors(fwd, x).normalize();
-  m.makeBasis(x, y, fwd.clone().normalize());
-  return m;
+  _lookX.crossVectors(up, fwd);
+  if (_lookX.lengthSq() < 1e-8) _lookX.set(1, 0, 0);
+  _lookX.normalize();
+  _lookY.crossVectors(fwd, _lookX).normalize();
+  _lookFwd.copy(fwd);
+  if (_lookFwd.lengthSq() < 1e-8) _lookFwd.set(0, 0, -1);
+  else _lookFwd.normalize();
+  _lookM.makeBasis(_lookX, _lookY, _lookFwd);
+  return _lookM;
 }

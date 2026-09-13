@@ -341,6 +341,10 @@ export class GameAudio {
     window.addEventListener("keydown", this.unlock);
     window.addEventListener("gamepadconnected", this.unlock);
     document.addEventListener("visibilitychange", this.onVis);
+    window.addEventListener("pagehide", this.onHide);
+    window.addEventListener("pageshow", this.onShow);
+    document.addEventListener("freeze", this.onHide);
+    document.addEventListener("resume", this.onShow);
   }
 
   detach() {
@@ -349,14 +353,25 @@ export class GameAudio {
     window.removeEventListener("keydown", this.unlock);
     window.removeEventListener("gamepadconnected", this.unlock);
     document.removeEventListener("visibilitychange", this.onVis);
+    window.removeEventListener("pagehide", this.onHide);
+    window.removeEventListener("pageshow", this.onShow);
+    document.removeEventListener("freeze", this.onHide);
+    document.removeEventListener("resume", this.onShow);
   }
 
   private onVis = () => {
+    if (document.visibilityState === "hidden") this.onHide();
+    else this.onShow();
+  };
+
+  private onHide = () => {
     if (!this.ctx || !this.unlocked) return;
-    if (document.visibilityState === "hidden") {
-      if (this.ctx.state === "running") void this.ctx.suspend();
-      return;
-    }
+    if (this.ctx.state === "running") void this.ctx.suspend();
+  };
+
+  private onShow = () => {
+    if (!this.ctx || !this.unlocked) return;
+    if (document.visibilityState === "hidden") return;
     if (this.ctx.state === "suspended") void this.ctx.resume();
   };
 

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { BuiltTrack, ThemeId } from "./types";
 import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
+import type { TextureBudget } from "./quality";
 
 const _dummy = new THREE.Object3D();
 const _fwd = new THREE.Vector3();
@@ -25,8 +26,8 @@ export type EnvBuild = {
   textures: THREE.Texture[];
 };
 
-export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: THREE.Texture[]) {
-  const tex = makeGroundTexture(theme);
+export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: THREE.Texture[], budget?: TextureBudget) {
+  const tex = makeGroundTexture(theme, { size: budget?.size ?? 256, anisotropy: budget?.anisotropy ?? 8 });
   textures.push(tex);
   const mat = mesh.material as THREE.MeshStandardMaterial;
   mat.map = tex;

@@ -26,7 +26,10 @@ export class Vfx {
   private skidIdx = 0;
   private skidCount = 0;
   private skidMesh: THREE.LineSegments;
-  private lastSkid: [number, number, number] | null = null;
+  private lastSkidX = 0;
+  private lastSkidY = 0;
+  private lastSkidZ = 0;
+  private hasLastSkid = false;
   private mats: THREE.Material[] = [];
   private geos: THREE.BufferGeometry[] = [];
   density = 1;
@@ -278,21 +281,21 @@ export class Vfx {
 
   skid(snap: CarSnap, active: boolean) {
     if (!active || snap.airborne || this.density < 0.12) {
-      this.lastSkid = null;
+      this.hasLastSkid = false;
       return;
     }
     const x = snap.px - snap.fx * 0.7;
     const y = snap.py - 0.32;
     const z = snap.pz - snap.fz * 0.7;
-    if (this.lastSkid) {
-      const dx = x - this.lastSkid[0];
-      const dz = z - this.lastSkid[2];
+    if (this.hasLastSkid) {
+      const dx = x - this.lastSkidX;
+      const dz = z - this.lastSkidZ;
       if (dx * dx + dz * dz < 0.04) return;
       const i = this.skidIdx % this.skidCap;
       const o = i * 6;
-      this.skidPos[o] = this.lastSkid[0];
-      this.skidPos[o + 1] = this.lastSkid[1];
-      this.skidPos[o + 2] = this.lastSkid[2];
+      this.skidPos[o] = this.lastSkidX;
+      this.skidPos[o + 1] = this.lastSkidY;
+      this.skidPos[o + 2] = this.lastSkidZ;
       this.skidPos[o + 3] = x;
       this.skidPos[o + 4] = y;
       this.skidPos[o + 5] = z;
@@ -304,7 +307,10 @@ export class Vfx {
       (this.skidGeo.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
       this.skidGeo.setDrawRange(0, Math.min(this.skidCount, this.skidCap) * 2);
     }
-    this.lastSkid = [x, y, z];
+    this.lastSkidX = x;
+    this.lastSkidY = y;
+    this.lastSkidZ = z;
+    this.hasLastSkid = true;
   }
 
   step(dt: number) {
@@ -316,7 +322,7 @@ export class Vfx {
   resetSkids() {
     this.skidIdx = 0;
     this.skidCount = 0;
-    this.lastSkid = null;
+    this.hasLastSkid = false;
     this.skidGeo.setDrawRange(0, 0);
     this.sparks.life.fill(0);
     this.smoke.life.fill(0);
@@ -331,8 +337,10 @@ export class Vfx {
 }
 
 function stepCloud(cloud: Cloud, cap: number, dt: number, gravity: number, drag: number) {
+  let live = 0;
   for (let i = 0; i < cap; i++) {
     if (cloud.life[i]! <= 0) continue;
+    live++;
     cloud.life[i]! -= dt;
     cloud.pos[i * 3]! += cloud.vel[i * 3]! * dt;
     cloud.pos[i * 3 + 1]! += cloud.vel[i * 3 + 1]! * dt;
@@ -343,6 +351,7 @@ function stepCloud(cloud: Cloud, cap: number, dt: number, gravity: number, drag:
       cloud.vel[i * 3 + 2]! *= 1 - drag * dt;
     }
   }
+  if (!live) return;
   (cloud.points.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
   const lifeAttr = cloud.points.geometry.getAttribute("life") as THREE.BufferAttribute | undefined;
   if (lifeAttr) lifeAttr.needsUpdate = true;
