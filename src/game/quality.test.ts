@@ -85,10 +85,12 @@ describe("quality presets", () => {
     assert.equal(high.env, 0.08);
 
     const ridge = themeLightLevels("canyon", QUALITY_PRESETS.high);
-    assert.equal(ridge.sun, 1.55);
-    assert.equal(ridge.hemi, 0.82);
-    assert.equal(ridge.exposure, 1.06);
-    assert.equal(ridge.bloomMul, 0.55);
+    assert.equal(ridge.sun, 1.44);
+    assert.equal(ridge.hemi, 0.76);
+    assert.equal(ridge.exposure, 1.0);
+    assert.equal(ridge.bloomMul, 0.48);
+    assert.ok(ridge.sun > themeLightLevels("stadium", QUALITY_PRESETS.high).sun);
+    assert.ok(ridge.exposure > themeLightLevels("stadium", QUALITY_PRESETS.high).exposure);
 
     const helix = themeLightLevels("night", QUALITY_PRESETS.high);
     assert.equal(helix.sun, 0.95);

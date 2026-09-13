@@ -139,10 +139,11 @@ export type ThemeLightLevels = {
 };
 
 /**
- * Per-theme light / bloom. Ridge + Helix stay on the #16 look.
- * Green Circuit (stadium) pulls Medium/High so asphalt + car stay readable
- * instead of washing out under day hemi/sun + High bloom/IBL.
- * High env stays 0.08 — sky IBL may replace the studio room, not the intensity.
+ * Per-theme light / bloom. Green Circuit (stadium) pulls Medium/High so
+ * asphalt + car stay readable (#19/#21). Ridge dusk is a hair lower than
+ * the old #16 punch so it shares an exposure range with Circuit High.
+ * Helix Night sun/hemi/exposure + 88/460 fog stay locked.
+ * High Circuit env stays 0.08 — sky IBL may replace the studio room.
  */
 export function themeLightLevels(
   theme: "stadium" | "canyon" | "night",
@@ -159,13 +160,15 @@ export function themeLightLevels(
     };
   }
   if (theme === "canyon") {
+    // Dusk stays warm, but sits closer to pulled Circuit High so the three
+    // themes share one exposure range instead of Ridge blowing out.
     return {
-      sun: 1.55,
-      hemi: 0.82,
-      exposure: 1.06,
-      env: quality.environment ? 0.42 : 0,
-      bloomMul: 0.55,
-      bloomThreshold: Math.max(quality.bloomThreshold, 0.91),
+      sun: 1.44,
+      hemi: 0.76,
+      exposure: 1.0,
+      env: quality.environment ? 0.32 : 0,
+      bloomMul: 0.48,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.92),
     };
   }
   const high = quality.tier === "high";
