@@ -61,6 +61,7 @@ export function defaultSurface(id: TrackId): SurfaceKind {
     case "canyon":
     case "mesa":
     case "hollow":
+    case "ember":
       return "dirt";
     case "summit":
       return "ice";

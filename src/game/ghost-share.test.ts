@@ -93,13 +93,13 @@ describe("ghost file encode/decode", () => {
     assert.equal(ghostHudTag("hotseat"), "P1");
   });
 
-  it("accepts Red Mesa and Black Hollow keys from the seven-track campaign", () => {
-    assert.deepEqual(TRACK_ORDER.slice(-2), ["mesa", "hollow"]);
-    assert.equal(isTrackId("mesa"), true);
-    assert.equal(isTrackId("hollow"), true);
-    assert.equal(isTrackId("red-mesa"), false);
+  it("accepts Ember Caldera and Storm Dock keys from the nine-track campaign", () => {
+    assert.deepEqual(TRACK_ORDER.slice(-2), ["ember", "storm"]);
+    assert.equal(isTrackId("ember"), true);
+    assert.equal(isTrackId("storm"), true);
+    assert.equal(isTrackId("ember-caldera"), false);
     assert.equal(isTrackId("custom"), true);
-    for (const trackId of ["mesa", "hollow"] as const) {
+    for (const trackId of ["ember", "storm"] as const) {
       const file = encodeGhostFile({ trackId, time: 36_000, source: "last", frames: rec(20) });
       assert.equal(file.trackId, trackId);
       const decoded = decodeGhostFile(file);

@@ -412,7 +412,7 @@ export function makeCar(ghost: boolean): CarRig {
 
   const paintLivery = (id: LiveryId) => {
     const def = liveryDef(id);
-    const night = theme === "night" || theme === "grove";
+    const night = theme === "night" || theme === "grove" || theme === "storm";
     (accent as THREE.MeshStandardMaterial).color.setHex(night ? def.accentNight : def.accent);
     (accent as THREE.MeshStandardMaterial).emissive.setHex(night ? def.accentEmissiveNight : def.accentEmissive);
     (accent as THREE.MeshStandardMaterial).emissiveIntensity = night ? 0.85 : 0.22;
@@ -425,15 +425,16 @@ export function makeCar(ghost: boolean): CarRig {
     if (ghost) return;
     const night = next === "night";
     const grove = next === "grove";
-    const dark = night || grove;
+    const storm = next === "storm";
+    const dark = night || grove || storm;
     const bm = bodyMat as THREE.MeshStandardMaterial;
     const tex = dark ? nightLivery : dayLivery;
     if (tex) {
       bm.map = tex;
       bm.needsUpdate = true;
     }
-    bm.emissive.setHex(night ? 0x2a3a68 : grove ? 0x14281c : 0x1a100c);
-    bm.emissiveIntensity = night ? 0.28 : grove ? 0.16 : 0.04;
+    bm.emissive.setHex(night ? 0x2a3a68 : grove ? 0x14281c : storm ? 0x142028 : next === "ember" ? 0x28140c : 0x1a100c);
+    bm.emissiveIntensity = night ? 0.28 : grove ? 0.16 : storm ? 0.18 : next === "ember" ? 0.1 : 0.04;
     const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
     const def = liveryDef(liveryId);
     bodyPhys.sheenColor.setHex(
@@ -447,7 +448,11 @@ export function makeCar(ghost: boolean): CarRig {
               ? 0xffd0b0
               : next === "mesa"
                 ? 0xffe0a0
-                : def.sheen,
+                : next === "ember"
+                  ? 0xffb070
+                  : storm
+                    ? 0xb8d8f0
+                    : def.sheen,
     );
     // Circuit High scene env stays 0.08 so asphalt does not wash. The car
     // multiplies that back up so clearcoat can still read the sky.
@@ -459,17 +464,21 @@ export function makeCar(ghost: boolean): CarRig {
           ? CAR_PAINT.envCanyon
           : next === "mesa"
             ? CAR_PAINT.envMesa
-            : CAR_PAINT.envDay;
+            : next === "ember"
+              ? CAR_PAINT.envEmber
+              : storm
+                ? CAR_PAINT.envStorm
+                : CAR_PAINT.envDay;
     bodyPhys.envMapIntensity = env;
-    bodyPhys.clearcoat = night ? 0.88 : grove ? 0.9 : CAR_PAINT.clearcoat;
-    bodyPhys.iridescence = night ? 0.22 : grove ? 0.12 : CAR_PAINT.iridescence;
+    bodyPhys.clearcoat = night ? 0.88 : grove ? 0.9 : storm ? 0.96 : next === "ember" ? 0.9 : CAR_PAINT.clearcoat;
+    bodyPhys.iridescence = night ? 0.22 : grove ? 0.12 : storm ? 0.16 : CAR_PAINT.iridescence;
     (glass as THREE.MeshPhysicalMaterial).envMapIntensity = env * 1.1;
     (gold as THREE.MeshPhysicalMaterial).envMapIntensity = env;
     (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
     (rim as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.85;
-    (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : grove ? 0x121814 : 0x1a1a1e);
+    (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : grove ? 0x121814 : storm ? 0x121820 : 0x1a1a1e);
     paintLivery(liveryId);
-    if (boostLight) boostLight.color.setHex(night ? 0x4ef0ff : grove ? 0x6ef0a0 : 0xff7a2a);
+    if (boostLight) boostLight.color.setHex(night ? 0x4ef0ff : grove ? 0x6ef0a0 : storm ? 0x88d0ff : next === "ember" ? 0xff6020 : 0xff7a2a);
   };
 
   const setLivery = (id: LiveryId) => {

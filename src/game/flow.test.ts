@@ -29,7 +29,9 @@ describe("nextTrackId", () => {
     assert.equal(nextTrackId("summit"), "yard");
     assert.equal(nextTrackId("yard"), "mesa");
     assert.equal(nextTrackId("mesa"), "hollow");
-    assert.equal(nextTrackId("hollow"), "circuit");
+    assert.equal(nextTrackId("hollow"), "ember");
+    assert.equal(nextTrackId("ember"), "storm");
+    assert.equal(nextTrackId("storm"), "circuit");
     assert.equal(nextTrackId("custom"), "circuit");
   });
 });
@@ -122,7 +124,11 @@ describe("buildResults", () => {
     const mesa = buildResults({ time: 33_000, trackId: "mesa", prevBest: null, ghost: null, medal: "gold" });
     assert.equal(mesa.nextTrackId, "hollow");
     const hollow = buildResults({ time: 32_000, trackId: "hollow", prevBest: null, ghost: null, medal: "gold" });
-    assert.equal(hollow.nextTrackId, "circuit");
+    assert.equal(hollow.nextTrackId, "ember");
+    const ember = buildResults({ time: 34_000, trackId: "ember", prevBest: null, ghost: null, medal: "gold" });
+    assert.equal(ember.nextTrackId, "storm");
+    const storm = buildResults({ time: 33_500, trackId: "storm", prevBest: null, ghost: null, medal: "gold" });
+    assert.equal(storm.nextTrackId, "circuit");
   });
 });
 

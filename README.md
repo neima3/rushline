@@ -1,6 +1,6 @@
 # Rushline
 
-A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on seven hand-built tracks — or run **Rush Cup**. Desktop, touch, and gamepad.
+A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on nine hand-built tracks — or run **Rush Cup**. Desktop, touch, and gamepad.
 
 **Live stack:** React 19 · TanStack Start · Three.js r185 · Zustand · Tailwind v4 · Web Audio
 
@@ -10,11 +10,11 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 **Hotseat** — two players on one device. P1 drives, then P2 races P1's ghost on the same circuit. A local scoreboard compares the times. No account.
 
-**Rush Cup** — a short local campaign. Clear **Gold** (or better) on all seven tracks in order, then **Author Cup** unlocks on the same seven. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
+**Rush Cup** — a short local campaign. Clear **Gold** (or better) on all nine tracks in order, then **Author Cup** unlocks on the same nine. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
 
 **Validated** — finish without using rewind and results shows a soft Validated badge. Rewind still counts for PB and medals. Local only — not online anti-cheat.
 
-**Stock laps** — Settings can set time-trial and hotseat laps on the stock seven to **1 / 2 / 3** (or Track for each circuit's authored count). Medals scale with the lap count. Custom and Rush Cup keep their own laps.
+**Stock laps** — Settings can set time-trial and hotseat laps on the stock nine to **1 / 2 / 3** (or Track for each circuit's authored count). Medals scale with the lap count. Custom and Rush Cup keep their own laps.
 
 Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the keyboard, touch, and gamepad bindings that are actually live.
 
@@ -33,11 +33,13 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 | **Arc Yard** | Works tech | ~952 m | Metal docks, gantry climb, freight drop |
 | **Red Mesa** | Desert dirt | ~1118 m | Dirt climb, plastic table, dirt edge drop |
 | **Black Hollow** | Forest dirt | ~819 m | Moonlit dirt pines, then a tech clearing sprint |
+| **Ember Caldera** | Lava dusk | ~1011 m | Ash rim, lava-glass hairpins, crater drop |
+| **Storm Dock** | Rain city | ~901 m | Wet streets, ice plaza, tech pier sprint |
 | **Custom** | Your ribbon | editor | Closed Catmull-Rom loop you place yourself |
 
-Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens a lite editor (control points, height / width / bank, checkpoint and boost flags). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock seven.
+Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens a lite editor (control points, height / width / bank, checkpoint and boost flags). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock nine.
 
-**Surfaces** change how the car grips. Plastic (Circuit, Mesa table) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing) sticks later and stops harder. The HUD chip names the ribbon under the car.
+**Surfaces** change how the car grips. Plastic (Circuit, Mesa table, Storm streets) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines, Ember ash) enters a slide earlier and pulls accel. Ice (White Pass, Storm plaza) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing, Storm pier) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
 Each stock circuit ships a lightweight **author ghost** paced to the Author medal, so a first-time run always has a rival. A personal-best ghost is saved with the time and replaces it. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 

@@ -40,7 +40,7 @@ export type EditorIssue = {
   boosts: number;
 };
 
-const THEMES: ThemeId[] = ["stadium", "canyon", "night", "alpine", "works", "mesa", "grove"];
+const THEMES: ThemeId[] = ["stadium", "canyon", "night", "alpine", "works", "mesa", "grove", "ember", "storm"];
 const SURFACES: SurfaceKind[] = ["plastic", "dirt", "ice", "tech"];
 
 let draftOverride: CustomTrackSave | null = null;
@@ -386,6 +386,8 @@ export const EDITOR_THEMES: { id: ThemeId; label: string }[] = [
   { id: "works", label: "Works" },
   { id: "mesa", label: "Mesa" },
   { id: "grove", label: "Grove" },
+  { id: "ember", label: "Ember" },
+  { id: "storm", label: "Storm" },
 ];
 
 export const EDITOR_SURFACES: { id: SurfaceKind; label: string }[] = [

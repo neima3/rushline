@@ -106,12 +106,14 @@ export class Vfx {
     const works = theme === "works";
     const mesa = theme === "mesa";
     const grove = theme === "grove";
-    this.trailColor.setHex(night ? 0x4ef0ff : alpine ? 0x9ad4ff : works ? 0x3ef0d8 : grove ? 0x7ef0a8 : mesa ? 0xffc050 : 0xff8a3a);
+    const ember = theme === "ember";
+    const storm = theme === "storm";
+    this.trailColor.setHex(night ? 0x4ef0ff : alpine ? 0x9ad4ff : works ? 0x3ef0d8 : grove ? 0x7ef0a8 : mesa ? 0xffc050 : ember ? 0xff6020 : storm ? 0x88d0ff : 0xff8a3a);
     (this.trail.points.material as THREE.PointsMaterial).color.copy(this.trailColor);
     (this.smoke.points.material as THREE.PointsMaterial).color.setHex(
-      canyon ? 0xc4a078 : night ? 0xb8a0d0 : alpine ? 0xe8eef4 : works ? 0x6a6058 : mesa ? 0xe0c070 : grove ? 0x3a5040 : 0xc8c4bc,
+      canyon ? 0xc4a078 : night ? 0xb8a0d0 : alpine ? 0xe8eef4 : works ? 0x6a6058 : mesa ? 0xe0c070 : grove ? 0x3a5040 : ember ? 0x6a4030 : storm ? 0x6a7888 : 0xc8c4bc,
     );
-    (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : works ? 0xffb040 : grove ? 0xc8f090 : mesa ? 0xffe080 : 0xffd090);
+    (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : works ? 0xffb040 : grove ? 0xc8f090 : mesa ? 0xffe080 : ember ? 0xff8040 : storm ? 0xc8e8ff : 0xffd090);
     (this.sparks.points.material as THREE.PointsMaterial).size = night ? 0.18 : 0.15;
     (this.trail.points.material as THREE.PointsMaterial).size = night ? 0.32 : 0.28;
   }

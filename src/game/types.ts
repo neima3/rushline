@@ -1,6 +1,6 @@
 import type { LiveryId } from "./livery";
 
-export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works" | "mesa" | "grove";
+export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works" | "mesa" | "grove" | "ember" | "storm";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
@@ -12,11 +12,11 @@ export function isLobbyPhase(phase: Phase): boolean {
 
 export type CameraMode = "chase" | "far" | "hood" | "cockpit";
 
-export type StockTrackId = "circuit" | "canyon" | "helix" | "summit" | "yard" | "mesa" | "hollow";
+export type StockTrackId = "circuit" | "canyon" | "helix" | "summit" | "yard" | "mesa" | "hollow" | "ember" | "storm";
 
 export type TrackId = StockTrackId | "custom";
 
-export const TRACK_ORDER: StockTrackId[] = ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"];
+export const TRACK_ORDER: StockTrackId[] = ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow", "ember", "storm"];
 
 export const PLAYABLE_ORDER: TrackId[] = [...TRACK_ORDER, "custom"];
 

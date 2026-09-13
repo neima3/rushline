@@ -67,6 +67,24 @@ describe("parseCup", () => {
     assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[5]!), true);
     assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[6]!), false);
   });
+
+  it("reopens Gold after a seven-track save so Ember Caldera and Storm Dock stay in order", () => {
+    const medals = {
+      "gold-circuit": "gold",
+      "gold-canyon": "gold",
+      "gold-helix": "gold",
+      "gold-summit": "gold",
+      "gold-yard": "gold",
+      "gold-mesa": "gold",
+      "gold-hollow": "gold",
+    };
+    const parsed = parseCup(JSON.stringify({ version: 1, medals, goldComplete: true, unlocked: { gold: 6, author: 0 } }));
+    assert.equal(parsed.goldComplete, false);
+    assert.equal(parsed.unlocked.gold, 7);
+    assert.equal(continueEvent(parsed)?.id, "gold-ember");
+    assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[7]!), true);
+    assert.equal(isEventUnlocked(parsed, CUP_EVENTS.gold[8]!), false);
+  });
 });
 
 describe("applyCupFinish", () => {
@@ -125,7 +143,7 @@ describe("commitCupRun", () => {
     assert.equal(result.nextEventId, "gold-canyon");
     assert.equal(result.nextTrackId, "canyon");
     assert.equal(result.eventIndex, 0);
-    assert.equal(result.eventTotal, 7);
+    assert.equal(result.eventTotal, 9);
     assert.equal(progress.unlocked.gold, 1);
     assert.ok(io.getItem(CUP_KEY)?.includes("gold-circuit"));
 
@@ -139,10 +157,10 @@ describe("commitCupRun", () => {
   it("announces a finished Gold Cup and feeds Author as the next challenge", () => {
     const io = memoryIo();
     let progress = emptyCup();
-    for (const ev of CUP_EVENTS.gold.slice(0, 6)) {
+    for (const ev of CUP_EVENTS.gold.slice(0, 8)) {
       progress = commitCupRun(ev, 40_000, "gold", io, progress).progress;
     }
-    const last = commitCupRun(CUP_EVENTS.gold[6]!, 40_000, "gold", io, progress);
+    const last = commitCupRun(CUP_EVENTS.gold[8]!, 40_000, "gold", io, progress);
     assert.equal(last.result.cupComplete, true);
     assert.equal(last.result.nextEventId, "author-circuit");
     assert.equal(cupHeadline(last.result, "gold"), "Gold Cup cleared");
@@ -155,6 +173,8 @@ describe("getCupEvent", () => {
     assert.equal(getCupEvent("author-yard")?.target, "author");
     assert.equal(getCupEvent("gold-mesa")?.trackId, "mesa");
     assert.equal(getCupEvent("author-hollow")?.trackId, "hollow");
+    assert.equal(getCupEvent("gold-ember")?.trackId, "ember");
+    assert.equal(getCupEvent("author-storm")?.trackId, "storm");
     assert.equal(getCupEvent("nope"), null);
   });
 });

@@ -767,7 +767,11 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                 ? 0.66
                 : theme === "grove"
                   ? 0.58
-                  : 0.55;
+                  : theme === "ember"
+                    ? 0.64
+                    : theme === "storm"
+                      ? 0.6
+                      : 0.55;
     const ch =
       theme === "stadium"
         ? 0.28
@@ -781,8 +785,12 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                 ? 0.17
                 : theme === "grove"
                   ? 0.14
-                  : 0.13;
-    const lift = theme === "stadium" ? 0.05 : theme === "alpine" ? 0.04 : theme === "works" ? 0.035 : theme === "mesa" ? 0.03 : 0.025;
+                  : theme === "ember"
+                    ? 0.16
+                    : theme === "storm"
+                      ? 0.15
+                      : 0.13;
+    const lift = theme === "stadium" ? 0.05 : theme === "alpine" ? 0.04 : theme === "works" ? 0.035 : theme === "mesa" ? 0.03 : theme === "ember" ? 0.032 : 0.025;
     for (const side of [-1, 1] as const) {
       const aox = side < 0 ? alx : arx;
       const aoy = side < 0 ? aly : ary;
@@ -807,7 +815,15 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                 ? stripe
                   ? { r: 0.96, g: 0.42, b: 0.12 }
                   : { r: 0.98, g: 0.86, b: 0.52 }
-                : stripe
+                : theme === "ember"
+                  ? stripe
+                    ? { r: 1, g: 0.28, b: 0.08 }
+                    : { r: 0.98, g: 0.62, b: 0.18 }
+                  : theme === "storm"
+                    ? side < 0
+                      ? { r: 0.28, g: 0.72, b: 0.92 }
+                      : { r: 0.86, g: 0.9, b: 0.96 }
+                    : stripe
                   ? theme === "stadium"
                     ? { r: 1, g: 0.1, b: 0.06 }
                     : theme === "alpine"
@@ -854,7 +870,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       pushTri(curbPos, curbNrm, curbCol, null, aox, aoy, aoz, bex, bey, bez, aex, aey, aez, nx, ny, nz, curbA);
       pushTri(curbPos, curbNrm, curbCol, null, aox, aoy, aoz, box, boy, boz, bex, bey, bez, nx, ny, nz, curbA);
 
-      const lip = theme === "stadium" ? 0.18 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.15 : 0.12;
+      const lip = theme === "stadium" ? 0.18 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.15 : theme === "ember" ? 0.16 : 0.12;
       const lipCol =
         theme === "night"
           ? { r: 0.07, g: 0.09, b: 0.14 }
@@ -864,7 +880,11 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
               ? { r: 0.06, g: 0.1, b: 0.08 }
               : theme === "mesa"
                 ? { r: 0.16, g: 0.1, b: 0.05 }
-                : { r: 0.07, g: 0.07, b: 0.08 };
+                : theme === "ember"
+                  ? { r: 0.18, g: 0.08, b: 0.04 }
+                  : theme === "storm"
+                    ? { r: 0.08, g: 0.1, b: 0.14 }
+                    : { r: 0.07, g: 0.07, b: 0.08 };
       const l0x = aox - a.rx * side * lip + a.ux * 0.03;
       const l0y = aoy - a.ry * side * lip + a.uy * 0.03;
       const l0z = aoz - a.rz * side * lip + a.uz * 0.03;
@@ -899,9 +919,17 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                     ? side < 0
                       ? { r: 0.28, g: 0.72, b: 0.42 }
                       : { r: 0.72, g: 0.62, b: 0.22 }
-                    : side < 0
-                      ? { r: 0.2, g: 0.72, b: 0.95 }
-                      : { r: 0.9, g: 0.22, b: 0.62 };
+                    : theme === "ember"
+                      ? side < 0
+                        ? { r: 1, g: 0.32, b: 0.08 }
+                        : { r: 0.72, g: 0.18, b: 0.08 }
+                      : theme === "storm"
+                        ? side < 0
+                          ? { r: 0.22, g: 0.64, b: 0.86 }
+                          : { r: 0.7, g: 0.78, b: 0.88 }
+                        : side < 0
+                          ? { r: 0.2, g: 0.72, b: 0.95 }
+                          : { r: 0.9, g: 0.22, b: 0.62 };
       const a0x = aox + a.rx * side * rd + a.ux * railH0;
       const a0y = aoy + a.ry * side * rd + a.uy * railH0;
       const a0z = aoz + a.rz * side * rd + a.uz * railH0;
@@ -934,7 +962,11 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                 ? { r: 0.62, g: 0.42, b: 0.22 }
                 : theme === "grove"
                   ? { r: 0.16, g: 0.24, b: 0.18 }
-                  : { r: 0.82, g: 0.8, b: 0.74 };
+                  : theme === "ember"
+                    ? { r: 0.42, g: 0.18, b: 0.1 }
+                    : theme === "storm"
+                      ? { r: 0.22, g: 0.28, b: 0.34 }
+                      : { r: 0.82, g: 0.8, b: 0.74 };
       pushTri(wallPos, wallNrm, wallCol, null, aex, aey, aez, bTopX, bTopY, bTopZ, aTopX, aTopY, aTopZ, nx, ny, nz, inner);
       pushTri(wallPos, wallNrm, wallCol, null, aex, aey, aez, bex, bey, bez, bTopX, bTopY, bTopZ, nx, ny, nz, inner);
 
@@ -970,8 +1002,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       strip(markPos, markNrm, markCol, markUv, ly0x, ly0y, ly0z, ly1x, ly1y, ly1z, ly2x, ly2y, ly2z, ly3x, ly3y, ly3z, a.ux, a.uy, a.uz, white, u0, u1);
     }
 
-    const edgeW = theme === "canyon" ? 0.26 : theme === "stadium" ? 0.14 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.2 : 0.1;
-    const inset = theme === "canyon" ? 0.12 : theme === "mesa" ? 0.14 : 0.22;
+    const edgeW = theme === "canyon" ? 0.26 : theme === "stadium" ? 0.14 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.2 : theme === "ember" ? 0.22 : theme === "storm" ? 0.16 : 0.1;
+    const inset = theme === "canyon" ? 0.12 : theme === "mesa" ? 0.14 : theme === "ember" ? 0.13 : 0.22;
     const edgeCol =
       theme === "stadium"
         ? { r: 1, g: 1, b: 0.98 }
@@ -985,7 +1017,11 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
                 ? { r: 0.98, g: 0.78, b: 0.32 }
                 : theme === "grove"
                   ? { r: 0.52, g: 0.88, b: 0.62 }
-                  : { r: 0.98, g: 0.96, b: 0.9 };
+                  : theme === "ember"
+                    ? { r: 1, g: 0.48, b: 0.16 }
+                    : theme === "storm"
+                      ? { r: 0.62, g: 0.84, b: 0.96 }
+                      : { r: 0.98, g: 0.96, b: 0.9 };
     for (const side of [-1, 1] as const) {
       const e0x = a.x + a.rx * side * (ha - inset) + a.ux * 0.025;
       const e0y = a.y + a.ry * side * (ha - inset) + a.uy * 0.025;
@@ -1044,18 +1080,18 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     map: asphalt,
     roughnessMap: asphaltRough ?? undefined,
     vertexColors: true,
-    roughness: theme === "night" ? 0.38 : theme === "stadium" ? 0.52 : theme === "alpine" ? 0.58 : theme === "works" ? 0.44 : theme === "mesa" ? 0.7 : theme === "grove" ? 0.48 : 0.74,
-    metalness: theme === "night" ? 0.16 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.12 : theme === "works" ? 0.2 : theme === "mesa" ? 0.06 : theme === "grove" ? 0.1 : 0.05,
-    emissive: theme === "night" ? 0x1c2438 : theme === "alpine" ? 0x101820 : theme === "works" ? 0x181410 : theme === "mesa" ? 0x201808 : theme === "grove" ? 0x081410 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.34 : theme === "alpine" ? 0.06 : theme === "works" ? 0.12 : theme === "mesa" ? 0.08 : theme === "grove" ? 0.16 : 0,
+    roughness: theme === "night" ? 0.38 : theme === "stadium" ? 0.52 : theme === "alpine" ? 0.58 : theme === "works" ? 0.44 : theme === "mesa" ? 0.7 : theme === "grove" ? 0.48 : theme === "ember" ? 0.68 : theme === "storm" ? 0.42 : 0.74,
+    metalness: theme === "night" ? 0.16 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.12 : theme === "works" ? 0.2 : theme === "mesa" ? 0.06 : theme === "grove" ? 0.1 : theme === "ember" ? 0.08 : theme === "storm" ? 0.18 : 0.05,
+    emissive: theme === "night" ? 0x1c2438 : theme === "alpine" ? 0x101820 : theme === "works" ? 0x181410 : theme === "mesa" ? 0x201808 : theme === "grove" ? 0x081410 : theme === "ember" ? 0x281008 : theme === "storm" ? 0x081018 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.34 : theme === "alpine" ? 0.06 : theme === "works" ? 0.12 : theme === "mesa" ? 0.08 : theme === "grove" ? 0.16 : theme === "ember" ? 0.14 : theme === "storm" ? 0.18 : 0,
     side: THREE.DoubleSide,
   });
   const curbMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: theme === "stadium" ? 0.22 : theme === "alpine" ? 0.26 : theme === "works" ? 0.28 : theme === "mesa" ? 0.36 : 0.32,
-    metalness: theme === "night" ? 0.28 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.14 : theme === "works" ? 0.22 : theme === "grove" ? 0.16 : 0.06,
-    emissive: theme === "night" ? 0x3a2060 : theme === "stadium" ? 0x2a0808 : theme === "alpine" ? 0x102028 : theme === "works" ? 0x281808 : theme === "mesa" ? 0x281404 : theme === "grove" ? 0x102818 : 0x140404,
-    emissiveIntensity: theme === "night" ? 0.62 : theme === "stadium" ? 0.12 : theme === "alpine" ? 0.1 : theme === "works" ? 0.22 : theme === "mesa" ? 0.14 : theme === "grove" ? 0.28 : 0.04,
+    roughness: theme === "stadium" ? 0.22 : theme === "alpine" ? 0.26 : theme === "works" ? 0.28 : theme === "mesa" ? 0.36 : theme === "ember" ? 0.34 : theme === "storm" ? 0.3 : 0.32,
+    metalness: theme === "night" ? 0.28 : theme === "stadium" ? 0.08 : theme === "alpine" ? 0.14 : theme === "works" ? 0.22 : theme === "grove" ? 0.16 : theme === "storm" ? 0.2 : 0.06,
+    emissive: theme === "night" ? 0x3a2060 : theme === "stadium" ? 0x2a0808 : theme === "alpine" ? 0x102028 : theme === "works" ? 0x281808 : theme === "mesa" ? 0x281404 : theme === "grove" ? 0x102818 : theme === "ember" ? 0x301004 : theme === "storm" ? 0x102028 : 0x140404,
+    emissiveIntensity: theme === "night" ? 0.62 : theme === "stadium" ? 0.12 : theme === "alpine" ? 0.1 : theme === "works" ? 0.22 : theme === "mesa" ? 0.14 : theme === "grove" ? 0.28 : theme === "ember" ? 0.2 : theme === "storm" ? 0.24 : 0.04,
   });
   const wallMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -1068,19 +1104,19 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     vertexColors: true,
     roughness: 0.38,
     metalness: 0.06,
-    emissive: theme === "night" ? 0x102028 : theme === "works" ? 0x141210 : theme === "grove" ? 0x0c1810 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.28 : theme === "works" ? 0.08 : theme === "grove" ? 0.12 : 0,
+    emissive: theme === "night" ? 0x102028 : theme === "works" ? 0x141210 : theme === "grove" ? 0x0c1810 : theme === "ember" ? 0x201008 : theme === "storm" ? 0x0c141c : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.28 : theme === "works" ? 0.08 : theme === "grove" ? 0.12 : theme === "ember" ? 0.1 : theme === "storm" ? 0.14 : 0,
   });
   const railMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.35,
-    metalness: theme === "night" ? 0.55 : theme === "works" ? 0.5 : theme === "grove" ? 0.38 : 0.4,
-    emissive: theme === "night" ? 0x3a60a0 : theme === "alpine" ? 0x203040 : theme === "works" ? 0x146060 : theme === "mesa" ? 0x402008 : theme === "grove" ? 0x184028 : 0x000000,
-    emissiveIntensity: theme === "night" ? 0.85 : theme === "alpine" ? 0.18 : theme === "works" ? 0.42 : theme === "mesa" ? 0.16 : theme === "grove" ? 0.38 : 0,
+    metalness: theme === "night" ? 0.55 : theme === "works" ? 0.5 : theme === "grove" ? 0.38 : theme === "storm" ? 0.48 : 0.4,
+    emissive: theme === "night" ? 0x3a60a0 : theme === "alpine" ? 0x203040 : theme === "works" ? 0x146060 : theme === "mesa" ? 0x402008 : theme === "grove" ? 0x184028 : theme === "ember" ? 0x501808 : theme === "storm" ? 0x184060 : 0x000000,
+    emissiveIntensity: theme === "night" ? 0.85 : theme === "alpine" ? 0.18 : theme === "works" ? 0.42 : theme === "mesa" ? 0.16 : theme === "grove" ? 0.38 : theme === "ember" ? 0.28 : theme === "storm" ? 0.4 : 0,
   });
   const postGeo = new THREE.CylinderGeometry(0.05, 0.06, 0.85, 5);
   const postMat = new THREE.MeshStandardMaterial({
-    color: theme === "canyon" ? 0x6a4634 : theme === "night" ? 0x1c222c : theme === "alpine" ? 0x8a7a68 : theme === "works" ? 0x3a3228 : theme === "mesa" ? 0x8a6238 : theme === "grove" ? 0x1a2418 : 0xb8b4aa,
+    color: theme === "canyon" ? 0x6a4634 : theme === "night" ? 0x1c222c : theme === "alpine" ? 0x8a7a68 : theme === "works" ? 0x3a3228 : theme === "mesa" ? 0x8a6238 : theme === "grove" ? 0x1a2418 : theme === "ember" ? 0x4a2214 : theme === "storm" ? 0x1c2834 : 0xb8b4aa,
     roughness: 0.5,
     metalness: 0.35,
   });
@@ -1121,8 +1157,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   group.add(grid);
 
   const boostMat = new THREE.MeshStandardMaterial({
-    color: theme === "night" ? 0x6ec8ff : theme === "works" ? 0x4ee8d4 : theme === "grove" ? 0x7ee8a0 : 0xe8c56a,
-    emissive: theme === "night" ? 0x3a8cff : theme === "works" ? 0x1aa890 : theme === "grove" ? 0x2a8850 : 0xc9a44a,
+    color: theme === "night" ? 0x6ec8ff : theme === "works" ? 0x4ee8d4 : theme === "grove" ? 0x7ee8a0 : theme === "ember" ? 0xff7a30 : theme === "storm" ? 0x7ec8e8 : 0xe8c56a,
+    emissive: theme === "night" ? 0x3a8cff : theme === "works" ? 0x1aa890 : theme === "grove" ? 0x2a8850 : theme === "ember" ? 0xc04010 : theme === "storm" ? 0x2a6088 : 0xc9a44a,
     emissiveIntensity: 1.15,
     roughness: 0.3,
     metalness: 0.25,
@@ -1325,6 +1361,59 @@ function hollowNodes() {
     .build();
 }
 
+function emberNodes() {
+  return new PathBuilder()
+    .setWidth(12.6)
+    .setSurface("dirt")
+    .straight(62)
+    .curve(-Math.PI * 0.72, 30, { bank: 0.4 })
+    .straight(28, { checkpoint: true })
+    .straight(52, { climb: 16, width: 11.8 })
+    .setSurface("plastic")
+    .curve(Math.PI * 0.82, 15, { bank: 0.5, climb: 5, width: 10.6 })
+    .curve(-Math.PI * 0.78, 14, { bank: 0.48, width: 10.4 })
+    .straight(20, { boost: true, checkpoint: true, width: 12.4 })
+    .setSurface("dirt")
+    .straight(86, { climb: -22, boost: true, width: 13.2 })
+    .straight(24, { checkpoint: true, width: 12 })
+    .setSurface("plastic")
+    .curve(Math.PI * 0.5, 22, { bank: 0.36 })
+    .straight(26, { boost: true })
+    .setSurface("dirt")
+    .curve(-Math.PI * 0.46, 26)
+    .straight(18)
+    .close()
+    .build();
+}
+
+function stormNodes() {
+  return new PathBuilder()
+    .setWidth(12)
+    .setSurface("plastic")
+    .straight(72)
+    .curve(-Math.PI * 0.5, 24, { width: 11.2 })
+    .curve(Math.PI * 0.46, 20, { width: 10.8 })
+    .straight(30, { checkpoint: true, width: 12 })
+    .setSurface("ice")
+    .curve(-Math.PI * 0.62, 15, { bank: 0.38, width: 10.6 })
+    .straight(16, { width: 11 })
+    .setSurface("tech")
+    .straight(26, { climb: 10, boost: true, width: 11.6 })
+    .curve(Math.PI * 0.88, 16, { bank: 0.46, width: 10.8 })
+    .straight(20, { checkpoint: true, boost: true, width: 12 })
+    .setSurface("plastic")
+    .straight(78, { climb: -12, width: 12.8 })
+    .straight(24, { checkpoint: true, width: 12 })
+    .setSurface("tech")
+    .curve(Math.PI * 0.42, 22, { bank: 0.34 })
+    .straight(28, { boost: true })
+    .setSurface("plastic")
+    .curve(-Math.PI * 0.4, 26)
+    .straight(18)
+    .close()
+    .build();
+}
+
 export const TRACK_DEFS: Record<StockTrackId, TrackDef> = {
   circuit: {
     id: "circuit",
@@ -1409,6 +1498,30 @@ export const TRACK_DEFS: Record<StockTrackId, TrackDef> = {
     medals: { author: 31_000, gold: 36_500, silver: 44_000, bronze: 55_000 },
     defaultSurface: "dirt",
     nodes: hollowNodes(),
+  },
+  ember: {
+    id: "ember",
+    name: "Ember Caldera",
+    blurb: "Ash rim, lava glass, then a crater drop.",
+    env: "ember",
+    laps: 1,
+    closed: true,
+    thumb: "/textures/thumb-ember.svg",
+    medals: { author: 33_000, gold: 38_500, silver: 46_000, bronze: 58_000 },
+    defaultSurface: "dirt",
+    nodes: emberNodes(),
+  },
+  storm: {
+    id: "storm",
+    name: "Storm Dock",
+    blurb: "Wet streets, ice plaza, then a tech pier.",
+    env: "storm",
+    laps: 1,
+    closed: true,
+    thumb: "/textures/thumb-storm.svg",
+    medals: { author: 32_500, gold: 38_000, silver: 45_500, bronze: 57_000 },
+    defaultSurface: "plastic",
+    nodes: stormNodes(),
   },
 };
 

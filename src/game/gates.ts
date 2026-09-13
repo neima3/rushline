@@ -31,7 +31,9 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
   const works = theme === "works";
   const grove = theme === "grove";
   const mesa = theme === "mesa";
-  const neon = night || works || grove;
+  const ember = theme === "ember";
+  const storm = theme === "storm";
+  const neon = night || works || grove || storm;
   const h = finish ? 4.05 : 3.55;
   const w = sm.width * 0.5 + 0.42;
   const postCol = finish
@@ -43,7 +45,11 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
           ? 0xd8f4e0
           : mesa
             ? 0xffe8c0
-            : GATE_LOOK.startPost
+            : ember
+              ? 0xffd0a0
+              : storm
+                ? 0xd8eaf4
+                : GATE_LOOK.startPost
     : night
       ? GATE_LOOK.cpNight
       : works
@@ -52,7 +58,11 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
           ? 0x7ee090
           : mesa
             ? 0xffc050
-            : GATE_LOOK.cpDay;
+            : ember
+              ? 0xff7a30
+              : storm
+                ? 0x7ec8e8
+                : GATE_LOOK.cpDay;
   const emit = finish
     ? GATE_LOOK.startEmissive
     : night
@@ -63,7 +73,11 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
           ? 0x2a8850
           : mesa
             ? 0xc46a18
-            : GATE_LOOK.cpEmissiveDay;
+            : ember
+              ? 0xc04010
+              : storm
+                ? 0x2a6088
+                : GATE_LOOK.cpEmissiveDay;
   const mat = new THREE.MeshStandardMaterial({
     color: postCol,
     emissive: emit,

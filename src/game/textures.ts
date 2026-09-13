@@ -42,10 +42,10 @@ export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THRE
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const grit = hash(x * 13 + y * 7) * (theme === "stadium" ? 22 : theme === "alpine" ? 16 : theme === "works" ? 20 : theme === "mesa" ? 24 : theme === "grove" ? 14 : 18);
+      const grit = hash(x * 13 + y * 7) * (theme === "stadium" ? 22 : theme === "alpine" ? 16 : theme === "works" ? 20 : theme === "mesa" ? 24 : theme === "grove" ? 14 : theme === "ember" ? 22 : theme === "storm" ? 16 : 18);
       const blotch = hash((x >> 3) + (y >> 2) * 17) * (theme === "stadium" ? 14 : 10);
       const n = grit + blotch + ((x ^ y) & 3) * 2;
-      const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 8 : theme === "alpine" ? 2 : theme === "works" ? 6 : theme === "mesa" ? 3 : 4);
+      const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 8 : theme === "alpine" ? 2 : theme === "works" ? 6 : theme === "mesa" ? 3 : theme === "ember" ? 4 : theme === "storm" ? 10 : 4);
       const seam = theme === "night" && (x % 64 < 2 || y % 64 < 2) ? 28 : 0;
       const panel = theme === "works" && (x % 48 < 2 || y % 72 < 2) ? 18 : 0;
       const iceStreak = theme === "alpine" ? Math.sin(y * 0.22) * 14 + Math.sin(x * 0.05) * 6 : 0;
@@ -79,7 +79,11 @@ export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THRE
               ? "#3a2410"
               : theme === "grove"
                 ? "#142018"
-                : "#141416";
+                : theme === "ember"
+                  ? "#3a1408"
+                  : theme === "storm"
+                    ? "#142028"
+                    : "#141416";
   for (let i = 0; i < (theme === "stadium" ? 72 : 40); i++) {
     ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, 10 + hash(i) * 28, theme === "stadium" ? 1.6 : 1);
   }
@@ -95,7 +99,7 @@ export function makeAsphaltRoughness(theme: ThemeId, opts?: TextureMakeOpts): TH
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
-  const mid = theme === "stadium" ? 148 : theme === "canyon" ? 168 : theme === "alpine" ? 132 : theme === "works" ? 118 : theme === "mesa" ? 158 : theme === "grove" ? 108 : 96;
+  const mid = theme === "stadium" ? 148 : theme === "canyon" ? 168 : theme === "alpine" ? 132 : theme === "works" ? 118 : theme === "mesa" ? 158 : theme === "grove" ? 108 : theme === "ember" ? 152 : theme === "storm" ? 112 : 96;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -204,7 +208,11 @@ export function makeGroundTexture(theme: ThemeId, opts?: TextureMakeOpts): THREE
               ? [196, 138, 62]
               : theme === "grove"
                 ? [22, 36, 26]
-                : [26, 22, 38];
+                : theme === "ember"
+                  ? [72, 28, 20]
+                  : theme === "storm"
+                    ? [28, 38, 46]
+                    : [26, 22, 38];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;

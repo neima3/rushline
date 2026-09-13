@@ -32,7 +32,7 @@ export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: 
   const mat = mesh.material as THREE.MeshStandardMaterial;
   mat.map = tex;
   mat.color.set(0xffffff);
-  mat.roughness = theme === "night" ? 0.92 : theme === "works" ? 0.88 : theme === "grove" ? 0.9 : theme === "mesa" ? 0.97 : 0.95;
+  mat.roughness = theme === "night" ? 0.92 : theme === "works" ? 0.88 : theme === "grove" ? 0.9 : theme === "mesa" ? 0.97 : theme === "ember" ? 0.96 : theme === "storm" ? 0.86 : 0.95;
   mat.needsUpdate = true;
 }
 
@@ -49,6 +49,8 @@ export function buildEnvironment(track: BuiltTrack, theme: ThemeId): EnvBuild {
   else if (theme === "works") buildWorks(track, group, geos, mats, lights);
   else if (theme === "mesa") buildMesa(track, group, geos, mats);
   else if (theme === "grove") buildGrove(track, group, geos, mats, lights);
+  else if (theme === "ember") buildEmber(track, group, geos, mats, lights);
+  else if (theme === "storm") buildStorm(track, group, geos, mats, lights);
   else buildNight(track, group, geos, mats, lights);
 
   decorateTrackside(track, theme, group, geos, mats, lights);
@@ -887,6 +889,263 @@ function buildGrove(
   addHorizonHaze(group, geos, mats, 0x143828, 0.2, ring + 64);
 }
 
+function buildEmber(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+  lights: THREE.Object3D[],
+) {
+  const ring = trackOutRadius(track) + 38;
+  const coneGeo = new THREE.ConeGeometry(1, 1, 7);
+  const basalt = new THREE.MeshStandardMaterial({ color: 0x2a1814, roughness: 0.96 });
+  const slag = new THREE.MeshStandardMaterial({
+    color: 0x6a2814,
+    roughness: 0.78,
+    emissive: 0x401008,
+    emissiveIntensity: 0.28,
+  });
+  const placed: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; slag: boolean }[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 + hash(i) * 0.2;
+    let r = 96 + hash(i + 3) * 78;
+    const h = 20 + hash(i + 6) * 32;
+    const sx = 12 + hash(i + 1) * 12;
+    const sz = 12 + hash(i + 2) * 10;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.9 + 22)) {
+      r = ring + 34 + hash(i) * 36;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.75 + 16)) continue;
+    placed.push({ x, y: h / 2 - 8, z, sx, h, sz, ry: a, slag: hash(i + 8) > 0.5 });
+  }
+  const placeCones = (list: typeof placed, mat: THREE.Material) => {
+    const mesh = new THREE.InstancedMesh(coneGeo, mat, list.length);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i]!;
+      _dummy.position.set(p.x, p.y, p.z);
+      _dummy.scale.set(p.sx, p.h, p.sz);
+      _dummy.rotation.set(0, p.ry, 0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+    group.add(mesh);
+  };
+  placeCones(placed.filter((p) => !p.slag), basalt);
+  placeCones(placed.filter((p) => p.slag), slag);
+  geos.push(coneGeo);
+  mats.push(basalt, slag);
+
+  const poolGeo = new THREE.CircleGeometry(1, 16);
+  const poolMat = new THREE.MeshStandardMaterial({
+    color: 0xff6a20,
+    roughness: 0.22,
+    metalness: 0.35,
+    emissive: 0xff4010,
+    emissiveIntensity: 1.15,
+  });
+  const poolN = 10;
+  const pools = new THREE.InstancedMesh(poolGeo, poolMat, poolN);
+  let pi = 0;
+  for (let i = 0; i < poolN; i++) {
+    const a = (i / poolN) * Math.PI * 2 + 0.35;
+    let r = ring + 18 + hash(i) * 28;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, 14)) {
+      r = ring + 42;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    if (overlapsTrack(track, x, z, 12)) continue;
+    const s = 7 + hash(i + 4) * 8;
+    _dummy.position.set(x, -0.6, z);
+    _dummy.scale.set(s, 1, s);
+    _dummy.rotation.set(-Math.PI / 2, 0, 0);
+    _dummy.updateMatrix();
+    pools.setMatrixAt(pi++, _dummy.matrix);
+  }
+  pools.count = pi;
+  group.add(pools);
+  geos.push(poolGeo);
+  mats.push(poolMat);
+
+  addTrackRocks(track, group, geos, mats, 0x2a1410, 0x8a3418);
+
+  let glows = 0;
+  for (let i = 0; i < 7 && glows < 5; i++) {
+    const sm = sampleAt(track, ((i + 0.25) / 7) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 8;
+    const pl = new THREE.PointLight(i % 2 === 0 ? 0xff6020 : 0xff9040, 0.9, 34, 2);
+    pl.position.set(sm.x + sm.rx * side * d + sm.ux * 2.2, sm.y + sm.uy * 2.2, sm.z + sm.rz * side * d + sm.uz * 2.2);
+    group.add(pl);
+    lights.push(pl);
+    glows++;
+  }
+
+  addHorizonHaze(group, geos, mats, 0xff6030, 0.16, ring + 78);
+}
+
+function buildStorm(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+  lights: THREE.Object3D[],
+) {
+  const ring = trackOutRadius(track) + 40;
+  const towerGeo = new THREE.BoxGeometry(1, 1, 1);
+  const towerMat = new THREE.MeshStandardMaterial({
+    color: 0x1c2834,
+    roughness: 0.48,
+    metalness: 0.28,
+    emissive: 0x101820,
+    emissiveIntensity: 0.32,
+  });
+  const n = 32;
+  const towers = new THREE.InstancedMesh(towerGeo, towerMat, n);
+  towers.castShadow = true;
+  let ti = 0;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + hash(i) * 0.12;
+    let r = ring + (i % 4) * 14;
+    const h = 14 + (i % 8) * 5.5;
+    const sx = 7 + (i % 3) * 2.4;
+    const sz = 7 + (i % 4) * 2;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 16)) {
+      r = ring + 30 + hash(i) * 28;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.65 + 14)) continue;
+    _dummy.position.set(x, h / 2 - 3.2, z);
+    _dummy.scale.set(sx, h, sz);
+    _dummy.rotation.set(0, a, 0);
+    _dummy.updateMatrix();
+    towers.setMatrixAt(ti++, _dummy.matrix);
+  }
+  towers.count = ti;
+  group.add(towers);
+  geos.push(towerGeo);
+  mats.push(towerMat);
+
+  const winGeo = new THREE.BoxGeometry(0.32, 0.46, 0.06);
+  const winMat = new THREE.MeshStandardMaterial({
+    color: 0xc8e4ff,
+    emissive: 0x8ec8ff,
+    emissiveIntensity: 1.35,
+    roughness: 0.35,
+  });
+  const winN = 120;
+  const windows = new THREE.InstancedMesh(winGeo, winMat, winN);
+  for (let i = 0; i < winN; i++) {
+    const a = hash(i) * Math.PI * 2;
+    const r = ring + (i % 4) * 14;
+    const y = 2 + hash(i + 5) * 26;
+    _dummy.position.set(Math.cos(a) * (r - 3.6), y, Math.sin(a) * (r - 3.6));
+    _dummy.lookAt(0, y, 0);
+    _dummy.scale.set(1, 1, 1);
+    _dummy.updateMatrix();
+    windows.setMatrixAt(i, _dummy.matrix);
+  }
+  group.add(windows);
+  geos.push(winGeo);
+  mats.push(winMat);
+
+  const waterGeo = new THREE.CircleGeometry(42, 28);
+  const waterMat = new THREE.MeshStandardMaterial({
+    color: 0x1a3040,
+    roughness: 0.16,
+    metalness: 0.48,
+    envMapIntensity: 1.15,
+  });
+  const water = new THREE.Mesh(waterGeo, waterMat);
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(ring * 0.12, -1.15, ring * 0.28);
+  water.receiveShadow = true;
+  group.add(water);
+  geos.push(waterGeo);
+  mats.push(waterMat);
+
+  const pileGeo = new THREE.CylinderGeometry(0.28, 0.34, 1, 6);
+  const pileMat = new THREE.MeshStandardMaterial({ color: 0x2a343c, roughness: 0.62, metalness: 0.32 });
+  const piles = new THREE.InstancedMesh(pileGeo, pileMat, 16);
+  piles.castShadow = true;
+  for (let i = 0; i < 16; i++) {
+    const sm = sampleAt(track, ((i + 0.2) / 16) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 7 + hash(i) * 5;
+    const h = 4.2 + hash(i + 2) * 2.4;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + h * 0.15, sm.z + sm.rz * side * d);
+    _dummy.scale.set(1, h, 1);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.updateMatrix();
+    piles.setMatrixAt(i, _dummy.matrix);
+  }
+  group.add(piles);
+  geos.push(pileGeo);
+  mats.push(pileMat);
+
+  const craneGeo = new THREE.BoxGeometry(0.22, 1, 0.22);
+  const boomGeo = new THREE.BoxGeometry(1, 0.16, 0.16);
+  const craneMat = new THREE.MeshStandardMaterial({
+    color: 0x3a4854,
+    roughness: 0.4,
+    metalness: 0.52,
+    emissive: 0x101820,
+    emissiveIntensity: 0.18,
+  });
+  const craneN = 6;
+  const masts = new THREE.InstancedMesh(craneGeo, craneMat, craneN);
+  const booms = new THREE.InstancedMesh(boomGeo, craneMat, craneN);
+  masts.castShadow = true;
+  for (let i = 0; i < craneN; i++) {
+    const sm = sampleAt(track, ((i + 0.45) / craneN) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 18 + hash(i) * 5;
+    const x = sm.x + sm.rx * side * d;
+    const z = sm.z + sm.rz * side * d;
+    const y = sm.y + 8;
+    _dummy.position.set(x, y, z);
+    _dummy.scale.set(1, 16, 1);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.updateMatrix();
+    masts.setMatrixAt(i, _dummy.matrix);
+    _dummy.position.set(x + sm.rx * side * 6, y + 7.4, z + sm.rz * side * 6);
+    _dummy.scale.set(12, 1, 1);
+    _fwd.set(sm.rx * side, 0, sm.rz * side);
+    _up.set(0, 1, 0);
+    _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
+    _dummy.updateMatrix();
+    booms.setMatrixAt(i, _dummy.matrix);
+  }
+  group.add(masts, booms);
+  geos.push(craneGeo, boomGeo);
+  mats.push(craneMat);
+
+  let floods = 0;
+  for (let i = 0; i < 7 && floods < 5; i++) {
+    const sm = sampleAt(track, ((i + 0.15) / 7) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 9;
+    const pl = new THREE.PointLight(i % 2 === 0 ? 0x88c8ff : 0xc8e8ff, 0.78, 32, 2);
+    pl.position.set(sm.x + sm.rx * side * d + sm.ux * 4.6, sm.y + sm.uy * 4.6, sm.z + sm.rz * side * d + sm.uz * 4.6);
+    group.add(pl);
+    lights.push(pl);
+    floods++;
+  }
+
+  addHorizonHaze(group, geos, mats, 0x4a6070, 0.18, ring + 76);
+}
+
 function decorateTrackside(
   track: BuiltTrack,
   theme: ThemeId,
@@ -908,7 +1167,11 @@ function decorateTrackside(
               ? 0xffe090
               : theme === "grove"
                 ? 0xb8f0c8
-                : 0xfff0c8,
+                : theme === "ember"
+                  ? 0xffb060
+                  : theme === "storm"
+                    ? 0xc8e8ff
+                    : 0xfff0c8,
     emissive:
       theme === "night"
         ? 0x6aa0ff
@@ -920,8 +1183,12 @@ function decorateTrackside(
               ? 0xffc040
               : theme === "grove"
                 ? 0x6ad080
-                : 0xffe0a0,
-    emissiveIntensity: theme === "night" ? 1.8 : theme === "alpine" ? 1.05 : theme === "works" ? 1.25 : theme === "mesa" ? 1.15 : theme === "grove" ? 1.4 : 0.9,
+                : theme === "ember"
+                  ? 0xff6020
+                  : theme === "storm"
+                    ? 0x88c8ff
+                    : 0xffe0a0,
+    emissiveIntensity: theme === "night" ? 1.8 : theme === "alpine" ? 1.05 : theme === "works" ? 1.25 : theme === "mesa" ? 1.15 : theme === "grove" ? 1.4 : theme === "ember" ? 1.35 : theme === "storm" ? 1.45 : 0.9,
   });
   const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.6, 6);
   const poleMat = new THREE.MeshStandardMaterial({
@@ -936,11 +1203,15 @@ function decorateTrackside(
               ? 0x6a4a28
               : theme === "grove"
                 ? 0x1a2218
-                : 0x2a2e36,
+                : theme === "ember"
+                  ? 0x3a2014
+                  : theme === "storm"
+                    ? 0x1c2834
+                    : 0x2a2e36,
     roughness: 0.5,
     metalness: 0.4,
   });
-  const step = Math.max(1, Math.floor(track.samples.length / (theme === "night" ? 36 : theme === "grove" ? 28 : 22)));
+  const step = Math.max(1, Math.floor(track.samples.length / (theme === "night" ? 36 : theme === "grove" ? 28 : theme === "storm" ? 30 : 22)));
   let realLights = 0;
   for (let i = 0; i < track.samples.length; i += step) {
     const sm = track.samples[i]!;
@@ -963,6 +1234,20 @@ function decorateTrackside(
     }
     if (theme === "grove" && realLights < 6) {
       const pl = new THREE.PointLight(0x88d898, 0.88, 32, 2);
+      pl.position.copy(lamp.position);
+      group.add(pl);
+      lights.push(pl);
+      realLights++;
+    }
+    if (theme === "ember" && realLights < 5) {
+      const pl = new THREE.PointLight(0xff7028, 0.82, 30, 2);
+      pl.position.copy(lamp.position);
+      group.add(pl);
+      lights.push(pl);
+      realLights++;
+    }
+    if (theme === "storm" && realLights < 6) {
+      const pl = new THREE.PointLight(0x88c8ff, 0.9, 34, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);
@@ -1189,7 +1474,11 @@ function addContrastBarriers(
                 ? 0xffc050
                 : theme === "grove"
                   ? 0x7ee090
-                  : 0xf4d24a,
+                  : theme === "ember"
+                    ? 0xff7a28
+                    : theme === "storm"
+                      ? 0x7ec8e8
+                      : 0xf4d24a,
     roughness: 0.28,
     metalness: 0.16,
     emissive:
@@ -1205,8 +1494,12 @@ function addContrastBarriers(
                 ? 0x5a2808
                 : theme === "grove"
                   ? 0x145028
-                  : 0x6a4a08,
-    emissiveIntensity: theme === "night" ? 0.85 : theme === "works" ? 0.55 : theme === "grove" ? 0.48 : theme === "mesa" ? 0.32 : 0.28,
+                  : theme === "ember"
+                    ? 0x5a1808
+                    : theme === "storm"
+                      ? 0x184058
+                      : 0x6a4a08,
+    emissiveIntensity: theme === "night" ? 0.85 : theme === "works" ? 0.55 : theme === "grove" ? 0.48 : theme === "mesa" ? 0.32 : theme === "ember" ? 0.42 : theme === "storm" ? 0.5 : 0.28,
   });
   const dark = new THREE.MeshStandardMaterial({
     color: 0x14161c,
