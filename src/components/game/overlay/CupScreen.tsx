@@ -168,7 +168,7 @@ function EventCard({
         </span>
         <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-subtle">
           <MedalRow medal={cupMedal} />
-          <span>Cup {formatTime(cupTime ?? -1)}</span>
+          <span>{cupTime != null ? `Cup ${formatTime(cupTime)}` : "Not run"}</span>
         </span>
       </span>
     </button>
