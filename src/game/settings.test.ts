@@ -7,6 +7,7 @@ import {
   loadSettings,
   parseSettings,
   qualityProfile,
+  steerPresetScale,
 } from "./settings.ts";
 
 describe("defaultSettings", () => {
@@ -17,6 +18,7 @@ describe("defaultSettings", () => {
     assert.equal(s.bloom, true);
     assert.equal(s.autoThrottle, false);
     assert.equal(s.trackAssist, "off");
+    assert.equal(s.steerPreset, "normal");
     assert.equal(s.motionBlur, false);
     assert.equal(s.rewindEnabled, true);
   });
@@ -106,6 +108,7 @@ describe("parseSettings", () => {
       fov: 12,
       cameraShake: 4,
       touchSteerSensitivity: 0.1,
+      steerPreset: "fast",
       trackAssist: "high",
       autoThrottle: false,
       invertSteer: true,
@@ -123,6 +126,7 @@ describe("parseSettings", () => {
     assert.equal(s.fov, 50);
     assert.equal(s.cameraShake, 1.5);
     assert.equal(s.touchSteerSensitivity, 0.45);
+    assert.equal(s.steerPreset, "fast");
     assert.equal(s.trackAssist, "high");
     assert.equal(s.invertSteer, true);
     assert.equal(s.autoThrottle, false);
@@ -148,6 +152,14 @@ describe("parseSettings", () => {
   });
 });
 
+describe("parseSettings steerPreset", () => {
+  it("falls back to Normal for missing or garbage values", () => {
+    assert.equal(parseSettings({}, false).steerPreset, "normal");
+    assert.equal(parseSettings({ steerPreset: "turbo" }, true).steerPreset, "normal");
+    assert.equal(parseSettings({ steerPreset: "slow" }, false).steerPreset, "slow");
+  });
+});
+
 describe("parseSettings trackAssist", () => {
   it("falls back to the platform default for missing or garbage values", () => {
     assert.equal(parseSettings({}, false).trackAssist, "off");
@@ -161,6 +173,15 @@ describe("applySteerSettings", () => {
   it("scales only the touch stick", () => {
     assert.equal(applySteerSettings(0.2, 0, 0.5, { sensitivity: 2, invert: false }), 1);
     assert.ok(Math.abs(applySteerSettings(0.2, 0, 0, { sensitivity: 2, invert: false }) - 0.2) < 1e-6);
+  });
+
+  it("scales keyboard and pad from the preset without touching Track Assist numbers", () => {
+    assert.equal(steerPresetScale("slow"), 0.72);
+    assert.equal(steerPresetScale("normal"), 1);
+    assert.equal(steerPresetScale("fast"), 1.22);
+    assert.ok(Math.abs(applySteerSettings(1, 0, 0, { sensitivity: 1, invert: false, preset: "slow" }) - 0.72) < 1e-6);
+    assert.ok(Math.abs(applySteerSettings(0.5, 0, 0, { sensitivity: 1, invert: false, preset: "fast" }) - 0.61) < 1e-6);
+    assert.ok(Math.abs(applySteerSettings(0, 0, 0.4, { sensitivity: 1, invert: false, preset: "fast" }) - 0.4) < 1e-6);
   });
 
   it("inverts the combined steer", () => {

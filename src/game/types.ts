@@ -10,7 +10,7 @@ export function isLobbyPhase(phase: Phase): boolean {
   return phase === "menu" || phase === "select" || phase === "garage" || phase === "cup";
 }
 
-export type CameraMode = "chase" | "hood";
+export type CameraMode = "chase" | "far" | "hood" | "cockpit";
 
 export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard";
 

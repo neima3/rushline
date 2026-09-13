@@ -1,8 +1,9 @@
 import type { Actions, PadInfo } from "./types";
 import { padInfoFrom, padInUse, pollPads, rumblePads, type PadHotPlug } from "./gamepad";
 import { resolveSampleDrive } from "./auto-throttle";
+import { emptyRespawnHold, RESTART_HOLD_MS, stepRespawnHold } from "./camera";
 import { steerFilter } from "./feel";
-import { applySteerSettings } from "./settings";
+import { applySteerSettings, type SteerPreset } from "./settings";
 
 const GAME_CODES = new Set([
   "KeyW",
@@ -28,6 +29,8 @@ const GAME_CODES = new Set([
   "KeyE",
   "Minus",
   "Equal",
+  "Delete",
+  "Home",
 ]);
 
 export class Input {
@@ -42,6 +45,9 @@ export class Input {
   touchMode = false;
   touchSteerSensitivity = 1;
   invertSteer = false;
+  steerPreset: SteerPreset = "normal";
+  holdRestartMs = RESTART_HOLD_MS;
+  nowMs = () => performance.now();
   /** Throttle from keys / pad / touch before auto-throttle fills in. */
   manualThrottle = 0;
   pad: PadInfo = { connected: false, id: "", xbox: false, active: false };
@@ -50,7 +56,8 @@ export class Input {
   onCameraHotkey: (() => void) | null = null;
   onPhotoHotkey: (() => void) | null = null;
   onPadChange: ((info: PadInfo, reason: PadHotPlug) => void) | null = null;
-  private queued = { pause: false, camera: false, respawn: false, photo: false };
+  private queued = { pause: false, camera: false, respawn: false, photo: false, restart: false };
+  private respawnHold = emptyRespawnHold();
   private brakeLatchUntil = 0;
   private edgePrev = {
     respawn: false,
@@ -105,6 +112,7 @@ export class Input {
           }
         }
         if (e.code === "KeyR") this.queued.respawn = true;
+        if (e.code === "Delete" || e.code === "Home") this.queued.restart = true;
       }
     };
     this.onKeyUp = (e) => {
@@ -243,8 +251,9 @@ export class Input {
     let steer = applySteerSettings(kbSteer, padSteer, this.touchSteer, {
       sensitivity: this.touchSteerSensitivity,
       invert: this.invertSteer,
+      preset: this.steerPreset,
     });
-    const now = performance.now();
+    const now = this.nowMs();
     const dt = this.lastSampleAt ? Math.min(0.05, (now - this.lastSampleAt) / 1000) : 1 / 60;
     this.lastSampleAt = now;
     const analog = Math.abs(this.touchSteer) > 0.02 || Boolean(gp && Math.abs(gp.steer) > 0.08);
@@ -257,17 +266,19 @@ export class Input {
       this.down("ShiftRight") ||
       Boolean(gp?.slide) ||
       this.touchSlide > 0.5;
-
     const rewindPad = Boolean(gp?.lb && gp?.y);
     const rewind = this.down("Backspace") || rewindPad || this.touchRewind > 0.5;
     const respawnNow = (this.down("KeyR") || Boolean(gp?.y && !gp?.lb)) && !rewind;
-    const restartNow = this.down("Enter");
+    const hold = stepRespawnHold(respawnNow, now, this.respawnHold, this.holdRestartMs);
+    this.respawnHold = hold.next;
+    if (hold.fireRestart) this.queued.restart = true;
+    const restartNow = this.down("Delete") || this.down("Home");
     const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
     const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view && !gp?.lb);
     const photoNow = this.down("KeyF") || Boolean(gp?.lb && gp?.view);
 
     const respawn = this.queued.respawn || (respawnNow && !this.edgePrev.respawn);
-    const restart = restartNow && !this.edgePrev.restart;
+    const restart = this.queued.restart || (restartNow && !this.edgePrev.restart);
     const pause = this.queued.pause || (pauseNow && !this.edgePrev.pause);
     const camera = this.queued.camera || (cameraNow && !this.edgePrev.camera);
     const photo = this.queued.photo || (photoNow && !this.edgePrev.photo);
@@ -275,6 +286,7 @@ export class Input {
     this.queued.camera = false;
     this.queued.respawn = false;
     this.queued.photo = false;
+    this.queued.restart = false;
     const confirm = confirmNow && !this.edgePrev.confirm;
     const back = backNow && !this.edgePrev.back;
     this.edgePrev = {

@@ -27,6 +27,7 @@ import { nextRewindTime, pinRaceClock, RewindTape, trimRecording, type RewindFra
 import { CarSim, FIXED_DT, MAX_PHYS_STEPS, copySnap, emptySnap, lerpSnap } from "./physics";
 import { pageIsHidden, shouldPauseForBackground } from "./lifecycle";
 import { World } from "./scene";
+import { nextCamera } from "./camera";
 import { Input } from "./input";
 import { GameAudio, muteFromSearch } from "./audio";
 import { buildResults } from "./flow";
@@ -156,7 +157,7 @@ export class Game {
         return;
       }
       if (isLobbyPhase(this.phase)) return;
-      this.setCamera(this.camera === "chase" ? "hood" : "chase");
+      this.setCamera(nextCamera(this.camera));
     };
     this.input.onPhotoHotkey = () => {
       const store = useGame.getState();
@@ -210,6 +211,7 @@ export class Game {
     this.audio.applyVolumes(s.master, s.sfx, s.music);
     this.input.touchSteerSensitivity = s.touchSteerSensitivity;
     this.input.invertSteer = s.invertSteer;
+    this.input.steerPreset = s.steerPreset;
     this.input.autoThrottle = s.autoThrottle;
     this.car.trackAssist = s.trackAssist;
     this.rewind.configure(this.input.touchMode);
@@ -323,6 +325,16 @@ export class Game {
     this.camera = mode;
     useGame.getState().setCamera(mode);
     this.world.snapCamera(this.curr, mode);
+  }
+
+  cycleCamera() {
+    this.setCamera(nextCamera(this.camera));
+  }
+
+  restartRun() {
+    if (this.phase === "race" || this.phase === "paused" || this.phase === "results" || this.phase === "countdown") {
+      this.startRace(this.trackId);
+    }
   }
 
   setMuted(m: boolean) {
@@ -613,10 +625,8 @@ export class Game {
       if (actions.photo) this.togglePhoto();
       if (actions.pause && (this.phase === "race" || this.phase === "countdown")) this.pause();
       else if (actions.pause && this.phase === "paused") this.resume();
-      if (actions.camera) this.setCamera(this.camera === "chase" ? "hood" : "chase");
-      if (actions.restart && (this.phase === "race" || this.phase === "paused" || this.phase === "results")) {
-        this.startRace(this.trackId);
-      }
+      if (actions.camera) this.cycleCamera();
+      if (actions.restart) this.restartRun();
       if (actions.respawn && (this.phase === "race" || this.phase === "countdown")) this.applyRespawn();
     }
 
