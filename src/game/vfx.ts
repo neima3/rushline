@@ -99,9 +99,12 @@ export class Vfx {
   setTheme(theme: ThemeId | boolean) {
     const night = theme === true || theme === "night";
     const canyon = theme === "canyon";
-    this.trailColor.setHex(night ? 0x4ef0ff : 0xff8a3a);
+    const alpine = theme === "alpine";
+    this.trailColor.setHex(night ? 0x4ef0ff : alpine ? 0x9ad4ff : 0xff8a3a);
     (this.trail.points.material as THREE.PointsMaterial).color.copy(this.trailColor);
-    (this.smoke.points.material as THREE.PointsMaterial).color.setHex(canyon ? 0xc4a078 : night ? 0xb8a0d0 : 0xc8c4bc);
+    (this.smoke.points.material as THREE.PointsMaterial).color.setHex(
+      canyon ? 0xc4a078 : night ? 0xb8a0d0 : alpine ? 0xe8eef4 : 0xc8c4bc,
+    );
     (this.sparks.points.material as THREE.PointsMaterial).color.setHex(night ? 0xff8ad0 : 0xffd090);
     (this.sparks.points.material as THREE.PointsMaterial).size = night ? 0.18 : 0.15;
     (this.trail.points.material as THREE.PointsMaterial).size = night ? 0.32 : 0.28;

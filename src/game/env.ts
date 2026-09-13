@@ -44,6 +44,7 @@ export function buildEnvironment(track: BuiltTrack, theme: ThemeId): EnvBuild {
 
   if (theme === "stadium") buildStadium(track, group, geos, mats, lights);
   else if (theme === "canyon") buildCanyon(track, group, geos, mats);
+  else if (theme === "alpine") buildAlpine(track, group, geos, mats);
   else buildNight(track, group, geos, mats, lights);
 
   decorateTrackside(track, theme, group, geos, mats, lights);
@@ -400,6 +401,104 @@ function buildNight(
   addHorizonHaze(group, geos, mats, 0x6a40c8, 0.1, ring + 70);
 }
 
+function buildAlpine(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const ring = trackOutRadius(track) + 40;
+  const peakGeo = new THREE.ConeGeometry(1, 1, 6);
+  const peakSnow = new THREE.MeshStandardMaterial({ color: 0xf2f6fa, roughness: 0.92 });
+  const peakRock = new THREE.MeshStandardMaterial({ color: 0x7a8894, roughness: 0.96 });
+  const peakPlaced: { x: number; y: number; z: number; sx: number; h: number; sz: number; snow: boolean }[] = [];
+  for (let i = 0; i < 22; i++) {
+    const a = (i / 22) * Math.PI * 2 + hash(i) * 0.2;
+    let r = 95 + hash(i + 3) * 90;
+    const h = 22 + hash(i + 6) * 38;
+    const sx = 10 + hash(i + 1) * 14;
+    const sz = 10 + hash(i + 2) * 12;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.85 + 22)) {
+      r = ring + 36 + hash(i) * 40;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.7 + 16)) continue;
+    peakPlaced.push({ x, y: h / 2 - 6, z, sx, h, sz, snow: hash(i + 8) > 0.32 });
+  }
+  const snowPeaks = peakPlaced.filter((p) => p.snow);
+  const rockPeaks = peakPlaced.filter((p) => !p.snow);
+  const placePeaks = (placed: typeof peakPlaced, mat: THREE.Material) => {
+    const mesh = new THREE.InstancedMesh(peakGeo, mat, placed.length);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    for (let i = 0; i < placed.length; i++) {
+      const p = placed[i]!;
+      _dummy.position.set(p.x, p.y, p.z);
+      _dummy.scale.set(p.sx, p.h, p.sz);
+      _dummy.rotation.set(0, hash(i) * 6, 0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+    group.add(mesh);
+  };
+  placePeaks(snowPeaks, peakSnow);
+  placePeaks(rockPeaks, peakRock);
+  geos.push(peakGeo);
+  mats.push(peakSnow, peakRock);
+
+  const lakeGeo = new THREE.CircleGeometry(28, 24);
+  const lakeMat = new THREE.MeshStandardMaterial({
+    color: 0xb8d0e0,
+    roughness: 0.18,
+    metalness: 0.42,
+    envMapIntensity: 1.2,
+  });
+  const lake = new THREE.Mesh(lakeGeo, lakeMat);
+  lake.rotation.x = -Math.PI / 2;
+  lake.position.set(ring * 0.15, -0.85, ring * 0.22);
+  lake.receiveShadow = true;
+  group.add(lake);
+  geos.push(lakeGeo);
+  mats.push(lakeMat);
+
+  const lodgeGeo = new THREE.BoxGeometry(1, 1, 1);
+  const lodgeMat = new THREE.MeshStandardMaterial({ color: 0x6a4a32, roughness: 0.86 });
+  const roofGeo = new THREE.ConeGeometry(0.85, 0.55, 4);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x8a2a22, roughness: 0.7 });
+  const lodgeN = 6;
+  const lodges = new THREE.InstancedMesh(lodgeGeo, lodgeMat, lodgeN);
+  const roofs = new THREE.InstancedMesh(roofGeo, roofMat, lodgeN);
+  lodges.castShadow = true;
+  roofs.castShadow = true;
+  for (let i = 0; i < lodgeN; i++) {
+    const sm = sampleAt(track, ((i + 0.35) / lodgeN) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 14 + hash(i) * 6;
+    const x = sm.x + sm.rx * side * d;
+    const z = sm.z + sm.rz * side * d;
+    _dummy.position.set(x, sm.y + 1.35, z);
+    _dummy.scale.set(5.2, 2.7, 3.6);
+    _dummy.rotation.set(0, Math.atan2(sm.rx * side, sm.rz * side), 0);
+    _dummy.updateMatrix();
+    lodges.setMatrixAt(i, _dummy.matrix);
+    _dummy.position.set(x, sm.y + 3.1, z);
+    _dummy.scale.set(4.2, 2.2, 3.2);
+    _dummy.updateMatrix();
+    roofs.setMatrixAt(i, _dummy.matrix);
+  }
+  group.add(lodges, roofs);
+  geos.push(lodgeGeo, roofGeo);
+  mats.push(lodgeMat, roofMat);
+
+  addTrees(group, geos, mats, 48, ring + 4, ring + 62, 0x2a4a36);
+  addTrackPines(track, group, geos, mats);
+  addSnowMounds(track, group, geos, mats);
+  addHorizonHaze(group, geos, mats, 0xc8dcec, 0.14, ring + 80);
+}
+
 function decorateTrackside(
   track: BuiltTrack,
   theme: ThemeId,
@@ -410,13 +509,13 @@ function decorateTrackside(
 ) {
   const lampGeo = new THREE.SphereGeometry(0.22, 8, 8);
   const lampMat = new THREE.MeshStandardMaterial({
-    color: theme === "night" ? 0xaad0ff : 0xfff0c8,
-    emissive: theme === "night" ? 0x6aa0ff : 0xffe0a0,
-    emissiveIntensity: theme === "night" ? 1.8 : 0.9,
+    color: theme === "night" ? 0xaad0ff : theme === "alpine" ? 0xe8f4ff : 0xfff0c8,
+    emissive: theme === "night" ? 0x6aa0ff : theme === "alpine" ? 0xc8e4ff : 0xffe0a0,
+    emissiveIntensity: theme === "night" ? 1.8 : theme === "alpine" ? 1.05 : 0.9,
   });
   const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.6, 6);
   const poleMat = new THREE.MeshStandardMaterial({
-    color: theme === "canyon" ? 0x5a4030 : 0x2a2e36,
+    color: theme === "canyon" ? 0x5a4030 : theme === "alpine" ? 0x6a5a4a : 0x2a2e36,
     roughness: 0.5,
     metalness: 0.4,
   });
@@ -649,10 +748,10 @@ function addContrastBarriers(
 ) {
   const geo = new THREE.BoxGeometry(0.1, 0.92, 1.35);
   const light = new THREE.MeshStandardMaterial({
-    color: theme === "night" ? 0x5ee8ff : theme === "canyon" ? 0xffc070 : 0xf4d24a,
+    color: theme === "night" ? 0x5ee8ff : theme === "canyon" ? 0xffc070 : theme === "alpine" ? 0xc8e6f6 : 0xf4d24a,
     roughness: 0.28,
     metalness: 0.16,
-    emissive: theme === "night" ? 0x146880 : theme === "canyon" ? 0x4a2008 : 0x6a4a08,
+    emissive: theme === "night" ? 0x146880 : theme === "canyon" ? 0x4a2008 : theme === "alpine" ? 0x204058 : 0x6a4a08,
     emissiveIntensity: theme === "night" ? 0.85 : 0.28,
   });
   const dark = new THREE.MeshStandardMaterial({
@@ -764,6 +863,79 @@ function addTireStacks(
   group.add(mesh);
   geos.push(geo);
   mats.push(mat);
+}
+
+function addTrackPines(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.4, 5);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.92 });
+  const leafGeo = new THREE.ConeGeometry(1.15, 3.4, 7);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x244434, roughness: 0.88 });
+  const n = 36;
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, n);
+  const leaves = new THREE.InstancedMesh(leafGeo, leafMat, n);
+  trunks.castShadow = true;
+  leaves.castShadow = true;
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 7 + hash(i) * 8;
+    const s = 0.75 + hash(i + 4) * 0.7;
+    const x = sm.x + sm.rx * side * d;
+    const z = sm.z + sm.rz * side * d;
+    _dummy.position.set(x, sm.y + 1.1 * s, z);
+    _dummy.scale.set(s, s, s);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.updateMatrix();
+    trunks.setMatrixAt(k, _dummy.matrix);
+    _dummy.position.set(x, sm.y + 3.2 * s, z);
+    _dummy.updateMatrix();
+    leaves.setMatrixAt(k, _dummy.matrix);
+    k++;
+  }
+  group.add(trunks, leaves);
+  geos.push(trunkGeo, leafGeo);
+  mats.push(trunkMat, leafMat);
+}
+
+function addSnowMounds(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const geo = new THREE.IcosahedronGeometry(1, 0);
+  const snow = new THREE.MeshStandardMaterial({ color: 0xeef4f8, roughness: 0.96 });
+  const slate = new THREE.MeshStandardMaterial({ color: 0x8a96a2, roughness: 0.94 });
+  const n = 32;
+  const aMesh = new THREE.InstancedMesh(geo, snow, n);
+  const bMesh = new THREE.InstancedMesh(geo, slate, n);
+  aMesh.castShadow = true;
+  bMesh.castShadow = true;
+  let ai = 0;
+  let bi = 0;
+  for (let i = 0; i < n; i++) {
+    const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 5 + hash(i + 2) * 7;
+    const s = 0.8 + hash(i + 5) * 1.4;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + 0.35 * s, sm.z + sm.rz * side * d);
+    _dummy.scale.set(s, s * 0.55, s);
+    _dummy.rotation.set(hash(i) * 0.4, hash(i + 3) * 6, 0);
+    _dummy.updateMatrix();
+    if (i % 3 === 0) bMesh.setMatrixAt(bi++, _dummy.matrix);
+    else aMesh.setMatrixAt(ai++, _dummy.matrix);
+  }
+  aMesh.count = ai;
+  bMesh.count = bi;
+  group.add(aMesh, bMesh);
+  geos.push(geo);
+  mats.push(snow, slate);
 }
 
 function hash(i: number) {

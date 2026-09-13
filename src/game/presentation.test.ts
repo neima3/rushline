@@ -31,6 +31,17 @@ describe("look polish 3 presentation locks", () => {
   it("keeps stadium sky haze weaker than Ridge dusk", () => {
     assert.ok(SKY_LOOK.stadium.haze < SKY_LOOK.canyon.haze);
     assert.ok(SKY_LOOK.stadium.sunGlow < SKY_LOOK.canyon.sunGlow);
+    assert.ok(SKY_LOOK.alpine.haze > SKY_LOOK.stadium.haze);
+    assert.ok(SKY_LOOK.alpine.haze < SKY_LOOK.canyon.haze);
+  });
+
+  it("gives alpine its own cool grade without rewriting Circuit or Helix", () => {
+    assert.equal(GRADE.stadium.tint, 0xffffff);
+    assert.ok(GRADE.alpine.saturation < GRADE.stadium.saturation);
+    assert.ok(GRADE.alpine.vignette > GRADE.stadium.vignette);
+    assert.ok(GRADE.alpine.vignette < GRADE.canyon.vignette);
+    assert.equal(themeLightLevels("stadium", QUALITY_PRESETS.high).sun, CIRCUIT_HIGH_LOCK.sun);
+    assert.deepEqual(fogWindow("night"), NIGHT_FOG);
   });
 
   it("keeps car paint in a clearcoat / low-roughness range", () => {

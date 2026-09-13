@@ -36,10 +36,10 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const grit = hash(x * 13 + y * 7) * (theme === "stadium" ? 22 : 18);
+      const grit = hash(x * 13 + y * 7) * (theme === "stadium" ? 22 : theme === "alpine" ? 16 : 18);
       const blotch = hash((x >> 3) + (y >> 2) * 17) * (theme === "stadium" ? 14 : 10);
       const n = grit + blotch + ((x ^ y) & 3) * 2;
-      const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 8 : 4);
+      const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 8 : theme === "alpine" ? 2 : 4);
       const seam = theme === "night" && (x % 64 < 2 || y % 64 < 2) ? 28 : 0;
       const wear = theme === "stadium" ? Math.max(0, 10 - Math.abs(x - 128) * 0.08) : 0;
       const edgeGrime = theme === "stadium" ? Math.max(0, (Math.abs(x - 128) / 128) * 22) : 0;
@@ -51,7 +51,8 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
   }
   ctx.putImageData(img, 0, 0);
   ctx.globalAlpha = theme === "stadium" ? 0.22 : 0.16;
-  ctx.fillStyle = theme === "night" ? "#6ec8ff" : theme === "canyon" ? "#2a1c16" : "#141416";
+  ctx.fillStyle =
+    theme === "night" ? "#6ec8ff" : theme === "canyon" ? "#2a1c16" : theme === "alpine" ? "#d8e8f4" : "#141416";
   for (let i = 0; i < (theme === "stadium" ? 72 : 40); i++) {
     ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, 10 + hash(i) * 28, theme === "stadium" ? 1.6 : 1);
   }
@@ -67,7 +68,7 @@ export function makeAsphaltRoughness(theme: ThemeId): THREE.CanvasTexture {
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
-  const mid = theme === "stadium" ? 148 : theme === "canyon" ? 168 : 96;
+  const mid = theme === "stadium" ? 148 : theme === "canyon" ? 168 : theme === "alpine" ? 132 : 96;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -124,7 +125,9 @@ export function makeGroundTexture(theme: ThemeId): THREE.CanvasTexture {
       ? [92, 138, 72]
       : theme === "canyon"
         ? [156, 82, 42]
-        : [26, 22, 38];
+        : theme === "alpine"
+          ? [214, 224, 232]
+          : [26, 22, 38];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;

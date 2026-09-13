@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef6fc"/>
+      <stop offset="0.42" stop-color="#c8dcec"/>
+      <stop offset="1" stop-color="#9ab0c4"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff4d8"/>
+      <stop offset="1" stop-color="#ffd8a0" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="280" height="200" fill="url(#sky)"/>
+  <circle cx="214" cy="46" r="28" fill="url(#sun)"/>
+  <polygon points="0,128 48,62 92,118 130,48 176,108 220,38 280,96 280,200 0,200" fill="#d8e4ee"/>
+  <polygon points="48,62 70,88 92,118 60,112" fill="#f4f8fb"/>
+  <polygon points="130,48 148,78 176,108 142,96" fill="#eef4f8"/>
+  <polygon points="220,38 236,70 258,92 228,78" fill="#f6f9fc"/>
+  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#4a5a68" stroke-width="11" stroke-linejoin="round"/>
+  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#8ab0c8" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M18 168 C 52 154, 70 132, 88 118 S 122 92, 148 86 S 186 96, 198 118 S 206 156, 168 164 S 96 172, 62 176 S 28 176, 18 168 Z" fill="none" stroke="#d8e8f4" stroke-width="2.2" stroke-dasharray="7 6"/>
+  <rect x="22" y="160" width="10" height="6" fill="#111113"/>
+  <rect x="32" y="160" width="10" height="6" fill="#f4f4f2"/>
+  <circle cx="148" cy="86" r="3.2" fill="#c8e6f6"/>
+  <circle cx="198" cy="118" r="3.2" fill="#c8e6f6"/>
+  <circle cx="168" cy="164" r="3.2" fill="#c8e6f6"/>
+</svg>

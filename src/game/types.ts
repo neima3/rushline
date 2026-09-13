@@ -1,4 +1,4 @@
-export type ThemeId = "stadium" | "canyon" | "night";
+export type ThemeId = "stadium" | "canyon" | "night" | "alpine";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
@@ -6,7 +6,7 @@ export type Phase = "menu" | "select" | "countdown" | "race" | "paused" | "resul
 
 export type CameraMode = "chase" | "hood";
 
-export type TrackId = "circuit" | "canyon" | "helix";
+export type TrackId = "circuit" | "canyon" | "helix" | "summit";
 
 export type TrackNode = {
   x: number;

@@ -1,3 +1,5 @@
+import type { ThemeId } from "./types";
+
 /** Graphics quality knobs — scene contract for Settings PR #17.
  *
  * Options UI is Settings-only. This module does not render a panel.
@@ -118,7 +120,7 @@ function asTier(v: unknown): QualityTier | null {
 
 /** Helix Night stays 88/460. Day themes may scale. Disable pushes day fog out, not night. */
 export function fogWindow(
-  theme: "stadium" | "canyon" | "night",
+  theme: ThemeId,
   knobs?: Pick<GraphicsKnobs, "fogNearMul" | "fogFarMul" | "fogEnabled">,
 ) {
   if (theme === "night") return { near: NIGHT_FOG.near, far: NIGHT_FOG.far };
@@ -146,7 +148,7 @@ export type ThemeLightLevels = {
  * High Circuit env stays 0.08 — sky IBL may replace the studio room.
  */
 export function themeLightLevels(
-  theme: "stadium" | "canyon" | "night",
+  theme: ThemeId,
   quality: Pick<QualityProfile, "tier" | "environment" | "bloomThreshold">,
 ): ThemeLightLevels {
   if (theme === "night") {
@@ -169,6 +171,17 @@ export function themeLightLevels(
       env: quality.environment ? 0.32 : 0,
       bloomMul: 0.48,
       bloomThreshold: Math.max(quality.bloomThreshold, 0.92),
+    };
+  }
+  if (theme === "alpine") {
+    // Cool morning. Own ladder — Circuit High pull and Helix night stay locked.
+    return {
+      sun: 1.16,
+      hemi: 0.7,
+      exposure: 0.96,
+      env: quality.environment ? 0.16 : 0,
+      bloomMul: 0.26,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.94),
     };
   }
   const high = quality.tier === "high";

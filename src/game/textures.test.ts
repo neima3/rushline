@@ -18,4 +18,14 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.canyon.r < ROAD_TINT.stadium.r);
     assert.ok(ROAD_TINT.night.b > ROAD_TINT.night.r);
   });
+
+  it("keeps alpine packed-ice cooler than Circuit without washing midtones", () => {
+    const [r, g, b] = ASPHALT_BASE.alpine;
+    assert.ok(b > r && g > r, `alpine base should read cool ${r},${g},${b}`);
+    assert.ok(r < 110 && b < 140);
+    assert.ok(ROAD_TINT.alpine.b > ROAD_TINT.alpine.r);
+    assert.ok(ROAD_TINT.alpine.r < ROAD_TINT.stadium.r);
+    const crown = roadCrown("alpine");
+    assert.ok(crown.edge > crown.mid);
+  });
 });

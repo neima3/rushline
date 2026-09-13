@@ -416,6 +416,11 @@ body {
   box-shadow: inset 3px 0 0 #5ee8ff;
 }
 
+.track-card[data-track="summit"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #b8d4e8;
+  background: linear-gradient(160deg, #e8f2fa 0%, #9ab0c4 46%, #d8e4ee 100%);
+}
+
 @media (max-width: 768px) {
   .hud-chrome,
   .hud-chip,

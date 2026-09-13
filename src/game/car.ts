@@ -417,7 +417,7 @@ export function makeCar(ghost: boolean): CarRig {
     bm.emissive.setHex(night ? 0x2a3a68 : 0x1a100c);
     bm.emissiveIntensity = night ? 0.28 : 0.04;
     const bodyPhys = bodyMat as THREE.MeshPhysicalMaterial;
-    bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : 0xffe6cc);
+    bodyPhys.sheenColor.setHex(night ? 0x9ad8ff : theme === "alpine" ? 0xd8e8f8 : 0xffe6cc);
     // Circuit High scene env stays 0.08 so asphalt does not wash. The car
     // multiplies that back up so clearcoat can still read the sky.
     const env = night ? CAR_PAINT.envNight : theme === "canyon" ? CAR_PAINT.envCanyon : CAR_PAINT.envDay;
