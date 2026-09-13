@@ -1,6 +1,6 @@
-import { sampleGhost, sanitizeFrames, wrapAngle } from "./ghost";
-import { ghostScrubSpan, ghostScrubTime } from "./photo";
-import type { GhostFrame, GhostSource, TrackId } from "./types";
+import { sampleGhost, sanitizeFrames, wrapAngle } from "./ghost.ts";
+import { ghostScrubSpan, ghostScrubTime } from "./photo.ts";
+import type { GhostFrame, GhostSource, TrackId } from "./types.ts";
 
 export type ReplaySource = Exclude<GhostSource, "none">;
 
