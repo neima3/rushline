@@ -4,23 +4,28 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 **Live stack:** React 19 · TanStack Start · Three.js r185 · Zustand · Tailwind v4 · Web Audio
 
-## Play
+## Feature map
 
-**Time trial** — pick any circuit, hunt Author / Gold / Silver / Bronze, and race your personal-best ghost.
+The TM-depth set now on this build. Help (menu, pause, or Settings) opens the same catalog plus the live control sheet.
 
-**Hotseat** — two players on one device. P1 drives, then P2 races P1's ghost on the same circuit. A local scoreboard compares the times. No account.
+| Feature | What it is |
+| --- | --- |
+| **Rewind** | Hold **Backspace** or **LB + Y** to scrub the last few seconds. The race clock and ghost compare walk backward with you. Allowed in time trial and Rush Cup. Does not wipe a standing personal best — only a finish after rewind can replace it. Toggle **Enable Rewind** in Settings (on by default on desktop). |
+| **Surfaces** | Plastic, dirt, ice, and tech change grip — not just paint. The HUD chip names the ribbon under the car. |
+| **Cameras** | **C** cycles Chase → Far → Hood → Cabin. All four stay usable at speed. |
+| **Checkpoint respawn** | **R** (or **Y**) returns you to the last checkpoint. Hold **R** / **Y**, or press **Delete**, to restart from lights-out. |
+| **Ghost share** | Export a last-run or PB tape as JSON from Results or Tracks, then import a friend's file as a rival. Local download / pick-a-file only. A rival never overwrites your PB, last run, Rush Cup, or Garage paint. |
+| **Author ghosts** | Every stock circuit ships an author-line ghost paced to the Author medal. A personal-best or imported rival replaces it. |
+| **Editor 1.1** | **Edit ribbon** on Custom — control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough. Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Time trial only. |
+| **Hotseat** | Two players on one device. P1 drives, then P2 races P1's ghost on the same circuit. A local scoreboard compares the times. |
+| **Validated** | Finish without rewind and results shows a soft Validated badge. Rewind still counts for PB and medals. Local only — not online anti-cheat. |
+| **Stock laps** | Settings can set time-trial and hotseat laps on the stock nine to **1 / 2 / 3** (or Track for each circuit's authored count). Medals scale with the lap count. Custom and Rush Cup keep their own laps. |
+| **Replay viewer** | **Watch replay** from Results follows last run, the shipped author ghost, a PB, an imported rival, or a hotseat tape. Pause / play, scrub, then **Done**. Photo mode stays a still. |
+| **Photo mode** | Freeze a still with the HUD hidden. Open from the camera button, Pause, Results, **F**, or **LB + View**. |
+| **Rush Cup** | Clear **Gold** (or better) on all nine tracks in order, then **Author Cup** unlocks on the same nine. Progress lives in `localStorage` under `rushline-cup-v1`. |
+| **Garage** | Six liveries: **Ivory**, **Violet**, **Sun**, **Frost**, **Carbon**, **Hazard**. Cosmetic paint persists in `rushline-v1` and `rushline-settings-v1`. |
 
-**Rush Cup** — a short local campaign. Clear **Gold** (or better) on all nine tracks in order, then **Author Cup** unlocks on the same nine. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
-
-**Validated** — finish without using rewind and results shows a soft Validated badge. Rewind still counts for PB and medals. Local only — not online anti-cheat.
-
-**Stock laps** — Settings can set time-trial and hotseat laps on the stock nine to **1 / 2 / 3** (or Track for each circuit's authored count). Medals scale with the lap count. Custom and Rush Cup keep their own laps.
-
-Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the keyboard, touch, and gamepad bindings that are actually live.
-
-**Rewind** — hold **Backspace** or **LB + Y** to scrub the last few seconds of the run. The race clock and ghost compare walk backward with you. Rewind is allowed in time trial and Rush Cup; it does not wipe a standing personal best — only a finish after rewind can replace it. Toggle **Enable Rewind** in Settings (on by default on desktop).
-
-**R** (or **Y**) returns you to the last checkpoint — Trackmania-style. Hold **R** / **Y**, or press **Delete**, to restart the whole run from lights-out. **C** cycles Chase → Far → Hood → Cabin; all four stay usable at speed. Settings has a Slow / Normal / Fast steering preset for keyboard and pad (Track Assist scales are unchanged).
+Help lists the keyboard, touch, and gamepad bindings that are actually live. Settings has a Slow / Normal / Fast steering preset for keyboard and pad (Track Assist scales are unchanged).
 
 ## Tracks
 
@@ -37,17 +42,13 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 | **Storm Dock** | Rain city | ~901 m | Wet streets, ice plaza, tech pier sprint |
 | **Custom** | Your ribbon | editor | Closed Catmull-Rom loop you place yourself |
 
-Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens Editor 1.1 (control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock nine.
+Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a shipped author ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens Editor 1.1 (control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough). Drive it in time trial. Rush Cup stays the stock nine.
 
-**Surfaces** change how the car grips. Plastic (Circuit, Mesa table, Storm streets) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines, Ember ash) enters a slide earlier and pulls accel. Ice (White Pass, Storm plaza) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing, Storm pier) sticks later and stops harder. The HUD chip names the ribbon under the car.
+**Surfaces** change how the car grips. Plastic (Circuit, Mesa table, Storm streets) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines, Ember ash) enters a slide earlier and pulls accel. Ice (White Pass, Storm plaza) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing, Storm pier) sticks later and stops harder.
 
-Each stock circuit ships a lightweight **author ghost** paced to the Author medal, so a first-time run always has a rival. A personal-best ghost is saved with the time and replaces it. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
+A personal-best ghost is saved with the time and replaces the author line. If that ghost is missing or too thin, the last finished run is used instead. An imported rival also replaces the author line. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 
-**Ghost share** — export a last-run or PB tape as a JSON file from Results or Tracks, then import a friend's file to race that circuit as a rival. Sharing is local only (download / pick a file). A rival never overwrites your PB, last run, Rush Cup, or Garage paint. Clear it from Tracks when you want the usual ghost back. Files live in `localStorage` under `rushline-ghost-share-v1`.
-
-## Garage
-
-Six liveries: **Ivory**, **Violet**, **Sun**, **Frost**, **Carbon**, **Hazard**. Pick one from the menu; the car on track updates live. Paint is cosmetic and persists in `rushline-v1` and `rushline-settings-v1`.
+**Ghost share** files live in `localStorage` under `rushline-ghost-share-v1`. Clear the rival from Tracks when you want the usual ghost back.
 
 ## Photo mode
 
@@ -129,8 +130,9 @@ src/game/            # simulation + rendering (pure Three.js, no R3F)
   scene.ts           # world, car mesh, camera, particles, environment
   input.ts           # keyboard + injected touch / gamepad actions
   gamepad.ts         # Standard mapping, deadzone, rumble
-  help.ts            # in-game controls sheet (source of truth for bindings copy)
+  help.ts            # feature map + in-game controls sheet
   ghost-share.ts     # TM-style ghost JSON export / import
+  author-ghost.ts    # shipped author-line tapes for the stock nine
   cup.ts             # Rush Cup campaign
   hotseat.ts         # local P1 / P2 alternate runs
   laps.ts            # stock 1 / 2 / 3 lap override

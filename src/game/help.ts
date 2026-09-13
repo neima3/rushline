@@ -1,4 +1,5 @@
 import { PAD_MAP, PAD_STICK_DEADZONE, PAD_TRIGGER_DEADZONE, padRaceHint } from "./gamepad.ts";
+import { PLAYABLE_ORDER, type TrackId } from "./types.ts";
 
 export type ControlRow = {
   id: string;
@@ -42,6 +43,125 @@ export const REPLAY_CONTROL_ROWS: ControlRow[] = [
   { id: "exit", action: "Exit replay", keys: "Esc or Backspace", pad: "B / Circle · Menu" },
 ];
 
+export type TrackVibe = {
+  id: TrackId;
+  name: string;
+  vibe: string;
+  signature: string;
+};
+
+/** Nine stock circuits + Custom — source of truth for README / Help vibes. */
+export const TRACK_VIBES: TrackVibe[] = [
+  { id: "circuit", name: "Green Circuit", vibe: "Stadium plastic", signature: "Banked stadium oval, boost pads, tight chicane · 2 laps" },
+  { id: "canyon", name: "Ridge Drop", vibe: "Canyon dirt", signature: "Paved start, dirt canyon, downhill jump" },
+  { id: "helix", name: "Night Helix", vibe: "Night tech", signature: "Full loop, sticky metal helix, night lights" },
+  { id: "summit", name: "White Pass", vibe: "Alpine ice", signature: "Switchbacks, packed ice, long descent" },
+  { id: "yard", name: "Arc Yard", vibe: "Works tech", signature: "Metal docks, gantry climb, freight drop" },
+  { id: "mesa", name: "Red Mesa", vibe: "Desert dirt", signature: "Dirt climb, plastic table, dirt edge drop" },
+  { id: "hollow", name: "Black Hollow", vibe: "Forest dirt", signature: "Moonlit dirt pines, then a tech clearing sprint" },
+  { id: "ember", name: "Ember Caldera", vibe: "Lava dusk", signature: "Ash rim, lava-glass hairpins, crater drop" },
+  { id: "storm", name: "Storm Dock", vibe: "Rain city", signature: "Wet streets, ice plaza, tech pier sprint" },
+  { id: "custom", name: "Custom", vibe: "Your ribbon", signature: "Closed Catmull-Rom loop you place yourself" },
+];
+
+export type FeatureMapRow = {
+  id: string;
+  name: string;
+  blurb: string;
+};
+
+/** TM-depth set now on main — Help + README share this catalog. */
+export const FEATURE_MAP: FeatureMapRow[] = [
+  {
+    id: "rewind",
+    name: "Rewind",
+    blurb:
+      "Hold Backspace or LB+Y to scrub the last few seconds. The clock and ghost walk backward with you. Allowed in time trial and Rush Cup. A finish after rewind can still be a PB.",
+  },
+  {
+    id: "surfaces",
+    name: "Surfaces",
+    blurb:
+      "Plastic slides, dirt bites late, ice is icy, tech sticks. The HUD chip names the ribbon under the car.",
+  },
+  {
+    id: "cameras",
+    name: "Cameras",
+    blurb: "C cycles Chase → Far → Hood → Cabin. All four stay usable at speed.",
+  },
+  {
+    id: "respawn",
+    name: "Checkpoint respawn",
+    blurb: "R or Y returns you to the last checkpoint. Hold R / Y, or press Delete, to restart from lights-out.",
+  },
+  {
+    id: "ghost-share",
+    name: "Ghost share",
+    blurb:
+      "Export a last-run or PB JSON from Results or Tracks, then import a friend's file as a rival. Local only — never overwrites your PB, Cup, or Garage paint.",
+  },
+  {
+    id: "author-ghosts",
+    name: "Author ghosts",
+    blurb:
+      "Every stock circuit ships an author-line ghost at medal pace. A personal-best or imported rival replaces it.",
+  },
+  {
+    id: "editor",
+    name: "Editor 1.1",
+    blurb:
+      "Edit ribbon — control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough. Save stays on this device. Time trial only — Rush Cup stays the stock nine.",
+  },
+  {
+    id: "hotseat",
+    name: "Hotseat",
+    blurb: "Two players on one device. P1 drives, then P2 races P1's ghost. A local scoreboard compares the times.",
+  },
+  {
+    id: "validated",
+    name: "Validated",
+    blurb:
+      "Finish without rewind for a soft Validated badge. Local only — not online anti-cheat. Rewind still counts for PB and medals.",
+  },
+  {
+    id: "stock-laps",
+    name: "Stock laps",
+    blurb:
+      "Settings can set time-trial and hotseat laps on the stock nine to 1 / 2 / 3, or Track. Medals scale with the count. Custom and Rush Cup keep authored laps.",
+  },
+  {
+    id: "replay",
+    name: "Replay viewer",
+    blurb:
+      "Watch replay from Results follows the last run, shipped author ghost, PB, imported rival, or a hotseat tape. Pause, play, scrub; Done returns to Results.",
+  },
+  {
+    id: "photo",
+    name: "Photo mode",
+    blurb: "Hide the HUD, orbit, capture a PNG. Open from F, Pause, Results, or LB+View. Replay does not replace it.",
+  },
+  {
+    id: "cup",
+    name: "Rush Cup",
+    blurb: "Gold on all nine stock tracks in order, then Author Cup unlocks on the same nine. Progress stays on this device.",
+  },
+  {
+    id: "garage",
+    name: "Garage",
+    blurb: "Six liveries: Ivory, Violet, Sun, Frost, Carbon, Hazard. Cosmetic paint persists on this device.",
+  },
+];
+
+export const FEATURE_MAP_IDS = FEATURE_MAP.map((row) => row.id);
+
+export function trackVibeIds(): TrackId[] {
+  return TRACK_VIBES.map((row) => row.id);
+}
+
+export function featureMapIdsMatchPlayable(): boolean {
+  return trackVibeIds().join(",") === PLAYABLE_ORDER.join(",");
+}
+
 export const COPY = {
   productEyebrow: "Precision time trial",
   tagline: "Every checkpoint. Stay on the plastic. Beat the medals — or run Rush Cup.",
@@ -55,9 +175,11 @@ export const COPY = {
   selectEyebrow: "Select circuit",
   selectHotseatEyebrow: "Hotseat — P1 then P2",
   editorEyebrow: "Editor 1.1",
-  helpTitle: "Controls",
-  helpEyebrow: "Help",
-  helpBlurb: "Desktop, touch, and gamepad — the bindings that are actually live.",
+  helpTitle: "Help",
+  helpEyebrow: "Feature map",
+  helpBlurb: "Nine stock tracks, the TM-depth set, and the bindings that are actually live.",
+  featureTitle: "TM-depth set",
+  tracksTitle: "Tracks",
   driveTitle: "On track",
   menuTitle: "Menus",
   touchTitle: "Touch",
