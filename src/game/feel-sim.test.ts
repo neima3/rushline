@@ -99,6 +99,10 @@ describe("mobile feel sims", () => {
   });
 
   it("medal pace drops Author then Gold without rewriting finish medals", () => {
+    const grid = medalPace("circuit", 0);
+    assert.equal(grid.holding, "author");
+    assert.ok(grid.remain != null && grid.remain >= 50_000);
+
     const early = medalPace("circuit", 1_000);
     assert.equal(early.holding, "author");
     assert.ok(early.remain != null && early.remain > 40_000);
@@ -112,5 +116,81 @@ describe("mobile feel sims", () => {
     assert.equal(miss.holding, null);
     assert.equal(miss.remain, null);
     assert.equal(miss.lost.length, 4);
+  });
+
+  it("latches a boost-pad hit across extra phys steps until consumed", () => {
+    const circuit = getTrack("circuit");
+    const pad = circuit.boosts[0];
+    assert.ok(pad != null, "circuit has a boost pad");
+    const car = new CarSim();
+    car.reset(circuit);
+    car.s = pad!;
+    car.n = 0;
+    car.speed = 16;
+    const before = car.speed;
+    car.step(circuit, cruise, 1 / 60);
+    const hit = car.justBoost;
+    const firstGain = car.speed - before;
+    assert.equal(hit, true, "expected a pad hit");
+    assert.ok(firstGain > 0.4, `punch started ${firstGain}`);
+    assert.ok(firstGain < 4.2, `punch should not dump all +5 in one step, got ${firstGain}`);
+    for (let i = 0; i < 4; i++) car.step(circuit, cruise, 1 / 60);
+    const latched = car.snap();
+    assert.equal(latched.justBoost, true, "pulse should survive extra steps");
+    car.clearFeelPulses();
+    assert.equal(car.snap().justBoost, false);
+  });
+
+  it("plants from a short drop without the old magnet dump", () => {
+    const canyon = getTrack("canyon");
+    const car = new CarSim();
+    car.reset(canyon);
+    const sm = sampleAt(canyon, 80);
+    car.s = sm.s;
+    car.n = 0;
+    car.airborne = true;
+    car.px = sm.x + sm.ux * 1.7;
+    car.py = sm.y + sm.uy * 1.7;
+    car.pz = sm.z + sm.uz * 1.7;
+    car.vx = sm.tx * 24;
+    car.vy = sm.ty * 24 - 2;
+    car.vz = sm.tz * 24;
+    car.fx = sm.tx;
+    car.fy = sm.ty;
+    car.fz = sm.tz;
+    let landed = false;
+    let landSpeed = 0;
+    let landPulse = false;
+    for (let i = 0; i < 90; i++) {
+      car.step(canyon, cruise, 1 / 60);
+      if (!car.airborne) {
+        landed = true;
+        landSpeed = car.speed;
+        landPulse = car.snap().justLand;
+        break;
+      }
+    }
+    assert.equal(landed, true, "should plant back on the ribbon");
+    assert.ok(landSpeed > 18, `kept speed ${landSpeed}`);
+    assert.equal(landPulse, true);
+    assert.ok(Math.abs(car.n) < sm.width * 0.45, `n ${car.n}`);
+  });
+
+  it("does not rubber-band a 1.8m hover in one step", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    const sm = sampleAt(circuit, 40);
+    car.s = sm.s;
+    car.n = 0;
+    car.airborne = true;
+    car.px = sm.x + sm.ux * 1.85;
+    car.py = sm.y + sm.uy * 1.85;
+    car.pz = sm.z + sm.uz * 1.85;
+    car.vx = sm.tx * 18;
+    car.vy = sm.ty * 18;
+    car.vz = sm.tz * 18;
+    car.step(circuit, cruise, 1 / 60);
+    assert.equal(car.airborne, true, "magnet must not teleport from ~1.8m");
   });
 });

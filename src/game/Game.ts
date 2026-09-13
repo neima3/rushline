@@ -250,6 +250,7 @@ export class Game {
     this.world.snapCamera(this.curr, this.camera);
     useGame.getState().setPhase("countdown");
     useGame.getState().setResults(null);
+    const gridPace = medalPace(this.trackId, 0);
     useGame.getState().setHud({
       time: 0,
       countdown: 3,
@@ -257,8 +258,8 @@ export class Game {
       laps: this.track.def.laps,
       cp: 0,
       cpTotal: this.track.checkpoints.length,
-      medal: null,
-      medalRemain: null,
+      medal: gridPace.holding,
+      medalRemain: gridPace.remain,
       ghostDelta: null,
       ghostS: null,
       ghostN: null,
@@ -442,6 +443,7 @@ export class Game {
     const alpha = Math.max(0, Math.min(1, this.acc / FIXED_DT));
     const vis = lerpSnap(this.prev, this.curr, alpha);
     this.world.applyCar(vis, dt, actions.steer, actions.brake);
+    this.car.clearFeelPulses();
     this.world.applyGhost(this.track, this.ghost, this.time);
     this.world.stepParticles(dt);
     const attract = this.phase === "menu" || this.phase === "select";
@@ -459,7 +461,10 @@ export class Game {
     this.hudAcc += dt;
     if (this.hudAcc > 0.08) {
       this.hudAcc = 0;
-      const pace = this.phase === "race" ? medalPace(this.trackId, this.time) : { holding: null, remain: null };
+      const pace =
+        this.phase === "race" || this.phase === "countdown"
+          ? medalPace(this.trackId, this.phase === "countdown" ? 0 : this.time)
+          : { holding: null, remain: null };
       const ghost = ghostAt(this.ghost, this.time);
       const ghostDelta =
         ghost && this.phase === "race"

@@ -1,5 +1,5 @@
 import type { TrackAssist } from "./settings";
-import type { TrackId } from "./types";
+import type { Medal, TrackId } from "./types";
 
 export type { TrackAssist };
 
@@ -53,12 +53,12 @@ export function shapeTouchSteer(raw: number): number {
   return Math.sign(x) * clamp(shaped, 0, 1);
 }
 
-/** Shared steer curve. Slightly larger deadzone than the old 0.04 analog slop. */
+/** Shared steer curve. Deadzone kept; mid-lock a hair more linear. */
 export function steerCurve(x: number) {
   const s = Math.sign(x);
   const a = Math.abs(x);
   if (a < 0.06) return 0;
-  return s * (a * a * 0.28 + a * 0.72);
+  return s * (a * a * 0.22 + a * 0.78);
 }
 
 /**
@@ -133,6 +133,71 @@ export function ghostSplitMs(ghostS: number, playerS: number, speed: number, len
 
 export function driftSteerThreshold(slideHeld: boolean): number {
   return slideHeld ? 0.26 : 1;
+}
+
+/** After a plant, bleed steer so the nose does not flick off the ribbon. */
+export function landSteerScale(landLock: number): number {
+  if (landLock <= 0) return 1;
+  return 0.52 + 0.48 * (1 - Math.min(1, landLock / 0.2));
+}
+
+/** Air yaw — a bit more than ground so you can line up Ridge / Helix landings. */
+export function airTurnRate(): number {
+  return 2.12;
+}
+
+/** Trackmania-style air pitch: throttle dives, brake lifts. */
+export function airPitchAccel(throttle: number, brake: number): number {
+  return Math.max(0, throttle) * 10.5 - Math.max(0, brake) * 12;
+}
+
+/** Speed keep on landing. Magnet used to dump ~28%; keep the run alive. */
+export function landSpeedKeep(impact: number, magnet: boolean): number {
+  if (magnet) return 0.94;
+  return 0.992 - Math.min(0.07, Math.max(0, impact) * 0.0055);
+}
+
+/** Near-miss settle height. Old 2.1 m teleport felt like a rubber band. */
+export function magnetLandHeight(): number {
+  return 0.9;
+}
+
+export function canLandWindow(): { min: number; max: number } {
+  return { min: -0.28, max: 1.02 };
+}
+
+export function landLockTime(impact: number, magnet: boolean): number {
+  if (magnet) return 0.16;
+  return 0.15 + Math.min(0.08, Math.max(0, impact) * 0.006);
+}
+
+export function boostPadPunch(): number {
+  return 5;
+}
+
+/** Spread the pad hit over a couple of frames so squat / burst match the speed. */
+export function boostPunchWindow(): number {
+  return 0.05;
+}
+
+export function medalPaceLabel(medal: Medal | null): string {
+  if (medal === "author") return "AUTH";
+  if (medal === "gold") return "GOLD";
+  if (medal === "silver") return "SILV";
+  if (medal === "bronze") return "BRNZ";
+  return "OUT";
+}
+
+/** Compact remain for the HUD chip — 6.2, not 0:06.200. */
+export function formatPaceRemain(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const sec = ms / 1000;
+  if (sec >= 60) {
+    const m = Math.floor(sec / 60);
+    const s = sec - m * 60;
+    return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+  }
+  return sec.toFixed(1);
 }
 
 export function stayPlanted(trackId: TrackId, s: number, assist: TrackAssist = "medium"): boolean {

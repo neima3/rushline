@@ -13,6 +13,14 @@ import {
   ghostSplitMs,
   headingAlign,
   headingReturn,
+  airPitchAccel,
+  boostPadPunch,
+  boostPunchWindow,
+  formatPaceRemain,
+  landSpeedKeep,
+  landSteerScale,
+  magnetLandHeight,
+  medalPaceLabel,
   openingHeadingBleed,
   openingLandLock,
   plantLateral,
@@ -217,5 +225,37 @@ describe("ghostSplitMs", () => {
     assert.ok(ghostSplitMs(20, 40, 20, 200, true) < 0);
     const wrap = ghostSplitMs(5, 190, 20, 200, true);
     assert.ok(wrap > 0 && wrap < 2000, `wrap ${wrap}`);
+  });
+});
+
+describe("land / air / boost feel helpers", () => {
+  it("damps steer on plant and keeps air pitch signed", () => {
+    assert.equal(landSteerScale(0), 1);
+    assert.ok(landSteerScale(0.2) < 0.7);
+    assert.ok(airPitchAccel(1, 0) > 8);
+    assert.ok(airPitchAccel(0, 1) < -8);
+    assert.ok(magnetLandHeight() < 1.2);
+    assert.ok(magnetLandHeight() > 0.6);
+  });
+
+  it("keeps landing speed instead of the old 0.72 dump", () => {
+    assert.ok(landSpeedKeep(12, false) > 0.9);
+    assert.ok(landSpeedKeep(4, true) > 0.9);
+    assert.ok(landSpeedKeep(20, false) < landSpeedKeep(4, false));
+  });
+
+  it("spreads the pad punch over a couple of frames", () => {
+    assert.equal(boostPadPunch(), 5);
+    assert.ok(boostPunchWindow() > 0.03 && boostPunchWindow() < 0.1);
+  });
+});
+
+describe("medal pace HUD copy", () => {
+  it("labels the held medal and compact remain", () => {
+    assert.equal(medalPaceLabel("author"), "AUTH");
+    assert.equal(medalPaceLabel("gold"), "GOLD");
+    assert.equal(medalPaceLabel(null), "OUT");
+    assert.equal(formatPaceRemain(6_200), "6.2");
+    assert.equal(formatPaceRemain(72_000), "1:12.0");
   });
 });

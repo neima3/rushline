@@ -3,9 +3,18 @@ import type { TrackAssist } from "./settings";
 import type { Actions, BuiltTrack, CarSnap } from "./types";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
+  airPitchAccel,
+  airTurnRate,
+  boostPadPunch,
+  boostPunchWindow,
+  canLandWindow,
   curbSnap,
   driftSteerThreshold,
   headingReturn,
+  landLockTime,
+  landSpeedKeep,
+  landSteerScale,
+  magnetLandHeight,
   openingHeadingBleed,
   openingLandLock,
   plantLateral,
@@ -23,11 +32,9 @@ const DRAG = 0.26;
 const COAST = 0.74;
 const TURN = 2.68;
 const DRIFT_TURN = 3.05;
-const AIR_TURN = 1.6;
 const RIDE = 0.38;
 const GRAVITY = 30;
 const FIXED = 1 / 60;
-const LAND_LOCK = 0.14;
 const STICK_SPEED = 16;
 const TURBO_MINI = 0.32;
 const TURBO_MID = 0.58;
@@ -87,6 +94,10 @@ export class CarSim {
   private landLock = 0;
   private airBlend = 0;
   private recoverLock = 0;
+  private pulseBoost = false;
+  private pulseTurbo = false;
+  private pulseLand = false;
+  private boostPunch = 0;
 
   reset(track: BuiltTrack) {
     this.s = 6;
@@ -116,6 +127,10 @@ export class CarSim {
     this.landLock = openingLandLock(track.def.id, this.trackAssist);
     this.airBlend = 0;
     this.recoverLock = 0;
+    this.pulseBoost = false;
+    this.pulseTurbo = false;
+    this.pulseLand = false;
+    this.boostPunch = 0;
     this.place(track);
   }
 
@@ -134,6 +149,10 @@ export class CarSim {
     this.justBoost = false;
     this.justTurbo = false;
     this.justLand = false;
+    this.pulseBoost = false;
+    this.pulseTurbo = false;
+    this.pulseLand = false;
+    this.boostPunch = 0;
     this.justRespawn = true;
     this.wasSlide = false;
     this.skipInterp = true;
@@ -284,6 +303,7 @@ export class CarSim {
     this.boost = Math.max(this.boost, boost);
     this.speed = Math.min(this.speed + 2.4 + this.driftCharge * 5.2, MAX_BOOST);
     this.justTurbo = true;
+    this.pulseTurbo = true;
     this.driftCharge = 0;
   }
 
@@ -319,10 +339,12 @@ export class CarSim {
     }
     this.wasSlide = slideHeld;
 
-    this.slideAmt += ((slideHeld ? 1 : 0) - this.slideAmt) * Math.min(1, 12 * dt);
+    this.slideAmt += ((slideHeld ? 1 : 0) - this.slideAmt) * Math.min(1, (slideHeld ? 16 : 10) * dt);
     let turn = (drifting ? DRIFT_TURN : TURN) * spdF * speedSteer;
     if (slideHeld && !drifting) turn *= 1.08;
+    if (drifting) turn *= 1 + this.driftCharge * 0.05;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
+    turn *= landSteerScale(this.landLock);
     this.heading += steer * turn * reverse * dt;
     const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting, this.trackAssist);
     if (bleed) this.heading *= 1 - bleed * dt;
@@ -377,11 +399,18 @@ export class CarSim {
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     if (sm.boost && this.speed > 3) {
-      if (this.boost <= 0.08) {
+      if (this.boost <= 0.08 && this.boostPunch <= 0) {
         this.justBoost = true;
-        this.speed = Math.min(this.speed + 5, MAX_BOOST);
+        this.pulseBoost = true;
+        this.boostPunch = boostPadPunch();
       }
       this.boost = Math.max(this.boost, 1.0);
+    }
+    if (this.boostPunch > 0) {
+      const rate = boostPadPunch() / boostPunchWindow();
+      const add = Math.min(this.boostPunch, rate * dt);
+      this.speed = Math.min(this.speed + add, MAX_BOOST);
+      this.boostPunch = Math.max(0, this.boostPunch - add);
     }
     if (this.boost > 0) {
       this.speed = Math.min(this.speed + 36 * dt, MAX_BOOST);
@@ -429,11 +458,12 @@ export class CarSim {
 
   private stepAir(track: BuiltTrack, actions: Actions, dt: number) {
     this.airTime += dt;
+    const airTurn = airTurnRate();
     const steer = steerCurve(actions.steer);
-    this.heading += steer * AIR_TURN * dt;
+    this.heading += steer * airTurn * dt;
     this.heading = clamp(this.heading, -0.7, 0.7);
 
-    const yaw = steer * AIR_TURN * 0.55 * dt;
+    const yaw = steer * airTurn * 0.62 * dt;
     if (Math.abs(yaw) > 1e-5) {
       const c = Math.cos(yaw);
       const s = Math.sin(yaw);
@@ -444,9 +474,11 @@ export class CarSim {
     }
 
     this.vy -= GRAVITY * dt;
+    const pitch = airPitchAccel(actions.throttle, actions.brake);
+    this.vy += pitch * dt;
     if (actions.throttle > 0) {
-      this.vx += this.fx * 5 * dt;
-      this.vz += this.fz * 5 * dt;
+      this.vx += this.fx * 6.2 * dt;
+      this.vz += this.fz * 6.2 * dt;
     }
     if (this.boost > 0) {
       this.vx += this.fx * 16 * dt;
@@ -475,13 +507,20 @@ export class CarSim {
 
     const upright = near.uy > 0.35;
     const vertical = near.uy < 0.2;
-    const onFace = height < 1.15 && height > -0.35;
+    const face = canLandWindow();
+    const onFace = height < face.max && height > face.min;
+    const airSpd = Math.hypot(this.vx, this.vy, this.vz);
+    const loopStick = vertical && this.airTime < 0.5 && airSpd > 14;
+    const helixBad =
+      track.def.id === "helix" &&
+      (helixRibbonOverhead(track, near) || helixNearGate(track, near.s) || (near.uy < 0.55 && !loopStick));
     const canLand =
-      this.airTime > 0.055 &&
+      this.airTime > 0.05 &&
       onFace &&
       Math.abs(lat) < near.width * 0.5 + 0.85 &&
       into < 4.2 &&
-      (!vertical || this.airTime < 0.55);
+      !helixBad &&
+      (upright || loopStick);
 
     if (Math.abs(lat) > near.width * 0.5 + 1.2 || height < -0.25) {
       this.boost = 0;
@@ -494,40 +533,21 @@ export class CarSim {
       }
     }
 
-    if (!canLand && upright && height < 2.1 && height > -0.8 && Math.abs(lat) < half + 5.5 && this.airTime > 0.08) {
-      this.airborne = false;
-      this.justLand = false;
-      this.landLock = LAND_LOCK;
-      this.airTime = 0;
-      this.airBlend = 0;
-      this.boost = 0;
-      this.s = near.s;
-      this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
-      const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
-      this.speed = clamp(vt * 0.72, -MAX_REV, MAX_SPEED);
-      this.heading = clamp(this.heading * 0.45, -0.4, 0.4);
-      this.skipInterp = true;
-      this.place(track);
+    if (
+      !canLand &&
+      upright &&
+      !helixBad &&
+      height < magnetLandHeight() &&
+      height > -0.45 &&
+      Math.abs(lat) < half + 2.4 &&
+      this.airTime > 0.08
+    ) {
+      this.plantFromAir(track, near, lat, into, true);
       return;
     }
 
     if (canLand) {
-      const impact = Math.max(0, -into);
-      this.airborne = false;
-      this.justLand = impact > 9;
-      this.landLock = LAND_LOCK;
-      this.airTime = 0;
-      this.airBlend = 0;
-      this.s = near.s;
-      this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
-      const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
-      const vr = this.vx * near.rx + this.vy * near.ry + this.vz * near.rz;
-      const keep = 0.988 - Math.min(0.1, impact * 0.007);
-      this.speed = Math.hypot(vt, vr) * Math.sign(vt || 1) * keep;
-      this.heading = Math.atan2(-vr, Math.max(0.18, Math.abs(vt)) * Math.sign(vt || 1));
-      this.heading = clamp(this.heading, -0.62, 0.62);
-      this.skipInterp = impact > 14;
-      this.place(track);
+      this.plantFromAir(track, near, lat, into, false);
       return;
     }
 
@@ -566,6 +586,45 @@ export class CarSim {
     this.ux = _up.x;
     this.uy = _up.y;
     this.uz = _up.z;
+  }
+
+  private plantFromAir(
+    track: BuiltTrack,
+    near: BuiltTrack["samples"][number],
+    lat: number,
+    into: number,
+    magnet: boolean,
+  ) {
+    const impact = Math.max(0, -into);
+    this.airborne = false;
+    this.justLand = !magnet || impact > 4 || this.airTime > 0.18;
+    if (this.justLand) this.pulseLand = true;
+    this.landLock = landLockTime(impact, magnet);
+    this.airTime = 0;
+    this.airBlend = 0;
+    if (magnet) this.boost = 0;
+    this.s = near.s;
+    this.n = clamp(lat, -near.width * 0.5 + 0.7, near.width * 0.5 - 0.7);
+    const vt = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
+    const vr = this.vx * near.rx + this.vy * near.ry + this.vz * near.rz;
+    const keep = landSpeedKeep(impact, magnet);
+    if (magnet) {
+      this.speed = clamp(vt * keep, -MAX_REV, MAX_SPEED);
+      this.heading = clamp(this.heading * 0.72, -0.42, 0.42);
+      this.skipInterp = true;
+    } else {
+      this.speed = Math.hypot(vt, vr) * Math.sign(vt || 1) * keep;
+      const fromVel = Math.atan2(-vr, Math.max(0.18, Math.abs(vt)) * Math.sign(vt || 1));
+      this.heading = clamp(this.heading * 0.35 + fromVel * 0.65, -0.62, 0.62);
+      this.skipInterp = impact > 14;
+    }
+    this.place(track);
+  }
+
+  clearFeelPulses() {
+    this.pulseBoost = false;
+    this.pulseTurbo = false;
+    this.pulseLand = false;
   }
 
   private detectGates(track: BuiltTrack, prevS: number) {
@@ -610,9 +669,9 @@ export class CarSim {
       boost: this.boost,
       slide: this.slideAmt,
       driftCharge: this.driftCharge,
-      justTurbo: this.justTurbo,
-      justLand: this.justLand,
-      justBoost: this.justBoost,
+      justTurbo: this.justTurbo || this.pulseTurbo,
+      justLand: this.justLand || this.pulseLand,
+      justBoost: this.justBoost || this.pulseBoost,
       fx: this.fx,
       fy: this.fy,
       fz: this.fz,
