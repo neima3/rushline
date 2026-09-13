@@ -421,6 +421,11 @@ body {
   background: linear-gradient(160deg, #e8f2fa 0%, #9ab0c4 46%, #d8e4ee 100%);
 }
 
+.track-card[data-track="yard"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #4ee8d4;
+  background: linear-gradient(160deg, #1c2434 0%, #5a3040 46%, #ff8a48 100%);
+}
+
 @media (max-width: 768px) {
   .hud-chrome,
   .hud-chip,

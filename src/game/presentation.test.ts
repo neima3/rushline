@@ -44,6 +44,16 @@ describe("look polish 3 presentation locks", () => {
     assert.deepEqual(fogWindow("night"), NIGHT_FOG);
   });
 
+  it("gives works its own sodium grade without rewriting Circuit or Helix", () => {
+    assert.equal(GRADE.works.tint, 0xffe4c8);
+    assert.ok(GRADE.works.vignette > GRADE.stadium.vignette);
+    assert.ok(GRADE.works.saturation > GRADE.alpine.saturation);
+    assert.ok(SKY_LOOK.works.haze > SKY_LOOK.stadium.haze);
+    assert.ok(SKY_LOOK.works.sunGlow > SKY_LOOK.night.sunGlow);
+    assert.equal(themeLightLevels("stadium", QUALITY_PRESETS.high).sun, CIRCUIT_HIGH_LOCK.sun);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.4, fogFarMul: 0.4 }), NIGHT_FOG);
+  });
+
   it("keeps car paint in a clearcoat / low-roughness range", () => {
     assert.ok(CAR_PAINT.clearcoat >= 0.9);
     assert.ok(CAR_PAINT.clearcoatRoughness <= 0.06);

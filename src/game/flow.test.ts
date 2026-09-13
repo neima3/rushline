@@ -26,7 +26,8 @@ describe("nextTrackId", () => {
     assert.equal(nextTrackId("circuit"), "canyon");
     assert.equal(nextTrackId("canyon"), "helix");
     assert.equal(nextTrackId("helix"), "summit");
-    assert.equal(nextTrackId("summit"), "circuit");
+    assert.equal(nextTrackId("summit"), "yard");
+    assert.equal(nextTrackId("yard"), "circuit");
   });
 });
 
@@ -93,12 +94,14 @@ describe("buildResults", () => {
     assert.equal(r.nextTrackId, "canyon");
   });
 
-  it("advances Next through White Pass, then wraps", () => {
+  it("advances Next through White Pass and Arc Yard, then wraps", () => {
     const helix = buildResults({ time: 28_000, trackId: "helix", prevBest: null, ghost: null, medal: "gold" });
     assert.equal(helix.nextTrackId, "summit");
     const summit = buildResults({ time: 30_000, trackId: "summit", prevBest: null, ghost: null, medal: "gold" });
     assert.equal(summit.medal, "gold");
-    assert.equal(summit.nextTrackId, "circuit");
+    assert.equal(summit.nextTrackId, "yard");
+    const yard = buildResults({ time: 31_000, trackId: "yard", prevBest: null, ghost: null, medal: "gold" });
+    assert.equal(yard.nextTrackId, "circuit");
   });
 });
 

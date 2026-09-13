@@ -19,6 +19,7 @@ export const TRACK_ENV_LABEL: Record<ThemeId, string> = {
   canyon: "Canyon",
   night: "Night",
   alpine: "Alpine",
+  works: "Works",
 };
 
 export const MEDAL_LABEL: Record<Medal, string> = {

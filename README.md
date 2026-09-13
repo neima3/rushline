@@ -1,6 +1,6 @@
 # Rushline
 
-A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on four hand-built tracks — playable on desktop and mobile.
+A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase medals, beat your ghost, and stick loops on five hand-built tracks — playable on desktop and mobile.
 
 **Live stack:** React 19 · TanStack Start · Three.js r185 · Zustand · Tailwind v4 · Web Audio
 
@@ -12,6 +12,7 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 | **Ridge Drop** | Canyon dusk | ~1213 m | Long downhill, jump, cliff walls |
 | **Helix Night** | Neon city | ~727 m | Full loop, sticky-track helix, night lights |
 | **White Pass** | Alpine morning | ~948 m | Switchbacks, packed ice, long descent |
+| **Arc Yard** | Industrial twilight | ~952 m | Tight dock cuts, gantry climb, freight drop |
 
 Each track has author / gold / silver / bronze medal times, checkpoints, boost pads, and a personal-best ghost.
 

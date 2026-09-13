@@ -1,4 +1,4 @@
-export type ThemeId = "stadium" | "canyon" | "night" | "alpine";
+export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
@@ -6,9 +6,9 @@ export type Phase = "menu" | "select" | "countdown" | "race" | "paused" | "resul
 
 export type CameraMode = "chase" | "hood";
 
-export type TrackId = "circuit" | "canyon" | "helix" | "summit";
+export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit"];
+export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit", "yard"];
 
 export type TrackNode = {
   x: number;
