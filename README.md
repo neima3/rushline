@@ -37,7 +37,7 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 | **Storm Dock** | Rain city | ~901 m | Wet streets, ice plaza, tech pier sprint |
 | **Custom** | Your ribbon | editor | Closed Catmull-Rom loop you place yourself |
 
-Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens a lite editor (control points, height / width / bank, checkpoint and boost flags). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock nine.
+Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens Editor 1.1 (control points, click-to-place checkpoints and boost pads, undo/redo, snap-to-grid, flatten, and a ribbon flythrough). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock nine.
 
 **Surfaces** change how the car grips. Plastic (Circuit, Mesa table, Storm streets) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines, Ember ash) enters a slide earlier and pulls accel. Ice (White Pass, Storm plaza) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing, Storm pier) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
@@ -124,7 +124,7 @@ No database or auth required. Personal-best times and ghosts persist in `localSt
 src/game/            # simulation + rendering (pure Three.js, no R3F)
   Game.ts            # rAF loop, phases, HUD wiring
   track.ts           # Catmull-Rom spline, parallel transport, mesh build
-  editor.ts          # Custom ribbon save / control points / validation
+  editor.ts          # Custom ribbon save / placement / undo / flythrough
   physics.ts         # grounded / airborne car, walls, boost, checkpoints
   scene.ts           # world, car mesh, camera, particles, environment
   input.ts           # keyboard + injected touch / gamepad actions

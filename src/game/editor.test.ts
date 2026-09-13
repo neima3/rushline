@@ -4,11 +4,20 @@ import {
   cloneSave,
   customDefFromSave,
   defaultCustomSave,
+  editorFlythroughPose,
+  emptyPointHistory,
   estimateLoopLength,
+  flattenRibbon,
   insertPoint,
   MIN_EDITOR_POINTS,
   parseCustomSave,
+  placeOnRibbon,
+  recordPointChange,
+  redoPoints,
   removePoint,
+  snapCoord,
+  snapPointsToGrid,
+  undoPoints,
   validateCustom,
   writeCustomSave,
 } from "./editor.ts";
@@ -106,5 +115,71 @@ describe("custom mesh + menu slot", () => {
     assert.equal(TRACK_DEFS.storm.name, "Storm Dock");
     assert.equal(nextTrackId("custom"), "circuit");
     assert.equal(nextTrackId("storm"), "circuit");
+  });
+});
+
+describe("editor 1.1 placement + history", () => {
+  it("toggles a boost or checkpoint on a nearby point", () => {
+    const start = defaultCustomSave().points;
+    const boostAt = start.findIndex((p) => p.boost);
+    assert.ok(boostAt > 0);
+    const p = start[boostAt]!;
+    const cleared = placeOnRibbon(start, p.x, p.z, "boost");
+    assert.equal(cleared.changed, true);
+    assert.equal(cleared.points[boostAt]?.boost, false);
+    const cp = start.find((pt) => pt.checkpoint)!;
+    const added = placeOnRibbon(start, cp.x + 0.2, cp.z - 0.2, "checkpoint");
+    assert.equal(added.changed, true);
+    assert.equal(added.points.filter((pt) => pt.checkpoint).length, start.filter((pt) => pt.checkpoint).length - 1);
+  });
+
+  it("refuses a checkpoint on the start line and drops one on the ribbon", () => {
+    const start = defaultCustomSave().points;
+    const refuse = placeOnRibbon(start, start[0]!.x, start[0]!.z, "checkpoint");
+    assert.equal(refuse.changed, false);
+    assert.match(refuse.message, /Start/);
+    const placed = placeOnRibbon(start, 70, -110, "checkpoint", false);
+    assert.equal(placed.changed, true);
+    assert.equal(placed.points.length, start.length + 1);
+    assert.equal(placed.points[placed.selected]?.checkpoint, true);
+    const boost = placeOnRibbon(start, 120, 40, "boost");
+    assert.equal(boost.changed, true);
+    assert.equal(boost.points[boost.selected]?.boost, true);
+  });
+
+  it("snaps and flattens without touching stock Cup order", () => {
+    assert.equal(snapCoord(11.6, 8), 8);
+    assert.equal(snapCoord(13, 8), 16);
+    const start = defaultCustomSave().points;
+    const snapped = snapPointsToGrid(start, 8);
+    assert.ok(snapped.every((p) => p.x % 8 === 0 && p.z % 8 === 0));
+    const flat = flattenRibbon(start.map((p, i) => (i === 2 ? { ...p, y: 6, bank: 0.4 } : p)));
+    assert.ok(flat.every((p) => p.y <= 0.03 && Math.abs(p.bank) < 1e-6));
+    assert.equal(CUP_EVENTS.gold.length, 9);
+    assert.ok(CUP_EVENTS.gold.every((e) => e.trackId !== "custom"));
+  });
+
+  it("undoes and redoes a control-point edit", () => {
+    const start = defaultCustomSave().points;
+    let history = emptyPointHistory();
+    const next = insertPoint(start, 1, { x: 20, z: -40 });
+    history = recordPointChange(history, start);
+    const back = undoPoints(history, next);
+    assert.ok(back);
+    assert.equal(back.points.length, start.length);
+    const forth = redoPoints(back.history, back.points);
+    assert.ok(forth);
+    assert.equal(forth.points.length, start.length + 1);
+    assert.equal(undoPoints(emptyPointHistory(), start), null);
+  });
+
+  it("flies the camera behind the sample looking forward", () => {
+    const sm = { x: 10, y: 1, z: 4, tx: 0, ty: 0, tz: 1, ux: 0, uy: 1, uz: 0 };
+    const pose = editorFlythroughPose(sm);
+    const camDot = (pose.cam.x - sm.x) * sm.tx + (pose.cam.y - sm.y) * sm.ty + (pose.cam.z - sm.z) * sm.tz;
+    const lookDot = (pose.look.x - sm.x) * sm.tx + (pose.look.y - sm.y) * sm.ty + (pose.look.z - sm.z) * sm.tz;
+    assert.ok(camDot < 0, `cam ${camDot}`);
+    assert.ok(lookDot > 0, `look ${lookDot}`);
+    assert.ok(pose.cam.y > sm.y);
   });
 });

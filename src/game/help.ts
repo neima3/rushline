@@ -54,7 +54,7 @@ export const COPY = {
   cupEyebrow: "Campaign",
   selectEyebrow: "Select circuit",
   selectHotseatEyebrow: "Hotseat — P1 then P2",
-  editorEyebrow: "Track editor lite",
+  editorEyebrow: "Editor 1.1",
   helpTitle: "Controls",
   helpEyebrow: "Help",
   helpBlurb: "Desktop, touch, and gamepad — the bindings that are actually live.",
@@ -93,7 +93,8 @@ export const COPY = {
     "Clear the rival from Tracks when you want the usual PB / last-run ghost back. Author ghosts return if no PB remains.",
   ],
   playNotes: [
-    "Time trial — any track, any medal. First run races the author ghost; a PB or imported rival replaces it. Custom is a closed ribbon you build in the lite editor.",
+    "Time trial — any track, any medal. First run races the author ghost; a PB or imported rival replaces it. Custom is a closed ribbon you build in the editor.",
+    "Editor 1.1 — place checkpoints and boosts on the plan, undo/redo points, snap or flatten, and fly the ribbon. Rush Cup stays the stock nine.",
     "Hotseat — two players take turns on the same circuit. P2 races P1's ghost, then a local scoreboard.",
     "A Validated badge means rewind was not used. Local only — not online anti-cheat.",
     "Settings can set stock time-trial / hotseat laps to 1, 2, or 3. Rush Cup and Custom keep their own counts.",
