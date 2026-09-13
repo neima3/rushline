@@ -16,6 +16,8 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 Each track has author / gold / silver / bronze medal times, checkpoints, boost pads, and a personal-best ghost.
 
+**Garage** — six liveries (Ivory, Violet, Sun, Frost, Carbon, Hazard). Pick one from the menu; the car on track updates live and the choice is saved.
+
 ## Controls
 
 ### Desktop
@@ -54,7 +56,7 @@ npm run build      # production bundle
 npm run typecheck  # tsc --noEmit
 ```
 
-No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`.
+No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`.
 
 ## Project map
 

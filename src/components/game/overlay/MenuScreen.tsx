@@ -1,4 +1,5 @@
-import { Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
+import { Car, Gamepad2, Gauge, Settings, Volume2, VolumeX } from "lucide-react";
+import { LIVERY_ORDER, liveryDef } from "@/game/livery";
 import { allTrackDefs, medalFor, TRACK_DEFS } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
 import { padRaceHint } from "@/game/gamepad";
@@ -22,7 +23,9 @@ type Props = {
   onMute: () => void;
   onAuto: () => void;
   onSettings: () => void;
+  onGarage: () => void;
   select: boolean;
+  garage: boolean;
 };
 
 export function MenuScreen({
@@ -40,14 +43,16 @@ export function MenuScreen({
   onMute,
   onAuto,
   onSettings,
+  onGarage,
   select,
+  garage,
 }: Props) {
   const trackId = useGame((s) => s.trackId);
   const featured = TRACK_DEFS[trackId];
 
   return (
     <div
-      data-overlay={select ? "select" : "menu"}
+      data-overlay={garage ? "garage" : select ? "select" : "menu"}
       className="pointer-events-auto absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-bg via-bg/78 to-transparent md:justify-center"
     >
       <div
@@ -68,7 +73,9 @@ export function MenuScreen({
           </p>
         </header>
 
-        {!select ? (
+        {garage ? (
+          <GaragePicker onBack={onBack} />
+        ) : !select ? (
           <div className="overlay-stagger-2 flex flex-col gap-2">
             <button
               type="button"
@@ -88,6 +95,14 @@ export function MenuScreen({
               className="h-12 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-fg transition-colors hover:bg-bg-elevated"
             >
               Tracks
+            </button>
+            <button
+              type="button"
+              onClick={onGarage}
+              className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-5 text-sm font-medium text-fg transition-colors hover:bg-bg-elevated"
+            >
+              <Car className="size-4" />
+              Garage
             </button>
             <div className="mt-1 grid grid-cols-3 gap-2">
               <button
@@ -117,7 +132,7 @@ export function MenuScreen({
               </button>
             </div>
             <p className="mt-1 hidden text-xs text-subtle md:block">
-              WASD steer · Space slide · Esc pause · Settings for graphics and Track Assist
+              WASD steer · Space slide · Esc pause · Garage for liveries · Settings for graphics
             </p>
           </div>
         ) : (
@@ -179,6 +194,58 @@ export function MenuScreen({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function GaragePicker({ onBack }: { onBack: () => void }) {
+  const livery = useGame((s) => s.settings.livery);
+  const setLivery = useGame((s) => s.setLivery);
+
+  return (
+    <div className="overlay-stagger-2 flex flex-col gap-3">
+      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">Garage</p>
+      <p className="text-xs text-subtle">Pick a paint. It stays on the car across every track.</p>
+      <div className="grid grid-cols-2 gap-2">
+        {LIVERY_ORDER.map((id, i) => {
+          const def = liveryDef(id);
+          const selected = id === livery;
+          return (
+            <button
+              key={id}
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={() => setLivery(id)}
+              data-livery={id}
+              style={{ animationDelay: `${80 + i * 45}ms` }}
+              className={cn(
+                "livery-card overlay-card-in flex overflow-hidden rounded-xl border text-left transition-[transform,border-color,background-color] duration-150",
+                selected ? "border-fg/45 bg-surface" : "border-border bg-surface/90 hover:border-border",
+              )}
+            >
+              <span className="livery-thumb relative h-[5.4rem] w-[4.6rem] shrink-0 overflow-hidden sm:w-24" data-livery={id} />
+              <span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5">
+                <span className="flex items-center gap-1.5">
+                  <span className="font-display text-xl leading-none tracking-tight">{def.name}</span>
+                  {selected ? (
+                    <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                      On car
+                    </span>
+                  ) : null}
+                </span>
+                <span className="mt-1 text-[11px] leading-snug text-muted">{def.blurb}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onBack}
+        className="h-11 rounded-md border border-border bg-bg-elevated text-sm text-muted"
+      >
+        Back
+      </button>
     </div>
   );
 }

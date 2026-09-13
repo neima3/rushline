@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, ThemeId } from "./types";
+import { DEFAULT_LIVERY, type LiveryId } from "./livery";
 import { buildTrackMeshes, nearestSample, sampleAt } from "./track";
 import { makeCar, type CarRig } from "./car";
 import { applyGroundMaterial, buildEnvironment } from "./env";
@@ -222,6 +223,7 @@ export class World {
   private envRoot = new THREE.Group();
   private car: CarRig;
   private ghost: CarRig;
+  private livery: LiveryId = DEFAULT_LIVERY;
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
   private fill: THREE.DirectionalLight;
@@ -455,6 +457,11 @@ export class World {
     this.patchKnobs({ dprCap: Math.max(0.75, Math.min(2.5, cap)) });
   }
 
+  setLivery(id: LiveryId) {
+    this.livery = id;
+    this.car.setLivery(id);
+  }
+
   get shadows() {
     return this.quality.shadows;
   }
@@ -562,6 +569,7 @@ export class World {
     this.applyThemeLights(theme);
     this.car.setTheme(theme);
     this.ghost.setTheme(theme);
+    this.car.setLivery(this.livery);
     this.car.setHeadlights(theme === "night");
     this.vfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog, pack.skyTint);
@@ -1064,6 +1072,8 @@ export class World {
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures) t.dispose();
+    this.car.disposeMaps();
+    this.ghost.disposeMaps();
     this.car.mats.forEach((m) => m.dispose());
     this.ghost.mats.forEach((m) => m.dispose());
     this.sky?.dispose();

@@ -4,6 +4,7 @@ import {
   applyQuality,
   applySteerSettings,
   defaultSettings,
+  loadSettings,
   parseSettings,
   qualityProfile,
 } from "./settings.ts";
@@ -63,10 +64,11 @@ describe("applyQuality", () => {
     assert.equal(high.bloom, true);
   });
 
-  it("does not wipe camera or audio", () => {
-    const s = applyQuality({ ...defaultSettings(false), master: 0.2, fov: 70 }, "low");
+  it("does not wipe camera, audio, or livery", () => {
+    const s = applyQuality({ ...defaultSettings(false), master: 0.2, fov: 70, livery: "frost" }, "low");
     assert.equal(s.master, 0.2);
     assert.equal(s.fov, 70);
+    assert.equal(s.livery, "frost");
   });
 });
 
@@ -111,6 +113,15 @@ describe("parseSettings", () => {
     assert.equal(s.autoThrottle, false);
     assert.equal(s.showSpeed, false);
     assert.equal(s.ghostOpacity, 1);
+    assert.equal(s.livery, "ivory");
+  });
+
+  it("keeps a saved livery and falls back on garbage", () => {
+    assert.equal(parseSettings({ livery: "hazard" }, false).livery, "hazard");
+    assert.equal(parseSettings({ livery: "turbo" }, true).livery, "ivory");
+    assert.equal(defaultSettings(false).livery, "ivory");
+    assert.equal(loadSettings(false, "carbon").livery, "carbon");
+    assert.equal(loadSettings(false, "nope").livery, "ivory");
   });
 });
 

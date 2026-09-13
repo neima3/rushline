@@ -47,7 +47,7 @@ export function Overlay({ gameRef }: Props) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
-      {phase === "menu" || phase === "select" ? (
+      {phase === "menu" || phase === "select" || phase === "garage" ? (
         <button
           type="button"
           className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
@@ -62,7 +62,7 @@ export function Overlay({ gameRef }: Props) {
         </button>
       ) : null}
 
-      {phase === "menu" || phase === "select" ? (
+      {phase === "menu" || phase === "select" || phase === "garage" ? (
         <MenuScreen
           ready={ready}
           best={best}
@@ -78,6 +78,10 @@ export function Overlay({ gameRef }: Props) {
           onTracks={() => {
             g()?.uiClick();
             g()?.setPhase("select");
+          }}
+          onGarage={() => {
+            g()?.uiClick();
+            g()?.setPhase("garage");
           }}
           onBack={() => {
             g()?.uiClick();
@@ -101,6 +105,7 @@ export function Overlay({ gameRef }: Props) {
             setSettingsOpen(true);
           }}
           select={phase === "select"}
+          garage={phase === "garage"}
         />
       ) : null}
 

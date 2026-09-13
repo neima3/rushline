@@ -39,6 +39,7 @@ describe("musicDuck", () => {
     assert.ok(musicDuck("paused") < musicDuck("results"));
     assert.ok(musicDuck("results") < musicDuck("menu"));
     assert.equal(musicDuck("menu"), musicDuck("select"));
+    assert.equal(musicDuck("menu"), musicDuck("garage"));
     assert.ok(musicDuck("race") < 0.2);
   });
 });

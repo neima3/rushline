@@ -1,3 +1,5 @@
+import { DEFAULT_LIVERY, liveryId, parseLivery, type LiveryId } from "./livery.ts";
+
 export const SETTINGS_KEY = "rushline-settings-v1";
 
 export type Quality = "low" | "medium" | "high";
@@ -24,6 +26,7 @@ export type Settings = {
   showSpeed: boolean;
   showMinimap: boolean;
   ghostOpacity: number;
+  livery: LiveryId;
 };
 
 export type QualityProfile = {
@@ -105,6 +108,7 @@ export function defaultSettings(touch = false): Settings {
     showSpeed: true,
     showMinimap: true,
     ghostOpacity: 0.46,
+    livery: DEFAULT_LIVERY,
   };
 }
 
@@ -159,21 +163,40 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     showSpeed: bool(o.showSpeed, base.showSpeed),
     showMinimap: bool(o.showMinimap, base.showMinimap),
     ghostOpacity: num(o.ghostOpacity, base.ghostOpacity, 0, 1),
+    livery: liveryId(o.livery, base.livery),
   };
 }
 
-export function loadSettings(touch = isTouchDevice()): Settings {
-  if (typeof window === "undefined") return defaultSettings(touch);
+export function loadSettings(touch = isTouchDevice(), saveLivery?: unknown): Settings {
+  if (typeof window === "undefined") {
+    const fresh = defaultSettings(touch);
+    const fallback = parseLivery(saveLivery);
+    if (fallback) fresh.livery = fallback;
+    return fresh;
+  }
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
+    const fallback = parseLivery(saveLivery);
     if (!raw) {
       const fresh = defaultSettings(touch);
+      if (fallback) fresh.livery = fallback;
       persistSettings(fresh);
       return fresh;
     }
-    return parseSettings(JSON.parse(raw), touch);
+    const parsed = parseSettings(JSON.parse(raw), touch);
+    if (!hasOwnLivery(raw) && fallback) parsed.livery = fallback;
+    return parsed;
   } catch {
     return defaultSettings(touch);
+  }
+}
+
+function hasOwnLivery(raw: string): boolean {
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    return o != null && typeof o === "object" && "livery" in o;
+  } catch {
+    return false;
   }
 }
 

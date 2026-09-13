@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { commitRun, memoryIo, parseSave, pushRecent } from "./persist.ts";
+import { commitRun, emptySave, memoryIo, parseSave, pushRecent } from "./persist.ts";
 import type { GhostFrame } from "./types.ts";
 
 function rec(n = 40): GhostFrame[] {
@@ -38,6 +38,27 @@ describe("commitRun", () => {
     assert.equal(result.savedBest, false);
     assert.equal(result.savedLast, true);
     assert.ok(io.getItem("rushline-last-v1"));
+  });
+});
+
+describe("parseSave livery", () => {
+  it("keeps a garage pick through a PB write", () => {
+    const io = memoryIo({
+      "rushline-v1": JSON.stringify({ version: 1, best: {}, ghosts: {}, livery: "carbon" }),
+    });
+    const save = parseSave(io.getItem("rushline-v1"));
+    assert.equal(save.livery, "carbon");
+    commitRun("circuit", 50_000, rec(40), io, save);
+    const after = parseSave(io.getItem("rushline-v1"));
+    assert.equal(after.livery, "carbon");
+    assert.equal(after.best.circuit, 50_000);
+  });
+
+  it("drops an unknown paint without wiping times", () => {
+    const parsed = parseSave(JSON.stringify({ version: 1, best: { circuit: 40_000 }, ghosts: {}, livery: "turbo" }));
+    assert.equal(parsed.livery, undefined);
+    assert.equal(parsed.best.circuit, 40_000);
+    assert.equal(emptySave().livery, undefined);
   });
 });
 
