@@ -384,12 +384,12 @@ function EditorMap({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-fg/20 bg-[#0c0c10]">
+    <div className="h-52 shrink-0 overflow-hidden rounded-xl border border-fg/25 bg-[#14141a] sm:h-60">
       <svg
         ref={svgRef}
         data-editor-map
         viewBox={`${x0} ${z0} ${w} ${h}`}
-        className="block h-52 w-full touch-none sm:h-60"
+        className="block h-full w-full touch-none"
         onPointerMove={(e) => {
           if (!drag.current) return;
           e.preventDefault();
