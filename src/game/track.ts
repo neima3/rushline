@@ -499,6 +499,7 @@ export function nearestSample(
   if (!n) return sampleAt(track, 0);
   const hint = samples.findIndex((sm) => sm.s >= hintS);
   const start = Math.max(0, hint < 0 ? 0 : hint);
+  const hintSm = sampleAt(track, hintS);
   let best = samples[start]!;
   let bestD = Infinity;
   let fallback = best;
@@ -513,15 +514,21 @@ export function nearestSample(
     if (wrap) i = ((i % n) + n) % n;
     else if (i < 0 || i >= n) continue;
     const sm = samples[i]!;
-    if (maxDs != null) {
-      let ds = sm.s - hintS;
-      if (wrap) {
-        ds = ((ds % L) + L) % L;
-        if (ds > L * 0.5) ds -= L;
-      }
-      if (Math.abs(ds) > maxDs) continue;
+    let ds = sm.s - hintS;
+    if (wrap) {
+      ds = ((ds % L) + L) % L;
+      if (ds > L * 0.5) ds -= L;
     }
-    const d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
+    if (maxDs != null && Math.abs(ds) > maxDs) continue;
+    let d = (sm.x - x) ** 2 + (sm.y - y) ** 2 + (sm.z - z) ** 2;
+    // Closed ribbons overlap at the start/finish. Index neighbors from the
+    // closing stretch sit a few metres left/right of the outbound lane and
+    // win a pure XYZ race — that is the pre-CP1 left-shoulder snap.
+    if (wrap) {
+      const align = sm.tx * hintSm.tx + sm.ty * hintSm.ty + sm.tz * hintSm.tz;
+      if (align < 0.12) d += 28;
+      d += Math.abs(ds) * 0.22;
+    }
     if (d < fallbackD) {
       fallbackD = d;
       fallback = sm;
