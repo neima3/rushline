@@ -30,7 +30,7 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
         aria-modal="true"
         aria-labelledby="settings-title"
         className={cn(
-          "relative flex h-full w-full flex-col border-border bg-surface shadow-[0_24px_80px_rgba(0,0,0,0.45)]",
+          "settings-sheet relative flex h-full w-full flex-col border-border bg-surface shadow-[0_24px_80px_rgba(0,0,0,0.45)]",
           "md:max-w-md md:border-l",
         )}
       >
@@ -40,6 +40,7 @@ export function SettingsPanel({ onClose, touch }: { onClose: () => void; touch: 
             <h2 id="settings-title" className="font-display text-4xl leading-none tracking-tight">
               Settings
             </h2>
+            <p className="mt-1 max-w-[16rem] text-xs text-subtle">Graphics, camera, and Track Assist. Your current preset stays put until you change it.</p>
           </div>
           <button
             type="button"

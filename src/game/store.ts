@@ -7,18 +7,20 @@ import {
   type Quality,
   type Settings,
 } from "./settings";
-import type {
-  CameraMode,
-  HudState,
-  PadInfo,
-  Phase,
-  ResultsState,
-  SaveData,
-  TrackId,
+import {
+  TRACK_ORDER,
+  type CameraMode,
+  type HudState,
+  type PadInfo,
+  type Phase,
+  type ResultsState,
+  type SaveData,
+  type TrackId,
 } from "./types";
+
 const SAVE_KEY = "rushline-v1";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix"];
+export { TRACK_ORDER };
 
 const emptyHud = (): HudState => ({
   time: 0,

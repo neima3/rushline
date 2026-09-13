@@ -8,6 +8,8 @@ export type CameraMode = "chase" | "hood";
 
 export type TrackId = "circuit" | "canyon" | "helix";
 
+export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix"];
+
 export type TrackNode = {
   x: number;
   y: number;
@@ -133,9 +135,13 @@ export type HudState = {
 export type ResultsState = {
   time: number;
   best: number | null;
+  prevBest: number | null;
   medal: Medal | null;
   isPb: boolean;
   trackId: TrackId;
+  ghostDelta: number | null;
+  hadGhost: boolean;
+  nextTrackId: TrackId;
 };
 
 export type GhostFrame = {

@@ -489,6 +489,105 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.overlay-enter {
+  animation: overlay-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.overlay-stagger-1 {
+  animation: overlay-rise 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.overlay-stagger-2 {
+  animation: overlay-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both;
+}
+
+.overlay-card-in {
+  animation: overlay-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes overlay-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.results-card {
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.results-time {
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 28px rgba(94, 232, 255, 0.16);
+}
+
+.results-medal-stamp {
+  animation: results-stamp 560ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+.results-medal-orb {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 22px rgba(94, 232, 255, 0.22);
+}
+
+.results-pb-chip {
+  animation: results-pb-glow 1.6s ease-out 1;
+}
+
+@keyframes results-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(0.72) translateY(8px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes results-pb-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 244, 242, 0.28);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(244, 244, 242, 0);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.first-run-card {
+  background: linear-gradient(180deg, rgba(16, 18, 26, 0.9), rgba(8, 10, 16, 0.86));
+}
+
+.settings-sheet {
+  animation: settings-slide 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes settings-slide {
+  from {
+    opacity: 0.4;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

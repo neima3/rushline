@@ -15,6 +15,7 @@ import { CarSim, FIXED_DT, MAX_PHYS_STEPS, lerpSnap } from "./physics";
 import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio } from "./audio";
+import { buildResults } from "./flow";
 import { readSave, TRACK_ORDER, useGame, writeSave } from "./store";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
@@ -580,8 +581,8 @@ export class Game {
 
   private onFinish() {
     const time = this.time;
-    const medal = medalFor(this.trackId, time);
     const prev = readSave().best[this.trackId] ?? null;
+    const priorGhost = this.ghost;
     const isPb = prev == null || time < prev;
     if (isPb) {
       writeSave((s) => {
@@ -596,13 +597,15 @@ export class Game {
     this.input.rumble("finish");
     this.phase = "results";
     useGame.getState().setPhase("results");
-    useGame.getState().setResults({
-      time,
-      best: isPb ? time : prev,
-      medal,
-      isPb,
-      trackId: this.trackId,
-    });
+    useGame.getState().setResults(
+      buildResults({
+        time,
+        trackId: this.trackId,
+        prevBest: prev,
+        ghost: priorGhost,
+        medal: medalFor(this.trackId, time),
+      }),
+    );
   }
 
   setTouchSteer(v: number) {
