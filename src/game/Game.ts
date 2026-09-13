@@ -52,6 +52,7 @@ import {
   TRACK_ORDER,
   useGame,
 } from "./store";
+import { readImportedGhost } from "./ghost-share";
 import {
   allCupEvents,
   continueEvent,
@@ -231,8 +232,9 @@ export class Game {
     useGame.getState().setPad(this.input.pad);
   }
 
-  private applyGhostChoice(id: TrackId) {
-    const picked = pickRaceGhost(readSave().ghosts[id], readLastSave().runs[id]?.frames, this.ghostPref);
+  private applyGhostChoice(id: TrackId, allowImport = false) {
+    const imported = allowImport ? (readImportedGhost(id)?.frames ?? null) : null;
+    const picked = pickRaceGhost(readSave().ghosts[id], readLastSave().runs[id]?.frames, this.ghostPref, imported);
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     this.ghostPref = "auto";
@@ -413,11 +415,12 @@ export class Game {
     }
   }
 
-  load(id: TrackId) {
+  load(id: TrackId, racing = false) {
     this.trackId = id;
     this.track = getTrack(id);
     this.world.loadTrack(this.track, this.track.def.env);
-    this.applyGhostChoice(id);
+    const allowImport = racing && useGame.getState().playMode !== "cup";
+    this.applyGhostChoice(id, allowImport);
     this.car.reset(this.track);
     this.car.snap(this.curr);
     copySnap(this.prev, this.curr);
@@ -474,8 +477,8 @@ export class Game {
     useGame.getState().setSettingsOpen(false);
     useGame.getState().setHelpOpen(false);
     this.ghostPref = pref;
-    if (id) this.load(id);
-    else this.load(this.trackId);
+    if (id) this.load(id, true);
+    else this.load(this.trackId, true);
     this.car.reset(this.track);
     this.car.snap(this.curr);
     copySnap(this.prev, this.curr);
@@ -512,6 +515,7 @@ export class Game {
       ghostS: null,
       ghostN: null,
       ghostLead: null,
+      ghostKind: this.ghostSource,
       cpFlash: null,
       wrongWay: false,
       rewinding: false,
@@ -807,6 +811,7 @@ export class Game {
         ghostN: ghost?.n ?? null,
         ghostDelta,
         ghostLead: ghostLead(ghostDelta),
+        ghostKind: this.ghostSource,
         medalRemain: pace.remain,
         cpFlash: flash,
         rewinding: this.rewinding,

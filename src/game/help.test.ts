@@ -50,6 +50,11 @@ describe("help control sheet", () => {
     assert.match(COPY.tagline, /Rush Cup/);
     assert.match(COPY.cupBlurb, /Gold/);
     assert.match(COPY.garageBlurb, /livery/i);
+    assert.match(COPY.ghostTitle, /Ghost share/i);
+    assert.ok(COPY.ghostNotes.some((line) => /export/i.test(line) && /JSON/i.test(line)));
+    assert.ok(COPY.ghostNotes.some((line) => /import/i.test(line)));
+    assert.ok(COPY.ghostNotes.some((line) => /never overwrites/i.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /Ghost share/i.test(line)));
   });
 
   it("keeps runtime hint strings aligned with the sheet", () => {

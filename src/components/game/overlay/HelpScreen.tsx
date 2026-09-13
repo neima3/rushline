@@ -91,6 +91,15 @@ export function HelpScreen({ touch, padConnected, onClose, onUiClick }: Props) {
             </ul>
           </Section>
 
+          <Section title={COPY.ghostTitle}>
+            <p className="text-sm leading-relaxed text-muted">{COPY.ghostBlurb}</p>
+            <ul className="space-y-1.5 text-sm leading-relaxed text-muted">
+              {COPY.ghostNotes.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </Section>
+
           <Section title={COPY.menuTitle}>
             <BindTable rows={MENU_CONTROL_ROWS} />
             <ul className="space-y-1.5 text-sm leading-relaxed text-muted">

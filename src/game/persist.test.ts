@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { commitRun, emptySave, memoryIo, parseSave, pushRecent } from "./persist.ts";
+import { SHARE_KEY } from "./ghost-share.ts";
 import { trimRecording } from "./rewind.ts";
 import type { GhostFrame } from "./types.ts";
 
@@ -75,6 +76,16 @@ describe("parseSave livery", () => {
     assert.equal(parsed.livery, undefined);
     assert.equal(parsed.best.circuit, 40_000);
     assert.equal(emptySave().livery, undefined);
+  });
+});
+
+describe("commitRun vs ghost share", () => {
+  it("never writes the imported-rival key", () => {
+    const io = memoryIo();
+    commitRun("circuit", 51_000, rec(40), io);
+    assert.equal(io.getItem(SHARE_KEY), null);
+    assert.ok(io.getItem("rushline-v1"));
+    assert.ok(io.getItem("rushline-last-v1"));
   });
 });
 

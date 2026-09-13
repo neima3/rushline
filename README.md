@@ -34,6 +34,8 @@ Each track has author / gold / silver / bronze times, checkpoints, boost pads, a
 
 A personal-best ghost is saved with the time. If that ghost is missing or too thin, the last finished run is used instead. Results can **Retry vs last run** to race that lap even when a stronger PB ghost exists. Best / last / medal times sit on each track card.
 
+**Ghost share** — export a last-run or PB tape as a JSON file from Results or Tracks, then import a friend's file to race that circuit as a rival. Sharing is local only (download / pick a file). A rival never overwrites your PB, last run, Rush Cup, or Garage paint. Clear it from Tracks when you want the usual ghost back. Files live in `localStorage` under `rushline-ghost-share-v1`.
+
 ## Garage
 
 Six liveries: **Ivory**, **Violet**, **Sun**, **Frost**, **Carbon**, **Hazard**. Pick one from the menu; the car on track updates live. Paint is cosmetic and persists in `rushline-v1` and `rushline-settings-v1`.
@@ -96,7 +98,7 @@ npm run build      # production bundle
 npm run typecheck  # tsc --noEmit
 ```
 
-No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`. Cup campaign progress is stored separately in `rushline-cup-v1`.
+No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`. Cup campaign progress is stored separately in `rushline-cup-v1`. Imported rival ghosts use `rushline-ghost-share-v1`.
 
 ## Project map
 
@@ -109,6 +111,7 @@ src/game/            # simulation + rendering (pure Three.js, no R3F)
   input.ts           # keyboard + injected touch / gamepad actions
   gamepad.ts         # Standard mapping, deadzone, rumble
   help.ts            # in-game controls sheet (source of truth for bindings copy)
+  ghost-share.ts     # TM-style ghost JSON export / import
   cup.ts             # Rush Cup campaign
   photo.ts           # photo orbit / still export
   store.ts           # zustand phase / HUD / save
