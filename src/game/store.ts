@@ -8,6 +8,7 @@ import {
   type Quality,
   type Settings,
 } from "./settings";
+import { emptyHotseat, type HotseatSession } from "./hotseat";
 import {
   PLAYABLE_ORDER,
   TRACK_ORDER,
@@ -16,6 +17,7 @@ import {
   type Medal,
   type PadInfo,
   type Phase,
+  type PlayMode,
   type ResultsState,
   type SaveData,
   type TrackId,
@@ -205,10 +207,11 @@ type GameStore = {
   photoGhost: boolean;
   photoScrub: number;
   photoFollowGhost: boolean;
-  playMode: "trial" | "cup";
+  playMode: PlayMode;
   cupEventId: string | null;
   cupFocusId: string;
   cupProgress: CupProgress;
+  hotseat: HotseatSession | null;
   setPhase: (p: Phase) => void;
   setTrack: (id: TrackId) => void;
   setHud: (h: Partial<HudState>) => void;
@@ -235,6 +238,9 @@ type GameStore = {
   setPhotoFollowGhost: (v: boolean) => void;
   setCupSession: (eventId: string | null) => void;
   setCupFocus: (id: string) => void;
+  setPlayMode: (mode: PlayMode) => void;
+  startHotseat: (trackId: TrackId) => void;
+  setHotseat: (session: HotseatSession | null) => void;
   refreshBest: () => void;
   refreshCup: () => void;
 };
@@ -270,6 +276,7 @@ export const useGame = create<GameStore>((set) => ({
   cupEventId: null,
   cupFocusId: "gold-circuit",
   cupProgress: emptyCup(),
+  hotseat: null,
   setPhase: (phase) => set({ phase }),
   setTrack: (trackId) => set({ trackId }),
   setHud: (h) => set((s) => ({ hud: { ...s.hud, ...h } })),
@@ -322,8 +329,26 @@ export const useGame = create<GameStore>((set) => ({
   setPhotoGhost: (photoGhost) => set({ photoGhost }),
   setPhotoScrub: (photoScrub) => set({ photoScrub: Math.max(0, Math.min(1, photoScrub)) }),
   setPhotoFollowGhost: (photoFollowGhost) => set({ photoFollowGhost }),
-  setCupSession: (cupEventId) => set({ playMode: cupEventId ? "cup" : "trial", cupEventId }),
+  setCupSession: (cupEventId) =>
+    set({
+      playMode: cupEventId ? "cup" : "trial",
+      cupEventId,
+      hotseat: null,
+    }),
   setCupFocus: (cupFocusId) => set({ cupFocusId }),
+  setPlayMode: (playMode) =>
+    set((s) => ({
+      playMode,
+      cupEventId: playMode === "cup" ? s.cupEventId : null,
+      hotseat: playMode === "hotseat" ? s.hotseat : null,
+    })),
+  startHotseat: (trackId) => set({ playMode: "hotseat", cupEventId: null, hotseat: emptyHotseat(trackId) }),
+  setHotseat: (hotseat) =>
+    set((s) => ({
+      hotseat,
+      playMode: hotseat ? "hotseat" : s.playMode === "hotseat" ? "trial" : s.playMode,
+      cupEventId: hotseat ? null : s.cupEventId,
+    })),
   refreshBest: () => {
     const save = readSave();
     const last = readLastSave();

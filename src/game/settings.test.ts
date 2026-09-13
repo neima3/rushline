@@ -21,6 +21,7 @@ describe("defaultSettings", () => {
     assert.equal(s.steerPreset, "normal");
     assert.equal(s.motionBlur, false);
     assert.equal(s.rewindEnabled, true);
+    assert.equal(s.stockLaps, "track");
   });
 
   it("uses Medium graphics and auto-throttle on touch", () => {
@@ -85,6 +86,16 @@ describe("applyQuality", () => {
     assert.equal(s.fov, 70);
     assert.equal(s.livery, "frost");
     assert.equal(s.rewindEnabled, false);
+    assert.equal(s.stockLaps, "track");
+  });
+
+  it("keeps a saved stock-laps choice and falls back on garbage", () => {
+    assert.equal(parseSettings({ stockLaps: 3 }, false).stockLaps, 3);
+    assert.equal(parseSettings({ stockLaps: 1 }, true).stockLaps, 1);
+    assert.equal(parseSettings({ stockLaps: 2 }, false).stockLaps, 2);
+    assert.equal(parseSettings({ stockLaps: "track" }, false).stockLaps, "track");
+    assert.equal(parseSettings({ stockLaps: 4 }, false).stockLaps, "track");
+    assert.equal(parseSettings({ stockLaps: "three" }, true).stockLaps, "track");
   });
 });
 

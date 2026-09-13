@@ -265,6 +265,7 @@ export function ghostHudTag(source: GhostSource): string {
   if (source === "import") return "RIVAL";
   if (source === "author") return "AUTH";
   if (source === "last") return "LAST";
+  if (source === "hotseat") return "P1";
   if (source === "pb") return "GHOST";
   return "GHOST";
 }

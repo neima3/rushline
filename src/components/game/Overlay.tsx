@@ -18,6 +18,7 @@ import { Minimap } from "./Minimap";
 import { CupScreen } from "./overlay/CupScreen";
 import { FirstRunHint } from "./overlay/FirstRunHint";
 import { HelpScreen } from "./overlay/HelpScreen";
+import { HotseatScreen } from "./overlay/HotseatScreen";
 import { EditorScreen } from "./overlay/EditorScreen";
 import { MenuScreen } from "./overlay/MenuScreen";
 import { PhotoScreen } from "./overlay/PhotoScreen";
@@ -53,6 +54,8 @@ export function Overlay({ gameRef }: Props) {
   const cupProgress = useGame((s) => s.cupProgress);
   const cupEventId = useGame((s) => s.cupEventId);
   const cupEvent = getCupEvent(cupEventId);
+  const playMode = useGame((s) => s.playMode);
+  const hotseat = useGame((s) => s.hotseat);
   const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
   const hideHud = photoMode;
@@ -104,8 +107,15 @@ export function Overlay({ gameRef }: Props) {
           }}
           onTracks={() => {
             g()?.uiClick();
+            useGame.getState().setPlayMode("trial");
             g()?.setPhase("select");
           }}
+          onHotseat={() => {
+            g()?.uiClick();
+            useGame.getState().setPlayMode("hotseat");
+            g()?.setPhase("select");
+          }}
+          hotseatSelect={playMode === "hotseat"}
           onGarage={() => {
             g()?.uiClick();
             g()?.setPhase("garage");
@@ -120,7 +130,8 @@ export function Overlay({ gameRef }: Props) {
           }}
           onRace={(id) => {
             g()?.uiClick();
-            g()?.beginTrial(id);
+            if (useGame.getState().playMode === "hotseat") g()?.beginHotseat(id);
+            else g()?.beginTrial(id);
           }}
           onRaceRival={(id) => {
             g()?.uiClick();
@@ -214,7 +225,13 @@ export function Overlay({ gameRef }: Props) {
           showSpeed={settings.showSpeed}
           showMinimap={settings.showMinimap}
           surface={hud.surface}
-          cupLabel={cupEvent ? `CUP ${cupEvent.index + 1}/5 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}` : null}
+          cupLabel={
+            cupEvent
+              ? `CUP ${cupEvent.index + 1}/7 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}`
+              : playMode === "hotseat"
+                ? `HOTSEAT · P${hotseat?.seat ?? 1}`
+                : null
+          }
           rewinding={hud.rewinding}
           rewindRemainMs={hud.rewindRemainMs}
         />
@@ -328,7 +345,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Restart",
               onClick: () => {
                 g()?.uiClick();
-                g()?.startRace();
+                g()?.restartRun();
               },
             },
             {
@@ -342,14 +359,44 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {!hideHud && phase === "results" && results ? (
+      {!hideHud && phase === "results" && results?.hotseat?.complete ? (
+        <HotseatScreen
+          trackId={results.trackId}
+          board={results.hotseat}
+          onRematch={() => {
+            g()?.uiClick();
+            g()?.rematchHotseat();
+          }}
+          onRetryP2={() => {
+            g()?.uiClick();
+            g()?.retryHotseat();
+          }}
+          onMenu={() => {
+            g()?.uiClick();
+            g()?.menu();
+          }}
+          onPhoto={() => {
+            g()?.uiClick();
+            g()?.enterPhoto();
+          }}
+        />
+      ) : !hideHud && phase === "results" && results ? (
         <ResultsScreen
           results={results}
           nextName={getTrackDef(results.nextTrackId).name}
           onRetry={() => {
             g()?.uiClick();
-            g()?.startRace(results.trackId);
+            if (results.hotseat) g()?.retryHotseat();
+            else g()?.startRace(results.trackId);
           }}
+          onHotseatNext={
+            results.hotseat && !results.hotseat.complete
+              ? () => {
+                  g()?.uiClick();
+                  g()?.continueHotseat();
+                }
+              : undefined
+          }
           onRetryLast={
             results.isPb
               ? undefined

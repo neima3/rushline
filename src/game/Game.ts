@@ -12,7 +12,16 @@ import {
   type TrackId,
 } from "./types";
 import { setCustomDraft, validateCustom, writeCustomSave, type CustomTrackSave } from "./editor.ts";
+import {
+  armHotseatSeat,
+  commitHotseatRun,
+  hotseatGhost,
+  hotseatResultsView,
+  rematchHotseat,
+} from "./hotseat";
+import { resolveRaceLaps, withRaceLaps } from "./laps";
 import { getTrack, invalidateCustomTrack, medalFor, medalPace, sampleAt, validateCustomBuild } from "./track";
+import { raceValidated } from "./validate";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
@@ -23,7 +32,7 @@ import {
   ghostTimeAtS,
 } from "./feel";
 import { authorGhostFor } from "./author-ghost";
-import { pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
+import { compactFrames, pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
 import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
@@ -130,6 +139,7 @@ export class Game {
   private photoFollowGhost = false;
   private rewind = new RewindTape();
   private rewinding = false;
+  private usedRewind = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -236,6 +246,16 @@ export class Game {
   }
 
   private applyGhostChoice(id: TrackId, allowImport = false) {
+    const store = useGame.getState();
+    if (store.playMode === "hotseat") {
+      const frames = hotseatGhost(store.hotseat);
+      if (frames) {
+        this.ghost = frames;
+        this.ghostSource = "hotseat";
+        this.ghostPref = "auto";
+        return;
+      }
+    }
     const imported = allowImport ? (readImportedGhost(id)?.frames ?? null) : null;
     const picked = pickRaceGhost(
       readSave().ghosts[id],
@@ -247,6 +267,17 @@ export class Game {
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
     this.ghostPref = "auto";
+  }
+
+  private applyRaceLaps() {
+    const store = useGame.getState();
+    const laps = resolveRaceLaps({
+      trackId: this.trackId,
+      authored: this.track.def.laps,
+      setting: store.settings.stockLaps,
+      playMode: store.playMode,
+    });
+    this.track = withRaceLaps(this.track, laps);
   }
 
   private fit() {
@@ -344,7 +375,8 @@ export class Game {
 
   restartRun() {
     if (this.phase === "race" || this.phase === "paused" || this.phase === "results" || this.phase === "countdown") {
-      this.startRace(this.trackId);
+      if (useGame.getState().playMode === "hotseat") this.retryHotseat();
+      else this.startRace(this.trackId);
     }
   }
 
@@ -427,8 +459,9 @@ export class Game {
   load(id: TrackId, racing = false) {
     this.trackId = id;
     this.track = getTrack(id);
+    if (racing) this.applyRaceLaps();
     this.world.loadTrack(this.track, this.track.def.env);
-    const allowImport = racing && useGame.getState().playMode !== "cup";
+    const allowImport = racing && useGame.getState().playMode !== "cup" && useGame.getState().playMode !== "hotseat";
     this.applyGhostChoice(id, allowImport);
     this.car.reset(this.track);
     this.car.snap(this.curr);
@@ -449,6 +482,39 @@ export class Game {
   beginTrial(id?: TrackId, pref: GhostPref = "auto") {
     useGame.getState().setCupSession(null);
     this.startRace(id, pref);
+  }
+
+  beginHotseat(id?: TrackId) {
+    const trackId = id ?? this.trackId;
+    useGame.getState().startHotseat(trackId);
+    this.startRace(trackId);
+  }
+
+  continueHotseat() {
+    const store = useGame.getState();
+    const session = store.hotseat;
+    if (!session?.p1) return;
+    store.setHotseat(armHotseatSeat(session, 2));
+    this.startRace(session.trackId);
+  }
+
+  rematchHotseat() {
+    const store = useGame.getState();
+    const session = store.hotseat;
+    if (!session) return;
+    store.setHotseat(rematchHotseat(session));
+    this.startRace(session.trackId);
+  }
+
+  retryHotseat() {
+    const store = useGame.getState();
+    const session = store.hotseat;
+    if (!session) {
+      this.startRace(this.trackId);
+      return;
+    }
+    store.setHotseat(armHotseatSeat(session, session.seat));
+    this.startRace(session.trackId);
   }
 
   beginCup(eventId: string) {
@@ -552,6 +618,7 @@ export class Game {
     this.recording = [];
     this.rewind.clear();
     this.rewinding = false;
+    this.usedRewind = false;
     this.input.touchRewind = 0;
     this.ghostSmooth = null;
     this.cpFlash = null;
@@ -561,7 +628,7 @@ export class Game {
     this.world.snapCamera(this.curr, this.camera);
     useGame.getState().setPhase("countdown");
     useGame.getState().setResults(null);
-    const gridPace = medalPace(this.trackId, 0);
+    const gridPace = medalPace(this.trackId, 0, this.track.def.medals);
     useGame.getState().setHud({
       time: 0,
       countdown: 3,
@@ -625,6 +692,7 @@ export class Game {
     this.car.snap(this.curr);
     copySnap(this.prev, this.curr);
     this.world.snapCamera(this.curr, this.camera);
+    useGame.getState().setCupSession(null);
     useGame.getState().setPhase("menu");
     useGame.getState().setHud({ countdown: null });
   }
@@ -705,6 +773,7 @@ export class Game {
       (this.rewind.canRewind() || this.rewinding);
 
     if (wantRewind) {
+      this.usedRewind = true;
       this.rewinding = true;
       const target = nextRewindTime(this.time, dt, this.rewind.oldestT());
       const frame = this.rewind.sample(target);
@@ -834,7 +903,7 @@ export class Game {
       this.hudAcc = 0;
       const pace =
         this.phase === "race" || this.phase === "countdown"
-          ? medalPace(this.trackId, this.phase === "countdown" ? 0 : this.time)
+          ? medalPace(this.trackId, this.phase === "countdown" ? 0 : this.time, this.track.def.medals)
           : { holding: null, remain: null };
       const ghost = sampleGhost(this.ghost, this.time, this.track.length, this.track.def.closed);
       let ghostDelta: number | null = null;
@@ -897,19 +966,34 @@ export class Game {
     const time = this.time;
     const prevBest = readSave().best[this.trackId] ?? null;
     const priorGhost = this.ghost;
-    const medal = medalFor(this.trackId, time);
+    const medal = medalFor(this.trackId, time, this.track.def.medals);
+    const validated = raceValidated(this.usedRewind);
     const commit = applyRunCommit(this.trackId, time, this.recording);
-    const picked = pickRaceGhost(
-      readSave().ghosts[this.trackId],
-      readLastSave().runs[this.trackId]?.frames,
-      "auto",
-      null,
-      authorGhostFor(this.trackId),
-    );
-    this.ghost = picked.frames;
-    this.ghostSource = picked.source;
+    const store = useGame.getState();
+    if (store.playMode === "hotseat" && store.hotseat) {
+      const next = commitHotseatRun(store.hotseat, {
+        seat: store.hotseat.seat,
+        time,
+        medal,
+        validated,
+        frames: compactFrames(this.recording),
+      });
+      store.setHotseat(next);
+      this.ghost = hotseatGhost({ ...next, seat: 2 }) ?? this.recording;
+      this.ghostSource = "hotseat";
+    } else {
+      const picked = pickRaceGhost(
+        readSave().ghosts[this.trackId],
+        readLastSave().runs[this.trackId]?.frames,
+        "auto",
+        null,
+        authorGhostFor(this.trackId),
+      );
+      this.ghost = picked.frames;
+      this.ghostSource = picked.source;
+    }
     useGame.getState().refreshBest();
-    const cupEvent = getCupEvent(useGame.getState().cupEventId);
+    const cupEvent = store.playMode === "hotseat" ? null : getCupEvent(store.cupEventId);
     const cup = cupEvent ? applyCupCommit(cupEvent, time, medal) : null;
     if (cup) useGame.getState().refreshCup();
     this.audio.setScene("results");
@@ -929,6 +1013,10 @@ export class Game {
         ghostSource: this.ghostSource,
         lastTime: commit.lastTime,
         recents: commit.recents,
+        validated,
+        laps: this.track.def.laps,
+        medals: this.track.def.medals,
+        hotseat: store.playMode === "hotseat" ? hotseatResultsView(useGame.getState().hotseat) : null,
       }),
       cup,
     });
@@ -1114,7 +1202,8 @@ export class Game {
       }
       if (actions.confirm) {
         this.audio.click();
-        this.beginTrial(this.trackId);
+        if (useGame.getState().playMode === "hotseat") this.beginHotseat(this.trackId);
+        else this.beginTrial(this.trackId);
       }
       if (yEdge) {
         this.audio.click();
@@ -1167,7 +1256,9 @@ export class Game {
       const results = useGame.getState().results;
       if (actions.confirm) {
         this.audio.click();
-        if (results?.cup?.nextEventId) this.beginCup(results.cup.nextEventId);
+        if (results?.hotseat && !results.hotseat.complete) this.continueHotseat();
+        else if (results?.hotseat?.complete) this.rematchHotseat();
+        else if (results?.cup?.nextEventId) this.beginCup(results.cup.nextEventId);
         else this.startRace(this.trackId);
       } else if (actions.back) {
         this.audio.click();

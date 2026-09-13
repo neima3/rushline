@@ -8,7 +8,13 @@ A browser-native **3D precision time-trial racer** inspired by Trackmania. Chase
 
 **Time trial** — pick any circuit, hunt Author / Gold / Silver / Bronze, and race your personal-best ghost.
 
+**Hotseat** — two players on one device. P1 drives, then P2 races P1's ghost on the same circuit. A local scoreboard compares the times. No account.
+
 **Rush Cup** — a short local campaign. Clear **Gold** (or better) on all seven tracks in order, then **Author Cup** unlocks on the same seven. Finishing an event unlocks the next challenge; results offer **Next challenge**. Progress lives in `localStorage` under `rushline-cup-v1` — no account.
+
+**Validated** — finish without using rewind and results shows a soft Validated badge. Rewind still counts for PB and medals. Local only — not online anti-cheat.
+
+**Stock laps** — Settings can set time-trial and hotseat laps on the stock seven to **1 / 2 / 3** (or Track for each circuit's authored count). Medals scale with the lap count. Custom and Rush Cup keep their own laps.
 
 Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the keyboard, touch, and gamepad bindings that are actually live.
 
@@ -115,6 +121,9 @@ src/game/            # simulation + rendering (pure Three.js, no R3F)
   help.ts            # in-game controls sheet (source of truth for bindings copy)
   ghost-share.ts     # TM-style ghost JSON export / import
   cup.ts             # Rush Cup campaign
+  hotseat.ts         # local P1 / P2 alternate runs
+  laps.ts            # stock 1 / 2 / 3 lap override
+  validate.ts        # local no-rewind badge
   photo.ts           # photo orbit / still export
   store.ts           # zustand phase / HUD / save
   audio.ts           # Web Audio engine + stingers

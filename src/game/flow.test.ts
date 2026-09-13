@@ -78,6 +78,20 @@ describe("buildResults", () => {
     assert.equal(r.hadGhost, false);
     assert.equal(r.ghostDelta, null);
     assert.equal(r.nextTrackId, "canyon");
+    assert.equal(r.validated, true);
+  });
+
+  it("marks a rewound finish as not validated", () => {
+    const r = buildResults({
+      time: 48_000,
+      trackId: "circuit",
+      prevBest: 52_000,
+      ghost: ghost(52_000),
+      medal: "author",
+      validated: false,
+    });
+    assert.equal(r.validated, false);
+    assert.equal(r.isPb, true);
   });
 
   it("keeps the standing PB when the run is slower and compares the ghost", () => {

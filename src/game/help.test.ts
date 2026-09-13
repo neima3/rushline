@@ -58,6 +58,9 @@ describe("help control sheet", () => {
     assert.ok(COPY.ghostNotes.some((line) => /never overwrites/i.test(line)));
     assert.ok(COPY.playNotes.some((line) => /author ghost/i.test(line)));
     assert.ok(COPY.playNotes.some((line) => /Ghost share/i.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /Hotseat/.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /Validated/.test(line)));
+    assert.match(COPY.selectHotseatEyebrow, /Hotseat/);
   });
 
   it("keeps runtime hint strings aligned with the sheet", () => {

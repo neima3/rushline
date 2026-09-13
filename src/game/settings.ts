@@ -1,3 +1,4 @@
+import { isStockLapsSetting, type StockLapsSetting } from "./laps.ts";
 import { DEFAULT_LIVERY, liveryId, parseLivery, type LiveryId } from "./livery.ts";
 
 export const SETTINGS_KEY = "rushline-settings-v1";
@@ -39,6 +40,8 @@ export type Settings = {
   ghostOpacity: number;
   livery: LiveryId;
   rewindEnabled: boolean;
+  /** Time trial + hotseat on stock tracks. Custom and Rush Cup keep authored laps. */
+  stockLaps: StockLapsSetting;
 };
 
 export type QualityProfile = {
@@ -135,6 +138,7 @@ export function defaultSettings(touch = false): Settings {
     ghostOpacity: 0.46,
     livery: DEFAULT_LIVERY,
     rewindEnabled: !touch,
+    stockLaps: "track",
   };
 }
 
@@ -196,6 +200,7 @@ export function parseSettings(raw: unknown, touch = false): Settings {
     ghostOpacity: num(o.ghostOpacity, base.ghostOpacity, 0, 1),
     livery: liveryId(o.livery, base.livery),
     rewindEnabled: bool(o.rewindEnabled, base.rewindEnabled),
+    stockLaps: isStockLapsSetting(o.stockLaps) ? o.stockLaps : base.stockLaps,
   };
 }
 

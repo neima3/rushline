@@ -1464,13 +1464,16 @@ export function allTrackDefs(): TrackDef[] {
   return [...TRACK_ORDER.map((id) => TRACK_DEFS[id]), getTrackDef("custom")];
 }
 
-export function medalFor(id: TrackId, time: number) {
-  const m = getTrackDef(id).medals;
-  if (time <= m.author) return "author" as const;
-  if (time <= m.gold) return "gold" as const;
-  if (time <= m.silver) return "silver" as const;
-  if (time <= m.bronze) return "bronze" as const;
+export function medalFromTimes(medals: TrackDef["medals"], time: number) {
+  if (time <= medals.author) return "author" as const;
+  if (time <= medals.gold) return "gold" as const;
+  if (time <= medals.silver) return "silver" as const;
+  if (time <= medals.bronze) return "bronze" as const;
   return null;
+}
+
+export function medalFor(id: TrackId, time: number, medals?: TrackDef["medals"]) {
+  return medalFromTimes(medals ?? getTrackDef(id).medals, time);
 }
 
 export type MedalPace = {
@@ -1480,13 +1483,12 @@ export type MedalPace = {
 };
 
 /** During a run: the medal you are still on pace for, and ms until it drops. */
-export function medalPace(id: TrackId, time: number): MedalPace {
-  const m = getTrackDef(id).medals;
+export function medalPaceFromTimes(medals: TrackDef["medals"], time: number): MedalPace {
   const ladder: { id: Medal; at: number }[] = [
-    { id: "author", at: m.author },
-    { id: "gold", at: m.gold },
-    { id: "silver", at: m.silver },
-    { id: "bronze", at: m.bronze },
+    { id: "author", at: medals.author },
+    { id: "gold", at: medals.gold },
+    { id: "silver", at: medals.silver },
+    { id: "bronze", at: medals.bronze },
   ];
   const lost: Medal[] = [];
   for (const rung of ladder) {
@@ -1496,4 +1498,8 @@ export function medalPace(id: TrackId, time: number): MedalPace {
     lost.push(rung.id);
   }
   return { holding: null, remain: null, lost };
+}
+
+export function medalPace(id: TrackId, time: number, medals?: TrackDef["medals"]): MedalPace {
+  return medalPaceFromTimes(medals ?? getTrackDef(id).medals, time);
 }

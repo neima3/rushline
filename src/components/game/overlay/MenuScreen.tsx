@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Car, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Volume2, VolumeX } from "lucide-react";
+import { Car, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Users, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
+import { resolveRaceLaps } from "@/game/laps";
 import { allTrackDefs, getTrackDef, medalFor } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
 import { COPY } from "@/game/help";
@@ -21,6 +22,8 @@ type Props = {
   pad: { connected: boolean; xbox: boolean; active: boolean };
   onStart: () => void;
   onTracks: () => void;
+  onHotseat: () => void;
+  hotseatSelect?: boolean;
   onCup: () => void;
   cupLabel: string;
   onBack: () => void;
@@ -47,6 +50,8 @@ export function MenuScreen({
   pad,
   onStart,
   onTracks,
+  onHotseat,
+  hotseatSelect,
   onCup,
   cupLabel,
   onBack,
@@ -65,6 +70,7 @@ export function MenuScreen({
   const trackId = useGame((s) => s.trackId);
   const featured = getTrackDef(trackId);
   const imports = useGame((s) => s.imports);
+  const stockLaps = useGame((s) => s.settings.stockLaps);
 
   return (
     <div
@@ -110,6 +116,20 @@ export function MenuScreen({
             >
               <span className="text-sm font-medium">Rush Cup</span>
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{cupLabel}</span>
+            </button>
+            <button
+              type="button"
+              data-hotseat
+              onClick={onHotseat}
+              className="flex h-14 flex-col items-start justify-center rounded-lg border border-border bg-surface px-5 text-left text-fg transition-colors hover:bg-bg-elevated"
+            >
+              <span className="inline-flex items-center gap-2 text-sm font-medium">
+                <Users className="size-4" />
+                Hotseat
+              </span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+                P1 then P2 · same circuit · ghosts
+              </span>
             </button>
             <button
               type="button"
@@ -165,7 +185,9 @@ export function MenuScreen({
           </div>
         ) : (
           <div className="overlay-stagger-2 flex flex-col gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">{COPY.selectEyebrow}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
+              {hotseatSelect ? COPY.selectHotseatEyebrow : COPY.selectEyebrow}
+            </p>
             {allTrackDefs().map((t, i) => {
               const pb = best[t.id];
               const last = lastTimes[t.id];
@@ -190,7 +212,16 @@ export function MenuScreen({
                       ) : null}
                     </span>
                     <span className="mt-1 text-[11px] uppercase tracking-[0.16em] text-subtle">
-                      {TRACK_ENV_LABEL[t.env]} · {t.laps} {t.laps === 1 ? "lap" : "laps"}
+                      {TRACK_ENV_LABEL[t.env]} ·{" "}
+                      {(() => {
+                        const laps = resolveRaceLaps({
+                          trackId: t.id,
+                          authored: t.laps,
+                          setting: stockLaps,
+                          playMode: hotseatSelect ? "hotseat" : "trial",
+                        });
+                        return `${laps} ${laps === 1 ? "lap" : "laps"}`;
+                      })()}
                     </span>
                     <span className="mt-1 text-xs text-muted">{t.blurb}</span>
                     <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">

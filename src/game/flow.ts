@@ -2,6 +2,7 @@ import {
   TRACK_ORDER,
   type GhostFrame,
   type GhostSource,
+  type HotseatResults,
   type Medal,
   type ResultsState,
   type ThemeId,
@@ -68,6 +69,10 @@ export function buildResults(input: {
   ghostSource?: GhostSource;
   lastTime?: number | null;
   recents?: number[];
+  validated?: boolean;
+  laps?: number;
+  medals?: ResultsState["medals"];
+  hotseat?: HotseatResults | null;
 }): ResultsState {
   const { time, trackId, prevBest, ghost, medal } = input;
   const isPb = prevBest == null || time < prevBest;
@@ -86,6 +91,10 @@ export function buildResults(input: {
     ghostDelta,
     hadGhost: ghostDelta != null,
     nextTrackId: nextTrackId(trackId),
+    validated: input.validated ?? true,
+    laps: input.laps ?? 1,
+    medals: input.medals ?? { author: 0, gold: 0, silver: 0, bronze: 0 },
+    hotseat: input.hotseat ?? null,
   };
 }
 
