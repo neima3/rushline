@@ -76,7 +76,7 @@ export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext,
               Retry vs last run
             </button>
           ) : null}
-          <button>
+          <button
             type="button"
             onMouseDown={keepPlayFocus}
             onClick={onNext}
