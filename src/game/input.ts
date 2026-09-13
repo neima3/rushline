@@ -23,6 +23,11 @@ const GAME_CODES = new Set([
   "Backspace",
   "Escape",
   "KeyP",
+  "KeyF",
+  "KeyQ",
+  "KeyE",
+  "Minus",
+  "Equal",
 ]);
 
 export class Input {
@@ -42,8 +47,9 @@ export class Input {
   private lastPadUse = 0;
   onPauseHotkey: (() => void) | null = null;
   onCameraHotkey: (() => void) | null = null;
+  onPhotoHotkey: (() => void) | null = null;
   onPadChange: ((info: PadInfo, reason: PadHotPlug) => void) | null = null;
-  private queued = { pause: false, camera: false, respawn: false };
+  private queued = { pause: false, camera: false, respawn: false, photo: false };
   private brakeLatchUntil = 0;
   private edgePrev = {
     respawn: false,
@@ -52,6 +58,7 @@ export class Input {
     camera: false,
     confirm: false,
     back: false,
+    photo: false,
   };
   private surface: HTMLElement | null = null;
   private lastKeyStamp = -1;
@@ -86,6 +93,14 @@ export class Input {
             this.edgePrev.camera = true;
           } else {
             this.queued.camera = true;
+          }
+        }
+        if (e.code === "KeyF") {
+          if (this.onPhotoHotkey) {
+            this.onPhotoHotkey();
+            this.edgePrev.photo = true;
+          } else {
+            this.queued.photo = true;
           }
         }
         if (e.code === "KeyR") this.queued.respawn = true;
@@ -245,15 +260,18 @@ export class Input {
     const respawnNow = this.down("KeyR") || Boolean(gp?.y);
     const restartNow = this.down("Enter") || this.down("Backspace");
     const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
-    const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view);
+    const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view && !gp?.lb);
+    const photoNow = this.down("KeyF") || Boolean(gp?.lb && gp?.view);
 
     const respawn = this.queued.respawn || (respawnNow && !this.edgePrev.respawn);
     const restart = restartNow && !this.edgePrev.restart;
     const pause = this.queued.pause || (pauseNow && !this.edgePrev.pause);
     const camera = this.queued.camera || (cameraNow && !this.edgePrev.camera);
+    const photo = this.queued.photo || (photoNow && !this.edgePrev.photo);
     this.queued.pause = false;
     this.queued.camera = false;
     this.queued.respawn = false;
+    this.queued.photo = false;
     const confirm = confirmNow && !this.edgePrev.confirm;
     const back = backNow && !this.edgePrev.back;
     this.edgePrev = {
@@ -263,6 +281,7 @@ export class Input {
       camera: cameraNow,
       confirm: confirmNow,
       back: backNow,
+      photo: photoNow,
     };
 
     return {
@@ -276,7 +295,14 @@ export class Input {
       camera,
       confirm,
       back,
+      photo,
       menuY,
     };
+  }
+
+  get zoomHeld() {
+    if (this.down("KeyE") || this.down("Equal")) return 1;
+    if (this.down("KeyQ") || this.down("Minus")) return -1;
+    return 0;
   }
 }

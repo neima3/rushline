@@ -27,6 +27,7 @@ Each track has author / gold / silver / bronze medal times, checkpoints, boost p
 | Slide | Space or Shift | LB / L1 / X |
 | Respawn | R | Y / Triangle |
 | Camera | C | View / Share / RB |
+| Photo mode | F | LB + View |
 | Pause | Esc or P | Menu / Start / Options |
 
 Stick and triggers use an inner deadzone (16% stick, 8% trigger) so a resting pad does not steal keyboard or touch. Hot-plug is live: connecting a pad shows an on-screen hint; keyboard, touch, and Track Assist stay unchanged.
@@ -37,6 +38,7 @@ A personal-best ghost is saved with the time. If that ghost is missing or too th
 - **Left pad** — steer
 - **Right buttons** — accel / brake / slide / respawn
 - Auto-throttle is on by default on touch devices
+- Photo mode (from the camera button, pause, or results) hides the HUD — drag to orbit and Capture saves a PNG
 
 ## Run locally
 

@@ -1,5 +1,5 @@
 import type { BuiltTrack, CameraMode, CarSnap, GhostFrame, GhostPref, Phase, TrackId } from "./types";
-import { getTrack, medalFor, medalPace } from "./track";
+import { getTrack, medalFor, medalPace, sampleAt } from "./track";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
@@ -18,6 +18,18 @@ import { World } from "./scene";
 import { Input } from "./input";
 import { GameAudio, muteFromSearch } from "./audio";
 import { buildResults } from "./flow";
+import {
+  defaultPhotoOrbit,
+  downloadBlob,
+  ghostScrubSpan,
+  ghostScrubTime,
+  nudgePhotoOrbit,
+  PHOTO_PITCH_RATE,
+  PHOTO_YAW_RATE,
+  PHOTO_ZOOM_RATE,
+  stillFilename,
+  type PhotoOrbit,
+} from "./photo";
 import { applyRunCommit, readLastSave, readSave, TRACK_ORDER, useGame } from "./store";
 import type { Settings } from "./settings";
 import { type GraphicsKnobs, type QualityTier } from "./quality";
@@ -77,6 +89,11 @@ export class Game {
   private frames = 0;
   private fpsAt = 0;
   private tabHidden = false;
+  private photoMode = false;
+  private photoFrom: Phase | null = null;
+  private photoOrbit: PhotoOrbit = defaultPhotoOrbit();
+  private photoScrub = 1;
+  private photoFollowGhost = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -98,8 +115,16 @@ export class Game {
       else if (this.phase === "paused") this.resume();
     };
     this.input.onCameraHotkey = () => {
+      if (this.photoMode) {
+        this.photoOrbit = defaultPhotoOrbit();
+        return;
+      }
       if (this.phase === "menu" || this.phase === "select") return;
       this.setCamera(this.camera === "chase" ? "hood" : "chase");
+    };
+    this.input.onPhotoHotkey = () => {
+      if (useGame.getState().settingsOpen) return;
+      this.togglePhoto();
     };
     this.audio.attach();
     if (muteFromSearch(window.location.search)) this.setMuted(true);
@@ -313,6 +338,7 @@ export class Game {
   }
 
   startRace(id?: TrackId, pref: GhostPref = "auto") {
+    this.clearPhoto();
     this.ghostPref = pref;
     if (id) this.load(id);
     else this.load(this.trackId);
@@ -385,6 +411,7 @@ export class Game {
   }
 
   menu() {
+    this.clearPhoto();
     this.phase = "menu";
     this.audio.setScene("menu");
     this.countdown = -1;
@@ -447,8 +474,11 @@ export class Game {
 
     if (store.settingsOpen) {
       if (actions.back || actions.confirm || actions.pause) useGame.getState().setSettingsOpen(false);
+    } else if (this.photoMode) {
+      this.handlePhotoPad(actions, dt);
     } else {
       this.handleMenuPad(actions);
+      if (actions.photo) this.togglePhoto();
       if (actions.pause && (this.phase === "race" || this.phase === "countdown")) this.pause();
       else if (actions.pause && this.phase === "paused") this.resume();
       if (actions.camera) this.setCamera(this.camera === "chase" ? "hood" : "chase");
@@ -458,8 +488,8 @@ export class Game {
       if (actions.respawn && (this.phase === "race" || this.phase === "countdown")) this.applyRespawn();
     }
 
-    const simulate = this.phase === "race" || this.phase === "countdown";
-    if (this.phase === "countdown") {
+    const simulate = !this.photoMode && (this.phase === "race" || this.phase === "countdown");
+    if (!this.photoMode && this.phase === "countdown") {
       const prevC = Math.ceil(this.countdown);
       this.countdown = countdownRemaining(this.countdownAt, now);
       const nextC = Math.ceil(this.countdown);
@@ -542,15 +572,20 @@ export class Game {
 
     const alpha = Math.max(0, Math.min(1, this.acc / FIXED_DT));
     const vis = lerpSnap(this.prev, this.curr, alpha);
-    this.world.applyCar(vis, dt, actions.steer, actions.brake);
+    this.world.applyCar(vis, this.photoMode ? 0 : dt, this.photoMode ? 0 : actions.steer, this.photoMode ? 0 : actions.brake);
     this.car.clearFeelPulses();
-    this.world.applyGhost(this.track, this.ghost, this.time, this.car.s, this.ghostSmooth);
-    this.world.stepParticles(dt);
-    const attract = this.phase === "menu" || this.phase === "select";
-    this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
-    this.audio.setScene(this.phase);
-    const racing = this.phase === "race" || this.phase === "countdown";
-    this.audio.setEngine(vis.speed, actions.throttle, vis.boost, vis.airborne, vis.slide, racing);
+    const ghostTime = this.photoGhostTime() ?? this.time;
+    this.world.applyGhost(this.track, this.ghost, ghostTime, this.car.s, this.ghostSmooth);
+    this.world.stepParticles(this.photoMode ? 0 : dt);
+    const attract = !this.photoMode && (this.phase === "menu" || this.phase === "select");
+    if (this.photoMode) {
+      this.world.applyPhotoCamera(this.photoLookTarget(vis), this.photoOrbit);
+    } else {
+      this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
+    }
+    this.audio.setScene(this.photoMode ? "paused" : this.phase);
+    const racing = !this.photoMode && (this.phase === "race" || this.phase === "countdown");
+    this.audio.setEngine(vis.speed, this.photoMode ? 0 : actions.throttle, vis.boost, vis.airborne, vis.slide, racing);
     if (!this.world.contextLost) this.world.render();
 
     this.frames++;
@@ -620,6 +655,7 @@ export class Game {
   }
 
   private onFinish() {
+    this.clearPhoto();
     const time = this.time;
     const prevBest = readSave().best[this.trackId] ?? null;
     const priorGhost = this.ghost;
@@ -666,6 +702,136 @@ export class Game {
 
   setTouchSlide(v: number) {
     this.input.touchSlide = v;
+  }
+
+  enterPhoto() {
+    if (this.photoMode) return;
+    if (useGame.getState().settingsOpen) return;
+    if (this.phase !== "race" && this.phase !== "countdown" && this.phase !== "paused" && this.phase !== "results") {
+      return;
+    }
+    if (this.phase === "race") this.timeHold = this.time;
+    if (this.phase === "countdown") {
+      this.countdown = Math.max(0, countdownRemaining(this.countdownAt, performance.now(), COUNTDOWN_S));
+    }
+    this.photoFrom = this.phase;
+    this.photoMode = true;
+    this.photoOrbit = defaultPhotoOrbit();
+    this.photoFollowGhost = false;
+    this.photoScrub = this.phase === "results" ? 1 : this.photoScrubFromRace();
+    const canGhost = this.phase === "results" && ghostScrubSpan(this.ghost) != null;
+    useGame.getState().setPhotoMode(true);
+    useGame.getState().setPhotoGhost(canGhost);
+    useGame.getState().setPhotoScrub(this.photoScrub);
+    useGame.getState().setPhotoFollowGhost(false);
+    useGame.getState().setPhotoCapturing(false);
+    this.input.touchSteer = 0;
+    this.input.touchThrottle = 0;
+    this.input.touchBrake = 0;
+    this.input.touchSlide = 0;
+  }
+
+  exitPhoto() {
+    if (!this.photoMode) return;
+    const from = this.photoFrom;
+    this.clearPhoto();
+    const now = performance.now();
+    this.lastT = now;
+    if (from === "race") this.raceClockAt = now;
+    if (from === "countdown") this.countdownAt = countdownPausedAt(now, this.countdown, COUNTDOWN_S);
+    this.capturePlayFocus();
+  }
+
+  togglePhoto() {
+    if (this.photoMode) this.exitPhoto();
+    else this.enterPhoto();
+  }
+
+  nudgePhoto(dyaw: number, dpitch: number, dzoom = 0) {
+    if (!this.photoMode) return;
+    this.photoOrbit = nudgePhotoOrbit(this.photoOrbit, dyaw, dpitch, dzoom);
+  }
+
+  setPhotoScrub(u: number) {
+    this.photoScrub = Math.max(0, Math.min(1, u));
+    useGame.getState().setPhotoScrub(this.photoScrub);
+  }
+
+  setPhotoFollowGhost(v: boolean) {
+    this.photoFollowGhost = v && ghostScrubSpan(this.ghost) != null;
+    useGame.getState().setPhotoFollowGhost(this.photoFollowGhost);
+  }
+
+  async capturePhoto(): Promise<boolean> {
+    if (!this.photoMode || this.world.contextLost) return false;
+    const store = useGame.getState();
+    store.setPhotoCapturing(true);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const blob = await this.world.captureStill();
+    store.setPhotoCapturing(false);
+    if (!blob) return false;
+    return downloadBlob(blob, stillFilename(this.trackId));
+  }
+
+  private clearPhoto() {
+    this.photoMode = false;
+    this.photoFrom = null;
+    this.photoFollowGhost = false;
+    this.photoOrbit = defaultPhotoOrbit();
+    useGame.getState().setPhotoMode(false);
+    useGame.getState().setPhotoCapturing(false);
+    useGame.getState().setPhotoGhost(false);
+    useGame.getState().setPhotoFollowGhost(false);
+  }
+
+  private photoScrubFromRace() {
+    const span = ghostScrubSpan(this.ghost);
+    if (!span) return 1;
+    return Math.max(0, Math.min(1, (this.time - span.start) / (span.end - span.start)));
+  }
+
+  private photoGhostTime() {
+    if (!this.photoMode || this.phase !== "results") return null;
+    return ghostScrubTime(this.ghost, this.photoScrub);
+  }
+
+  private photoLookTarget(vis: CarSnap) {
+    if (this.photoFollowGhost && this.phase === "results") {
+      const t = ghostScrubTime(this.ghost, this.photoScrub);
+      const pose = t != null ? sampleGhost(this.ghost, t, this.track.length, this.track.def.closed) : null;
+      if (pose) {
+        const at = sampleAt(this.track, pose.s);
+        const ch = Math.cos(pose.heading);
+        const sh = Math.sin(pose.heading);
+        return {
+          px: at.x + at.rx * pose.n + at.ux * 0.38,
+          py: at.y + at.ry * pose.n + at.uy * 0.38,
+          pz: at.z + at.rz * pose.n + at.uz * 0.38,
+          fx: at.tx * ch - at.rx * sh,
+          fy: at.ty * ch - at.ry * sh,
+          fz: at.tz * ch - at.rz * sh,
+        };
+      }
+    }
+    return vis;
+  }
+
+  private handlePhotoPad(actions: { confirm: boolean; back: boolean; pause: boolean; camera: boolean; photo: boolean; steer: number; throttle: number; brake: number }, dt: number) {
+    if (actions.photo || actions.back || actions.pause) {
+      this.exitPhoto();
+      return;
+    }
+    if (actions.confirm) {
+      void this.capturePhoto();
+      return;
+    }
+    if (actions.camera) this.photoOrbit = defaultPhotoOrbit();
+    this.photoOrbit = nudgePhotoOrbit(
+      this.photoOrbit,
+      actions.steer * PHOTO_YAW_RATE * dt,
+      (actions.throttle - actions.brake) * PHOTO_PITCH_RATE * dt,
+      this.input.zoomHeld * PHOTO_ZOOM_RATE * dt,
+    );
   }
 
   private handleMenuPad(actions: { confirm: boolean; back: boolean; menuY: number }) {
@@ -736,6 +902,7 @@ export class Game {
   }
 
   dispose() {
+    this.clearPhoto();
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.raf = 0;

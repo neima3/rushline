@@ -11,9 +11,10 @@ type Props = {
   onRetryLast?: () => void;
   onNext: () => void;
   onMenu: () => void;
+  onPhoto?: () => void;
 };
 
-export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext, onMenu }: Props) {
+export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext, onMenu, onPhoto }: Props) {
   const track = TRACK_DEFS[results.trackId];
   const pbDelta = results.prevBest == null ? null : results.time - results.prevBest;
   const headline = resultsHeadline(results.medal, results.isPb);
@@ -84,6 +85,16 @@ export function ResultsScreen({ results, nextName, onRetry, onRetryLast, onNext,
           >
             Next · {nextName}
           </button>
+          {onPhoto ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onPhoto}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Photo
+            </button>
+          ) : null}
           <button
             type="button"
             onMouseDown={keepPlayFocus}

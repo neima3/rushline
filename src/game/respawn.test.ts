@@ -15,6 +15,7 @@ const idle = {
   camera: false,
   confirm: false,
   back: false,
+  photo: false,
   menuY: 0,
 };
 

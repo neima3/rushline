@@ -70,6 +70,7 @@ export type Actions = {
   camera: boolean;
   confirm: boolean;
   back: boolean;
+  photo: boolean;
   menuY: number;
 };
 
