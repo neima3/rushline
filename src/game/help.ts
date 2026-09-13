@@ -82,7 +82,7 @@ export const FEATURE_MAP: FeatureMapRow[] = [
     id: "surfaces",
     name: "Surfaces",
     blurb:
-      "Plastic slides, dirt bites late, ice is icy, tech sticks. The HUD chip names the ribbon under the car.",
+      "Plastic slides, dirt bites late, ice is icy, tech sticks. Each kind has its own ribbon material. The HUD chip names what's under the car.",
   },
   {
     id: "cameras",
@@ -225,7 +225,7 @@ export const COPY = {
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
     "C cycles Chase → Far → Hood → Cabin. All four stay usable at speed.",
     "Garage paint is cosmetic only. Steering Slow/Normal/Fast and audio mix live under Settings.",
-    "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
+    "Surfaces change grip and paint: plastic slides, dirt bites late, ice is icy, tech sticks.",
     "Ghost share — export a PB or last-run JSON from Results or Tracks, then import a rival to race that circuit.",
     "After a finish, Watch replay plays that tape as a spectator — last run, shipped author ghost, PB, imported rival, or a hotseat tape.",
   ],
