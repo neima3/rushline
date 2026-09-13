@@ -1,5 +1,5 @@
 import type { TrackAssist } from "./settings";
-import type { Medal, TrackId } from "./types";
+import type { Medal, SurfaceKind, TrackId } from "./types";
 
 export type { TrackAssist };
 
@@ -30,6 +30,49 @@ export const TOUCH_STEER_DEADZONE = 0.12;
 export const BRAKE_HIT_SLOP = 16;
 export const PAD_HIT_SLOP = 8;
 export const CIRCUIT_CURB_S = 240;
+
+export const SURFACE_LABEL: Record<SurfaceKind, string> = {
+  plastic: "Plastic",
+  dirt: "Dirt",
+  ice: "Ice",
+  tech: "Tech",
+};
+
+/** Grip / slide / drive multipliers. Plastic is the shipped Circuit baseline. */
+export type SurfaceFeel = {
+  grip: number;
+  slideEntry: number;
+  accel: number;
+  brake: number;
+  drag: number;
+  turn: number;
+  yaw: number;
+};
+
+const SURFACE_FEEL: Record<SurfaceKind, SurfaceFeel> = {
+  plastic: { grip: 1, slideEntry: 1, accel: 1, brake: 0.97, drag: 1, turn: 1.03, yaw: 1.05 },
+  dirt: { grip: 0.62, slideEntry: 0.5, accel: 0.8, brake: 0.74, drag: 1.24, turn: 1.14, yaw: 1.2 },
+  ice: { grip: 0.34, slideEntry: 0.32, accel: 0.88, brake: 0.46, drag: 0.76, turn: 1.28, yaw: 1.42 },
+  tech: { grip: 1.1, slideEntry: 1.14, accel: 1.04, brake: 1.06, drag: 0.94, turn: 0.94, yaw: 0.92 },
+};
+
+export function defaultSurface(id: TrackId): SurfaceKind {
+  switch (id) {
+    case "canyon":
+      return "dirt";
+    case "summit":
+      return "ice";
+    case "helix":
+    case "yard":
+      return "tech";
+    default:
+      return "plastic";
+  }
+}
+
+export function surfaceFeel(kind: SurfaceKind = "plastic"): SurfaceFeel {
+  return SURFACE_FEEL[kind] ?? SURFACE_FEEL.plastic;
+}
 
 export function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
@@ -304,16 +347,22 @@ export function steerBite(steerAbs: number): number {
  * TM dirt / plastic: once Slide + steer commits, stay in the slide until
  * Slide is released. A brief steer dip must not dump you back to grip.
  */
-export function slideCommitted(slideHeld: boolean, steerAbs: number, speedAbs: number, latched: boolean): boolean {
+export function slideCommitted(
+  slideHeld: boolean,
+  steerAbs: number,
+  speedAbs: number,
+  latched: boolean,
+  entry = 1,
+): boolean {
   if (!slideHeld || speedAbs < 6.5) return false;
   if (latched) return true;
-  return steerAbs > driftSteerThreshold(true) && speedAbs > 8;
+  const gate = driftSteerThreshold(true) * Math.max(0.18, entry);
+  return steerAbs > gate && speedAbs > 8;
 }
 
-export function slideYawLimit(drifting: boolean, slideHeld: boolean): number {
-  if (drifting) return 0.88;
-  if (slideHeld) return 0.5;
-  return 0.33;
+export function slideYawLimit(drifting: boolean, slideHeld: boolean, yawScale = 1): number {
+  const base = drifting ? 0.88 : slideHeld ? 0.5 : 0.33;
+  return base * yawScale;
 }
 
 /** Catch the slide on release — snap back to grip instead of sticky mush. */

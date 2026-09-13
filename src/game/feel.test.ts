@@ -37,7 +37,9 @@ import {
   slideCommitted,
   slideReleaseSnap,
   slideYawLimit,
+  defaultSurface,
   stayPlanted,
+  surfaceFeel,
   steerBite,
   steerCurve,
   steerFilter,
@@ -293,6 +295,36 @@ describe("slide commit / exit", () => {
     assert.ok(slideYawLimit(true, true) > slideYawLimit(false, true));
     assert.ok(slideReleaseSnap(true, 0) > 6);
     assert.equal(slideReleaseSnap(false, 0), 0);
+  });
+});
+
+describe("surface grip types", () => {
+  it("orders ice < dirt < plastic < tech on grip, brake, and slide entry", () => {
+    const ice = surfaceFeel("ice");
+    const dirt = surfaceFeel("dirt");
+    const plastic = surfaceFeel("plastic");
+    const tech = surfaceFeel("tech");
+    assert.ok(ice.grip < dirt.grip && dirt.grip < plastic.grip && plastic.grip < tech.grip);
+    assert.ok(ice.brake < dirt.brake && dirt.brake < plastic.brake && plastic.brake < tech.brake);
+    assert.ok(ice.slideEntry < dirt.slideEntry && dirt.slideEntry < plastic.slideEntry && plastic.slideEntry < tech.slideEntry);
+    assert.ok(dirt.accel < ice.accel && ice.accel < plastic.accel && plastic.accel < tech.accel);
+    assert.ok(ice.turn > plastic.turn && tech.turn < plastic.turn);
+  });
+
+  it("maps each shipped track to its default ribbon", () => {
+    assert.equal(defaultSurface("circuit"), "plastic");
+    assert.equal(defaultSurface("canyon"), "dirt");
+    assert.equal(defaultSurface("helix"), "tech");
+    assert.equal(defaultSurface("summit"), "ice");
+    assert.equal(defaultSurface("yard"), "tech");
+  });
+
+  it("lets ice commit a slide with less steer than plastic", () => {
+    const ice = surfaceFeel("ice").slideEntry;
+    const plastic = surfaceFeel("plastic").slideEntry;
+    assert.equal(slideCommitted(true, 0.2, 14, false, plastic), false);
+    assert.equal(slideCommitted(true, 0.2, 14, false, ice), true);
+    assert.equal(slideCommitted(true, 0.08, 14, false, ice), false);
   });
 });
 

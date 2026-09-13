@@ -71,6 +71,7 @@ export const COPY = {
     "Rush Cup — Gold on all five, then Author. Next challenge unlocks in order.",
     "Hold Backspace or LB+Y to rewind the last few seconds. Allowed in time trial and Rush Cup — a finish after rewind can still be a PB.",
     "Garage paint is cosmetic only. Audio mix is under Settings.",
+    "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
   ],
   noMedal: "No medal this run. Bronze is the next target.",
   overlayError: "Overlay error",

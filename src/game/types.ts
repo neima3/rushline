@@ -16,6 +16,11 @@ export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard";
 
 export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit", "yard"];
 
+/** Trackmania-style ribbon materials. Distinct grip, not just paint. */
+export type SurfaceKind = "plastic" | "dirt" | "ice" | "tech";
+
+export const SURFACE_ORDER: SurfaceKind[] = ["plastic", "dirt", "ice", "tech"];
+
 export type TrackNode = {
   x: number;
   y: number;
@@ -24,6 +29,7 @@ export type TrackNode = {
   bank: number;
   boost?: boolean;
   checkpoint?: boolean;
+  surface?: SurfaceKind;
 };
 
 export type TrackDef = {
@@ -35,6 +41,7 @@ export type TrackDef = {
   closed: boolean;
   thumb: string;
   medals: { author: number; gold: number; silver: number; bronze: number };
+  defaultSurface: SurfaceKind;
   nodes: TrackNode[];
 };
 
@@ -55,6 +62,7 @@ export type Sample = {
   s: number;
   boost: boolean;
   checkpoint: boolean;
+  surface: SurfaceKind;
 };
 
 export type BuiltTrack = {
@@ -108,6 +116,7 @@ export type CarSnap = {
   justTurbo: boolean;
   justLand: boolean;
   justBoost: boolean;
+  surface: SurfaceKind;
   fx: number;
   fy: number;
   fz: number;
@@ -140,6 +149,7 @@ export type HudState = {
   cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
   rewinding: boolean;
   rewindRemainMs: number;
+  surface: SurfaceKind;
 };
 
 export type GhostSource = "pb" | "last" | "none";

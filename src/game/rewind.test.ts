@@ -57,6 +57,7 @@ function car(s: number): RewindCar {
     airBlend: 0,
     recoverLock: 0,
     boostPunch: 0,
+    surface: "plastic",
   };
 }
 

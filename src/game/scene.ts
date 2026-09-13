@@ -75,6 +75,7 @@ const _roadSample: Sample = {
   s: 0,
   boost: false,
   checkpoint: false,
+  surface: "plastic",
 };
 const _ghostSample: Sample = { ..._roadSample };
 

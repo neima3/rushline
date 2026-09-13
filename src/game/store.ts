@@ -68,6 +68,7 @@ const emptyHud = (): HudState => ({
   cpFlash: null,
   rewinding: false,
   rewindRemainMs: 0,
+  surface: "plastic",
 });
 
 const emptyPad = (): PadInfo => ({

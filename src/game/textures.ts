@@ -47,11 +47,20 @@ export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THRE
       const n = grit + blotch + ((x ^ y) & 3) * 2;
       const oil = Math.sin((x + y) * 0.08) * (theme === "stadium" ? 8 : theme === "alpine" ? 2 : theme === "works" ? 6 : 4);
       const seam = theme === "night" && (x % 64 < 2 || y % 64 < 2) ? 28 : 0;
+      const panel = theme === "works" && (x % 48 < 2 || y % 72 < 2) ? 18 : 0;
+      const iceStreak = theme === "alpine" ? Math.sin(y * 0.22) * 14 + Math.sin(x * 0.05) * 6 : 0;
+      const dirtRut = theme === "canyon" ? Math.sin(x * 0.11) * 12 + ((y >> 4) % 2 === 0 ? 6 : -4) : 0;
       const wear = theme === "stadium" ? Math.max(0, 10 - Math.abs(x - 128) * 0.08) : 0;
       const edgeGrime = theme === "stadium" ? Math.max(0, (Math.abs(x - 128) / 128) * 22) : 0;
-      d[i] = Math.max(0, Math.min(255, base[0] + n + oil - edgeGrime + seam + wear));
-      d[i + 1] = Math.max(0, Math.min(255, base[1] + n * 0.88 - edgeGrime + seam * 0.55 + wear * 0.7));
-      d[i + 2] = Math.max(0, Math.min(255, base[2] + n * 0.78 - oil - edgeGrime + seam + wear * 0.5));
+      d[i] = Math.max(0, Math.min(255, base[0] + n + oil - edgeGrime + seam + panel + iceStreak * 0.7 + dirtRut + wear));
+      d[i + 1] = Math.max(
+        0,
+        Math.min(255, base[1] + n * 0.88 - edgeGrime + seam * 0.55 + panel * 0.9 + iceStreak * 0.9 + dirtRut * 0.7 + wear * 0.7),
+      );
+      d[i + 2] = Math.max(
+        0,
+        Math.min(255, base[2] + n * 0.78 - oil - edgeGrime + seam + panel * 1.1 + iceStreak + dirtRut * 0.4 + wear * 0.5),
+      );
       d[i + 3] = 255;
     }
   }

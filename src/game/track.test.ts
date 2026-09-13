@@ -55,6 +55,24 @@ describe("White Pass", () => {
     assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
     assert.equal(TRACK_DEFS.helix.env, "night");
   });
+
+  it("tags each ribbon with a Trackmania surface kind", () => {
+    assert.equal(TRACK_DEFS.circuit.defaultSurface, "plastic");
+    assert.equal(TRACK_DEFS.canyon.defaultSurface, "dirt");
+    assert.equal(TRACK_DEFS.helix.defaultSurface, "tech");
+    assert.equal(TRACK_DEFS.summit.defaultSurface, "ice");
+    assert.equal(TRACK_DEFS.yard.defaultSurface, "tech");
+    const circuit = getTrack("circuit");
+    const canyon = getTrack("canyon");
+    const summit = getTrack("summit");
+    const yard = getTrack("yard");
+    assert.ok(circuit.samples.every((s) => s.surface === "plastic"));
+    assert.ok(summit.samples.every((s) => s.surface === "ice"));
+    assert.ok(yard.samples.every((s) => s.surface === "tech"));
+    assert.ok(canyon.samples.some((s) => s.surface === "plastic"));
+    assert.ok(canyon.samples.some((s) => s.surface === "dirt"));
+    assert.ok(canyon.samples.filter((s) => s.surface === "dirt").length > canyon.samples.length * 0.5);
+  });
 });
 
 describe("Arc Yard", () => {
