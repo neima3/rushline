@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { SurfaceKind, ThemeId } from "./types";
-import { surfaceAlbedoBase, surfaceRoughnessMid } from "./look";
+import { ASPHALT_BASE, surfaceAlbedoBase, surfaceRoughnessMid } from "./look";
 import { liveryDef, type LiveryId } from "./livery";
 
 export { ASPHALT_BASE, ROAD_TINT, roadCrown } from "./look";
