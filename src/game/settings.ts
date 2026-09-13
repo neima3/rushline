@@ -34,11 +34,14 @@ export type QualityProfile = {
   bloom: boolean;
   motionBlur: boolean;
   shadowMap: number;
+  shadowExtent: number;
   particleDensity: number;
   dprCap: number;
   fogNearMul: number;
   fogFarMul: number;
   cameraFar: number;
+  texSize: number;
+  anisotropy: number;
 };
 
 const QUALITY: Record<Quality, QualityProfile> = {
@@ -47,33 +50,42 @@ const QUALITY: Record<Quality, QualityProfile> = {
     bloom: false,
     motionBlur: false,
     shadowMap: 512,
+    shadowExtent: 40,
     particleDensity: 0.22,
     dprCap: 1,
     fogNearMul: 0.52,
     fogFarMul: 0.5,
     cameraFar: 280,
+    texSize: 128,
+    anisotropy: 1,
   },
   medium: {
     shadows: true,
     bloom: false,
     motionBlur: false,
-    shadowMap: 1024,
+    shadowMap: 512,
+    shadowExtent: 48,
     particleDensity: 0.55,
     dprCap: 1.5,
     fogNearMul: 0.78,
     fogFarMul: 0.72,
     cameraFar: 520,
+    texSize: 128,
+    anisotropy: 2,
   },
   high: {
     shadows: true,
     bloom: true,
     motionBlur: false,
     shadowMap: 1536,
+    shadowExtent: 70,
     particleDensity: 1,
     dprCap: 2,
     fogNearMul: 1,
     fogFarMul: 1,
     cameraFar: 900,
+    texSize: 256,
+    anisotropy: 8,
   },
 };
 

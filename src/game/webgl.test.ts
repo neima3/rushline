@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   MAX_DRAW_PIXELS,
+  MAX_DRAW_PIXELS_MOBILE,
   clampDrawingPixelRatio,
+  drawingPixelBudget,
   isGlContextLost,
   preferMsaa,
 } from "./webgl.ts";
@@ -36,6 +38,22 @@ describe("preferMsaa", () => {
     assert.equal(preferMsaa(1, false), true);
     assert.equal(preferMsaa(2, false), false);
     assert.equal(preferMsaa(1, true), false);
+  });
+
+  it("never enables MSAA on Low or Medium", () => {
+    assert.equal(preferMsaa(1, false, "low"), false);
+    assert.equal(preferMsaa(1, false, "medium"), false);
+    assert.equal(preferMsaa(1, false, "high"), true);
+  });
+});
+
+describe("drawingPixelBudget", () => {
+  it("tightens the Aw Snap budget on coarse pointers", () => {
+    assert.equal(drawingPixelBudget(false), MAX_DRAW_PIXELS);
+    assert.equal(drawingPixelBudget(true), MAX_DRAW_PIXELS_MOBILE);
+    assert.ok(MAX_DRAW_PIXELS_MOBILE < MAX_DRAW_PIXELS);
+    const dpr = clampDrawingPixelRatio(3, 2, 1180, 820, MAX_DRAW_PIXELS_MOBILE);
+    assert.ok(1180 * 820 * dpr * dpr <= MAX_DRAW_PIXELS_MOBILE * 1.01);
   });
 });
 

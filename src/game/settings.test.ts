@@ -48,6 +48,17 @@ describe("qualityProfile", () => {
     assert.equal(q.particleDensity, 1);
     assert.equal(q.cameraFar, 900);
     assert.equal(q.shadowMap, 1536);
+    assert.equal(q.shadowExtent, 70);
+    assert.equal(q.texSize, 256);
+    assert.equal(q.anisotropy, 8);
+  });
+
+  it("caps Medium shadow map and texture size", () => {
+    const q = qualityProfile("medium");
+    assert.ok(q.shadowMap <= 512);
+    assert.ok(q.texSize <= 128);
+    assert.ok(q.anisotropy <= 4);
+    assert.ok(q.shadowExtent < qualityProfile("high").shadowExtent);
   });
 });
 

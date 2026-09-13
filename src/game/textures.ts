@@ -18,18 +18,23 @@ function hash(i: number) {
   return x - Math.floor(x);
 }
 
-function tex(c: HTMLCanvasElement, repeat = 18) {
+export type TextureMakeOpts = {
+  size?: number;
+  anisotropy?: number;
+};
+
+function tex(c: HTMLCanvasElement, repeat = 18, anisotropy = 8) {
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
-  t.anisotropy = 8;
+  t.anisotropy = anisotropy;
   t.colorSpace = THREE.SRGBColorSpace;
   t.needsUpdate = true;
   return t;
 }
 
-export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
-  const size = 256;
+export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
+  const size = opts?.size ?? 256;
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
@@ -66,14 +71,14 @@ export function makeAsphaltTexture(theme: ThemeId): THREE.CanvasTexture {
     ctx.fillRect(hash(i + 2) * size, hash(i + 9) * size, 10 + hash(i) * 28, theme === "stadium" ? 1.6 : 1);
   }
   ctx.globalAlpha = 1;
-  const t = tex(c, theme === "night" ? 14 : 16);
+  const t = tex(c, theme === "night" ? 14 : 16, opts?.anisotropy ?? 8);
   t.repeat.set(1, 1);
   return t;
 }
 
 /** Roughness variation so High-quality asphalt reads grit vs oil, not a flat slab. */
-export function makeAsphaltRoughness(theme: ThemeId): THREE.CanvasTexture {
-  const size = 256;
+export function makeAsphaltRoughness(theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
+  const size = opts?.size ?? 256;
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
@@ -89,7 +94,7 @@ export function makeAsphaltRoughness(theme: ThemeId): THREE.CanvasTexture {
     }
   }
   ctx.putImageData(img, 0, 0);
-  const t = tex(c, 16);
+  const t = tex(c, 16, opts?.anisotropy ?? 8);
   t.colorSpace = THREE.NoColorSpace;
   t.repeat.set(1, 1);
   return t;
@@ -168,8 +173,8 @@ export function makeLiveryTexture(id: LiveryId, night = false): THREE.CanvasText
   return t;
 }
 
-export function makeGroundTexture(theme: ThemeId): THREE.CanvasTexture {
-  const size = 256;
+export function makeGroundTexture(theme: ThemeId, opts?: TextureMakeOpts): THREE.CanvasTexture {
+  const size = opts?.size ?? 256;
   const { c, ctx } = canvas(size);
   const img = ctx.createImageData(size, size);
   const d = img.data;
@@ -194,7 +199,7 @@ export function makeGroundTexture(theme: ThemeId): THREE.CanvasTexture {
     }
   }
   ctx.putImageData(img, 0, 0);
-  return tex(c, 48);
+  return tex(c, 48, opts?.anisotropy ?? 8);
 }
 
 export function makeMetalTexture(): THREE.CanvasTexture {
