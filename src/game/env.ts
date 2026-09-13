@@ -32,7 +32,7 @@ export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: 
   const mat = mesh.material as THREE.MeshStandardMaterial;
   mat.map = tex;
   mat.color.set(0xffffff);
-  mat.roughness = theme === "night" ? 0.92 : theme === "works" ? 0.88 : 0.95;
+  mat.roughness = theme === "night" ? 0.92 : theme === "works" ? 0.88 : theme === "grove" ? 0.9 : theme === "mesa" ? 0.97 : 0.95;
   mat.needsUpdate = true;
 }
 
@@ -47,6 +47,8 @@ export function buildEnvironment(track: BuiltTrack, theme: ThemeId): EnvBuild {
   else if (theme === "canyon") buildCanyon(track, group, geos, mats);
   else if (theme === "alpine") buildAlpine(track, group, geos, mats);
   else if (theme === "works") buildWorks(track, group, geos, mats, lights);
+  else if (theme === "mesa") buildMesa(track, group, geos, mats);
+  else if (theme === "grove") buildGrove(track, group, geos, mats, lights);
   else buildNight(track, group, geos, mats, lights);
 
   decorateTrackside(track, theme, group, geos, mats, lights);
@@ -687,6 +689,204 @@ function buildWorks(
   addHorizonHaze(group, geos, mats, 0xff7040, 0.11, ring + 74);
 }
 
+function buildMesa(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+) {
+  const ring = trackOutRadius(track) + 40;
+  const tableGeo = new THREE.CylinderGeometry(1, 1.15, 1, 7);
+  const sand = new THREE.MeshStandardMaterial({ color: 0xe8b060, roughness: 0.94 });
+  const clay = new THREE.MeshStandardMaterial({ color: 0xc46a28, roughness: 0.9 });
+  const placed: { x: number; y: number; z: number; sx: number; h: number; sz: number; ry: number; clay: boolean }[] = [];
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2 + hash(i) * 0.18;
+    let r = 100 + hash(i + 4) * 88;
+    const h = 16 + hash(i + 7) * 26;
+    const sx = 14 + hash(i + 1) * 12;
+    const sz = 14 + hash(i + 2) * 10;
+    let x = Math.cos(a) * r;
+    let z = Math.sin(a) * r;
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.9 + 22)) {
+      r = ring + 36 + hash(i) * 40;
+      x = Math.cos(a) * r;
+      z = Math.sin(a) * r;
+    }
+    if (overlapsTrack(track, x, z, Math.max(sx, sz) * 0.75 + 16)) continue;
+    placed.push({ x, y: h / 2 - 7, z, sx, h, sz, ry: a, clay: hash(i + 9) > 0.45 });
+  }
+  const sandTables = placed.filter((p) => !p.clay);
+  const clayTables = placed.filter((p) => p.clay);
+  const placeTables = (list: typeof placed, mat: THREE.Material) => {
+    const mesh = new THREE.InstancedMesh(tableGeo, mat, list.length);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i]!;
+      _dummy.position.set(p.x, p.y, p.z);
+      _dummy.scale.set(p.sx, p.h, p.sz);
+      _dummy.rotation.set(0, p.ry, 0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+    group.add(mesh);
+  };
+  placeTables(sandTables, sand);
+  placeTables(clayTables, clay);
+  geos.push(tableGeo);
+  mats.push(sand, clay);
+
+  const duneGeo = new THREE.IcosahedronGeometry(1, 0);
+  const duneMat = new THREE.MeshStandardMaterial({ color: 0xf0c878, roughness: 0.98 });
+  const dunes = new THREE.InstancedMesh(duneGeo, duneMat, 28);
+  dunes.castShadow = true;
+  dunes.receiveShadow = true;
+  let di = 0;
+  for (let i = 0; i < 28; i++) {
+    const sm = track.samples[Math.floor((i / 28) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 8 + hash(i) * 10;
+    const s = 1.4 + hash(i + 3) * 2.2;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + 0.28 * s, sm.z + sm.rz * side * d);
+    _dummy.scale.set(s, s * 0.42, s);
+    _dummy.rotation.set(hash(i) * 0.3, hash(i + 2) * 6, 0);
+    _dummy.updateMatrix();
+    dunes.setMatrixAt(di++, _dummy.matrix);
+  }
+  dunes.count = di;
+  group.add(dunes);
+  geos.push(duneGeo);
+  mats.push(duneMat);
+
+  const joshGeo = new THREE.CylinderGeometry(0.12, 0.2, 3.4, 5);
+  const joshMat = new THREE.MeshStandardMaterial({ color: 0x6a7040, roughness: 0.9 });
+  const armGeo = new THREE.CylinderGeometry(0.08, 0.1, 1.3, 5);
+  const n = 20;
+  const trunks = new THREE.InstancedMesh(joshGeo, joshMat, n);
+  const arms = new THREE.InstancedMesh(armGeo, joshMat, n);
+  trunks.castShadow = true;
+  for (let i = 0; i < n; i++) {
+    const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 7 + hash(i) * 9;
+    const x = sm.x + sm.rx * side * d;
+    const z = sm.z + sm.rz * side * d;
+    const s = 0.8 + hash(i + 4) * 0.7;
+    _dummy.position.set(x, sm.y + 1.5 * s, z);
+    _dummy.scale.set(s, s, s);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.updateMatrix();
+    trunks.setMatrixAt(i, _dummy.matrix);
+    _dummy.position.set(x + 0.55 * s, sm.y + 2.4 * s, z);
+    _dummy.rotation.set(0, 0, 0.9);
+    _dummy.updateMatrix();
+    arms.setMatrixAt(i, _dummy.matrix);
+  }
+  group.add(trunks, arms);
+  geos.push(joshGeo, armGeo);
+  mats.push(joshMat);
+
+  addTrackRocks(track, group, geos, mats, 0x8a4a22, 0xf0b058);
+  addHorizonHaze(group, geos, mats, 0xffd070, 0.16, ring + 86);
+}
+
+function buildGrove(
+  track: BuiltTrack,
+  group: THREE.Group,
+  geos: THREE.BufferGeometry[],
+  mats: THREE.Material[],
+  lights: THREE.Object3D[],
+) {
+  const ring = trackOutRadius(track) + 28;
+  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 4.2, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.94 });
+  const leafGeo = new THREE.ConeGeometry(1.7, 5.2, 7);
+  const leafDark = new THREE.MeshStandardMaterial({ color: 0x1a3c28, roughness: 0.9 });
+  const leafLite = new THREE.MeshStandardMaterial({
+    color: 0x2a5840,
+    roughness: 0.86,
+    emissive: 0x143820,
+    emissiveIntensity: 0.28,
+  });
+  const n = 64;
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, n);
+  const darkLeaves = new THREE.InstancedMesh(leafGeo, leafDark, n);
+  const liteLeaves = new THREE.InstancedMesh(leafGeo, leafLite, n);
+  trunks.castShadow = true;
+  darkLeaves.castShadow = true;
+  liteLeaves.castShadow = true;
+  let ti = 0;
+  let di = 0;
+  let li = 0;
+  for (let i = 0; i < n; i++) {
+    const sm = track.samples[Math.floor((i / n) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 3.8 + hash(i) * 5;
+    const x = sm.x + sm.rx * side * d;
+    const z = sm.z + sm.rz * side * d;
+    if (overlapsTrack(track, x, z, 3.2)) continue;
+    const s = 0.85 + hash(i + 5) * 0.85;
+    _dummy.position.set(x, sm.y + 1.9 * s, z);
+    _dummy.scale.set(s, s, s);
+    _dummy.rotation.set(0, hash(i) * 6, 0);
+    _dummy.updateMatrix();
+    trunks.setMatrixAt(ti++, _dummy.matrix);
+    _dummy.position.set(x, sm.y + 4.6 * s, z);
+    _dummy.updateMatrix();
+    if (i % 3 === 0) liteLeaves.setMatrixAt(li++, _dummy.matrix);
+    else darkLeaves.setMatrixAt(di++, _dummy.matrix);
+  }
+  trunks.count = ti;
+  darkLeaves.count = di;
+  liteLeaves.count = li;
+  group.add(trunks, darkLeaves, liteLeaves);
+  geos.push(trunkGeo, leafGeo);
+  mats.push(trunkMat, leafDark, leafLite);
+
+  addTrees(group, geos, mats, 40, ring + 6, ring + 58, 0x245438);
+
+  const mossGeo = new THREE.IcosahedronGeometry(0.9, 0);
+  const moss = new THREE.MeshStandardMaterial({ color: 0x1c3a24, roughness: 0.96 });
+  const fern = new THREE.MeshStandardMaterial({ color: 0x2a5030, roughness: 0.94 });
+  const underN = 36;
+  const mossMesh = new THREE.InstancedMesh(mossGeo, moss, underN);
+  const fernMesh = new THREE.InstancedMesh(mossGeo, fern, underN);
+  let mi = 0;
+  let fi = 0;
+  for (let i = 0; i < underN; i++) {
+    const sm = track.samples[Math.floor((i / underN) * track.samples.length)]!;
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 3.6 + hash(i + 2) * 5;
+    const s = 0.6 + hash(i + 4) * 0.9;
+    _dummy.position.set(sm.x + sm.rx * side * d, sm.y + 0.32 * s, sm.z + sm.rz * side * d);
+    _dummy.scale.set(s, s * 0.55, s);
+    _dummy.rotation.set(hash(i) * 0.4, hash(i + 3) * 6, 0);
+    _dummy.updateMatrix();
+    if (i % 2 === 0) mossMesh.setMatrixAt(mi++, _dummy.matrix);
+    else fernMesh.setMatrixAt(fi++, _dummy.matrix);
+  }
+  mossMesh.count = mi;
+  fernMesh.count = fi;
+  group.add(mossMesh, fernMesh);
+  geos.push(mossGeo);
+  mats.push(moss, fern);
+
+  let fireflies = 0;
+  for (let i = 0; i < 8 && fireflies < 5; i++) {
+    const sm = sampleAt(track, ((i + 0.3) / 8) * track.length);
+    const side = i % 2 === 0 ? 1 : -1;
+    const d = sm.width * 0.5 + 4.2;
+    const pl = new THREE.PointLight(i % 2 === 0 ? 0xa8e070 : 0x70d0a0, 0.72, 26, 2);
+    pl.position.set(sm.x + sm.rx * side * d + sm.ux * 2.4, sm.y + sm.uy * 2.4, sm.z + sm.rz * side * d + sm.uz * 2.4);
+    group.add(pl);
+    lights.push(pl);
+    fireflies++;
+  }
+
+  addHorizonHaze(group, geos, mats, 0x143828, 0.2, ring + 64);
+}
+
 function decorateTrackside(
   track: BuiltTrack,
   theme: ThemeId,
@@ -697,17 +897,50 @@ function decorateTrackside(
 ) {
   const lampGeo = new THREE.SphereGeometry(0.22, 8, 8);
   const lampMat = new THREE.MeshStandardMaterial({
-    color: theme === "night" ? 0xaad0ff : theme === "alpine" ? 0xe8f4ff : theme === "works" ? 0xffb060 : 0xfff0c8,
-    emissive: theme === "night" ? 0x6aa0ff : theme === "alpine" ? 0xc8e4ff : theme === "works" ? 0xff8a30 : 0xffe0a0,
-    emissiveIntensity: theme === "night" ? 1.8 : theme === "alpine" ? 1.05 : theme === "works" ? 1.25 : 0.9,
+    color:
+      theme === "night"
+        ? 0xaad0ff
+        : theme === "alpine"
+          ? 0xe8f4ff
+          : theme === "works"
+            ? 0xffb060
+            : theme === "mesa"
+              ? 0xffe090
+              : theme === "grove"
+                ? 0xb8f0c8
+                : 0xfff0c8,
+    emissive:
+      theme === "night"
+        ? 0x6aa0ff
+        : theme === "alpine"
+          ? 0xc8e4ff
+          : theme === "works"
+            ? 0xff8a30
+            : theme === "mesa"
+              ? 0xffc040
+              : theme === "grove"
+                ? 0x6ad080
+                : 0xffe0a0,
+    emissiveIntensity: theme === "night" ? 1.8 : theme === "alpine" ? 1.05 : theme === "works" ? 1.25 : theme === "mesa" ? 1.15 : theme === "grove" ? 1.4 : 0.9,
   });
   const poleGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.6, 6);
   const poleMat = new THREE.MeshStandardMaterial({
-    color: theme === "canyon" ? 0x5a4030 : theme === "alpine" ? 0x6a5a4a : theme === "works" ? 0x3a3228 : 0x2a2e36,
+    color:
+      theme === "canyon"
+        ? 0x5a4030
+        : theme === "alpine"
+          ? 0x6a5a4a
+          : theme === "works"
+            ? 0x3a3228
+            : theme === "mesa"
+              ? 0x6a4a28
+              : theme === "grove"
+                ? 0x1a2218
+                : 0x2a2e36,
     roughness: 0.5,
     metalness: 0.4,
   });
-  const step = Math.max(1, Math.floor(track.samples.length / (theme === "night" ? 36 : 22)));
+  const step = Math.max(1, Math.floor(track.samples.length / (theme === "night" ? 36 : theme === "grove" ? 28 : 22)));
   let realLights = 0;
   for (let i = 0; i < track.samples.length; i += step) {
     const sm = track.samples[i]!;
@@ -723,6 +956,13 @@ function decorateTrackside(
     group.add(pole, lamp);
     if (theme === "night" && realLights < 8) {
       const pl = new THREE.PointLight(0x8eb8ff, 1.0, 40, 2);
+      pl.position.copy(lamp.position);
+      group.add(pl);
+      lights.push(pl);
+      realLights++;
+    }
+    if (theme === "grove" && realLights < 6) {
+      const pl = new THREE.PointLight(0x88d898, 0.88, 32, 2);
       pl.position.copy(lamp.position);
       group.add(pl);
       lights.push(pl);
@@ -945,7 +1185,11 @@ function addContrastBarriers(
             ? 0xc8e6f6
             : theme === "works"
               ? 0x4ee8d4
-              : 0xf4d24a,
+              : theme === "mesa"
+                ? 0xffc050
+                : theme === "grove"
+                  ? 0x7ee090
+                  : 0xf4d24a,
     roughness: 0.28,
     metalness: 0.16,
     emissive:
@@ -957,8 +1201,12 @@ function addContrastBarriers(
             ? 0x204058
             : theme === "works"
               ? 0x146860
-              : 0x6a4a08,
-    emissiveIntensity: theme === "night" ? 0.85 : theme === "works" ? 0.55 : 0.28,
+              : theme === "mesa"
+                ? 0x5a2808
+                : theme === "grove"
+                  ? 0x145028
+                  : 0x6a4a08,
+    emissiveIntensity: theme === "night" ? 0.85 : theme === "works" ? 0.55 : theme === "grove" ? 0.48 : theme === "mesa" ? 0.32 : 0.28,
   });
   const dark = new THREE.MeshStandardMaterial({
     color: 0x14161c,

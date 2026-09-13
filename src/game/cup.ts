@@ -36,8 +36,8 @@ export type CupProgress = {
 export const CUP_ORDER: CupId[] = ["gold", "author"];
 
 export const CUP_META: Record<CupId, { name: string; blurb: string }> = {
-  gold: { name: "Gold Cup", blurb: "Gold or better on every circuit. Five events, in order." },
-  author: { name: "Author Cup", blurb: "Author times on the same five. Unlocks after Gold Cup." },
+  gold: { name: "Gold Cup", blurb: "Gold or better on every circuit. Seven events, in order." },
+  author: { name: "Author Cup", blurb: "Author times on the same seven. Unlocks after Gold Cup." },
 };
 
 const RANK: Record<Medal, number> = {
@@ -144,9 +144,18 @@ export function parseCup(raw: string | null | undefined): CupProgress {
       },
       medals,
       times,
-      goldComplete: parsed.goldComplete === true || isCupComplete({ ...empty, medals }, "gold"),
-      authorComplete: parsed.authorComplete === true || isCupComplete({ ...empty, medals }, "author"),
+      goldComplete: false,
+      authorComplete: false,
     };
+    for (const cupId of CUP_ORDER) {
+      for (const ev of CUP_EVENTS[cupId]) {
+        if (isEventCleared(next, ev) && ev.index + 1 < CUP_EVENTS[cupId].length) {
+          next.unlocked[cupId] = Math.max(next.unlocked[cupId], ev.index + 1);
+        }
+      }
+    }
+    next.goldComplete = isCupComplete(next, "gold");
+    next.authorComplete = isCupComplete(next, "author");
     if (next.goldComplete) next.unlocked.author = Math.max(next.unlocked.author, 0);
     return next;
   } catch {

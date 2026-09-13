@@ -1,6 +1,6 @@
 import type { LiveryId } from "./livery";
 
-export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works";
+export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works" | "mesa" | "grove";
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
@@ -12,9 +12,9 @@ export function isLobbyPhase(phase: Phase): boolean {
 
 export type CameraMode = "chase" | "far" | "hood" | "cockpit";
 
-export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard";
+export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard" | "mesa" | "hollow";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit", "yard"];
+export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"];
 
 /** Trackmania-style ribbon materials. Distinct grip, not just paint. */
 export type SurfaceKind = "plastic" | "dirt" | "ice" | "tech";

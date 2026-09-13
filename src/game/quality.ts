@@ -81,6 +81,8 @@ export type GraphicsKnobs = {
 export const SETTINGS_KEY = "rushline-settings-v1";
 export const NIGHT_FOG = { near: 88, far: 460 } as const;
 export const DAY_FOG = { near: 80, far: 440 } as const;
+/** Deep forest night — own window. Helix Night stays 88/460. */
+export const GROVE_FOG = { near: 46, far: 220 } as const;
 
 /** Settings #17 tier cost — particles / DPR / day fog scale. Night fog ignores muls. */
 export const SETTINGS_TIER_COST: Record<
@@ -206,6 +208,12 @@ export function fogWindow(
 ) {
   if (theme === "night") return { near: NIGHT_FOG.near, far: NIGHT_FOG.far };
   if (knobs?.fogEnabled === false) return { near: 2000, far: 4000 };
+  if (theme === "grove") {
+    return {
+      near: GROVE_FOG.near * (knobs?.fogNearMul ?? 1),
+      far: GROVE_FOG.far * (knobs?.fogFarMul ?? 1),
+    };
+  }
   return {
     near: DAY_FOG.near * (knobs?.fogNearMul ?? 1),
     far: DAY_FOG.far * (knobs?.fogFarMul ?? 1),
@@ -274,6 +282,28 @@ export function themeLightLevels(
       env: quality.environment ? 0.22 : 0,
       bloomMul: 0.34,
       bloomThreshold: Math.max(quality.bloomThreshold, 0.91),
+    };
+  }
+  if (theme === "mesa") {
+    // High-noon heat. Own ladder — Circuit High pull and Helix night stay locked.
+    return {
+      sun: 1.34,
+      hemi: 0.6,
+      exposure: 1.02,
+      env: quality.environment ? 0.14 : 0,
+      bloomMul: 0.2,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.95),
+    };
+  }
+  if (theme === "grove") {
+    // Moonlit canopy. Own fog + lights — never reuse Helix 88/460 or Circuit High.
+    return {
+      sun: 0.82,
+      hemi: 1.05,
+      exposure: 1.14,
+      env: quality.environment ? 0.22 : 0,
+      bloomMul: 0.4,
+      bloomThreshold: Math.min(quality.bloomThreshold, 0.84),
     };
   }
   const high = quality.tier === "high";

@@ -248,6 +248,28 @@ const THEMES: Record<ThemeId, ThemePack> = {
     sky: "",
     skyTint: 0xffe4d0,
   },
+  mesa: {
+    fog: 0xe8b868,
+    ground: 0xc48a3a,
+    hemiSky: 0xffe8b0,
+    hemiGround: 0x8a4a18,
+    sun: 0xfff0c0,
+    sunPos: [40, 140, 18],
+    exposure: 1.02,
+    sky: "",
+    skyTint: 0xfff4d8,
+  },
+  grove: {
+    fog: 0x1e3a2c,
+    ground: 0x1a2a1e,
+    hemiSky: 0x6a9878,
+    hemiGround: 0x243828,
+    sun: 0xd8f0e4,
+    sunPos: [-16, 54, -28],
+    exposure: 1.14,
+    sky: "",
+    skyTint: 0xe0f6ea,
+  },
 };
 
 export class World {
@@ -591,15 +613,27 @@ export class World {
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
     (this.scene.fog as THREE.Fog).color.set(pack.fog);
-    this.fogBase.near = theme === "night" ? 88 : 80;
-    this.fogBase.far = theme === "night" ? 460 : 440;
+    this.fogBase.near = theme === "night" ? 88 : theme === "grove" ? 46 : 80;
+    this.fogBase.far = theme === "night" ? 460 : theme === "grove" ? 220 : 440;
     this.applyFog();
     this.applyThemeLights(theme);
     this.tuneBloom(theme);
     this.post.setGrade(theme);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(pack.ground);
     this.ground.position.y =
-      theme === "canyon" ? -18 : theme === "night" ? -8 : theme === "alpine" ? -1.1 : theme === "works" ? -8 : -0.6;
+      theme === "canyon"
+        ? -18
+        : theme === "night"
+          ? -8
+          : theme === "alpine"
+            ? -1.1
+            : theme === "works"
+              ? -8
+              : theme === "mesa"
+                ? -10
+                : theme === "grove"
+                  ? -4
+                  : -0.6;
     const budget = textureBudget(this.quality.tier);
     applyGroundMaterial(this.ground, theme, this.textures, budget);
 
@@ -620,7 +654,7 @@ export class World {
     this.car.setTheme(theme);
     this.ghost.setTheme(theme);
     this.car.setLivery(this.livery);
-    this.car.setHeadlights(theme === "night");
+    this.car.setHeadlights(theme === "night" || theme === "grove");
     this.vfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog, pack.skyTint);
 
@@ -1097,21 +1131,43 @@ export class World {
     const nightFill = theme === "night" && this.quality.nightFills;
     const alpineFill = theme === "alpine" && this.quality.environment;
     const worksFill = theme === "works" && this.quality.environment;
+    const mesaFill = theme === "mesa" && this.quality.environment;
+    const groveFill = theme === "grove" && this.quality.nightFills;
     this.fill.color.set(
-      theme === "night" ? 0xb878d8 : theme === "alpine" ? 0xc8dcea : theme === "works" ? 0xff8a40 : 0x8ab4d8,
+      theme === "night"
+        ? 0xb878d8
+        : theme === "alpine"
+          ? 0xc8dcea
+          : theme === "works"
+            ? 0xff8a40
+            : theme === "mesa"
+              ? 0xffd080
+              : theme === "grove"
+                ? 0x68a878
+                : 0x8ab4d8,
     );
-    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : worksFill ? 0.22 : 0;
+    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : worksFill ? 0.22 : mesaFill ? 0.18 : groveFill ? 0.42 : 0;
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
     this.fill2.color.set(
-      theme === "night" ? 0xe890c8 : theme === "alpine" ? 0xe8f2fa : theme === "works" ? 0x3ee8d0 : 0xb8c8dc,
+      theme === "night"
+        ? 0xe890c8
+        : theme === "alpine"
+          ? 0xe8f2fa
+          : theme === "works"
+            ? 0x3ee8d0
+            : theme === "mesa"
+              ? 0xfff0c8
+              : theme === "grove"
+                ? 0xa8e0b8
+                : 0xb8c8dc,
     );
-    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : worksFill ? 0.14 : 0;
+    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : worksFill ? 0.14 : mesaFill ? 0.1 : groveFill ? 0.24 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {
       const pl = o as THREE.PointLight;
-      if (pl.isPointLight) pl.visible = this.quality.nightFills || theme !== "night";
+      if (pl.isPointLight) pl.visible = this.quality.nightFills || (theme !== "night" && theme !== "grove");
     }
   }
 

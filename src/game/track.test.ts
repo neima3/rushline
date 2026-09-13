@@ -48,7 +48,7 @@ describe("White Pass", () => {
 
   it("lists White Pass after the original three without rewriting them", () => {
     const ids = allTrackDefs().map((t) => t.id);
-    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard"]);
+    assert.deepEqual(ids.slice(0, 5), ["circuit", "canyon", "helix", "summit", "yard"]);
     assert.equal(TRACK_DEFS.circuit.name, "Green Circuit");
     assert.equal(TRACK_DEFS.canyon.name, "Ridge Drop");
     assert.equal(TRACK_DEFS.helix.name, "Night Helix");
@@ -62,16 +62,26 @@ describe("White Pass", () => {
     assert.equal(TRACK_DEFS.helix.defaultSurface, "tech");
     assert.equal(TRACK_DEFS.summit.defaultSurface, "ice");
     assert.equal(TRACK_DEFS.yard.defaultSurface, "tech");
+    assert.equal(TRACK_DEFS.mesa.defaultSurface, "dirt");
+    assert.equal(TRACK_DEFS.hollow.defaultSurface, "dirt");
     const circuit = getTrack("circuit");
     const canyon = getTrack("canyon");
     const summit = getTrack("summit");
     const yard = getTrack("yard");
+    const mesa = getTrack("mesa");
+    const hollow = getTrack("hollow");
     assert.ok(circuit.samples.every((s) => s.surface === "plastic"));
     assert.ok(summit.samples.every((s) => s.surface === "ice"));
     assert.ok(yard.samples.every((s) => s.surface === "tech"));
     assert.ok(canyon.samples.some((s) => s.surface === "plastic"));
     assert.ok(canyon.samples.some((s) => s.surface === "dirt"));
     assert.ok(canyon.samples.filter((s) => s.surface === "dirt").length > canyon.samples.length * 0.5);
+    assert.ok(mesa.samples.some((s) => s.surface === "dirt"));
+    assert.ok(mesa.samples.some((s) => s.surface === "plastic"));
+    assert.ok(mesa.samples.filter((s) => s.surface === "dirt").length > mesa.samples.length * 0.45);
+    assert.ok(hollow.samples.some((s) => s.surface === "dirt"));
+    assert.ok(hollow.samples.some((s) => s.surface === "tech"));
+    assert.ok(hollow.samples.filter((s) => s.surface === "dirt").length > hollow.samples.length * 0.4);
   });
 });
 
@@ -124,10 +134,106 @@ describe("Arc Yard", () => {
 
   it("lists Arc Yard after White Pass without rewriting the first four", () => {
     const ids = allTrackDefs().map((t) => t.id);
-    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard"]);
+    assert.deepEqual(ids.slice(0, 5), ["circuit", "canyon", "helix", "summit", "yard"]);
     assert.equal(TRACK_DEFS.summit.name, "White Pass");
     assert.equal(TRACK_DEFS.summit.env, "alpine");
     assert.equal(TRACK_DEFS.helix.env, "night");
     assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
+  });
+});
+
+describe("Red Mesa", () => {
+  it("compiles a closed mesa ribbon with checkpoints and boosts", () => {
+    const def = TRACK_DEFS.mesa;
+    assert.equal(def.name, "Red Mesa");
+    assert.equal(def.env, "mesa");
+    assert.equal(def.laps, 1);
+    assert.equal(def.closed, true);
+    assert.ok(def.thumb.includes("mesa"));
+
+    const track = getTrack("mesa");
+    assert.ok(track.samples.length > 80, `samples ${track.samples.length}`);
+    assert.ok(track.length > 800 && track.length < 1600, `length ${track.length}`);
+    assert.ok(track.checkpoints.length >= 3, `cps ${track.checkpoints.join(",")}`);
+    assert.ok(track.boosts.length >= 2, `boosts ${track.boosts.join(",")}`);
+    for (let i = 1; i < track.checkpoints.length; i++) {
+      assert.ok(track.checkpoints[i]! > track.checkpoints[i - 1]!, "checkpoints advance");
+    }
+    const first = track.samples[0]!;
+    const last = track.samples[track.samples.length - 1]!;
+    const seam = Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z);
+    assert.ok(seam < 18, `close seam ${seam}`);
+  });
+
+  it("has a rising medal ladder and ghost-ready save key", () => {
+    const m = TRACK_DEFS.mesa.medals;
+    assert.ok(m.author < m.gold && m.gold < m.silver && m.silver < m.bronze);
+    assert.equal(medalFor("mesa", m.author), "author");
+    assert.equal(medalFor("mesa", m.gold), "gold");
+    assert.equal(medalFor("mesa", m.silver), "silver");
+    assert.equal(medalFor("mesa", m.bronze), "bronze");
+    assert.equal(medalFor("mesa", m.bronze + 1), null);
+    const pace = medalPace("mesa", 0);
+    assert.equal(pace.holding, "author");
+    assert.ok((pace.remain ?? 0) > 0);
+  });
+
+  it("stores a Red Mesa ghost on the same save shape as the other tracks", () => {
+    const ghost = [
+      { t: 0, s: 6, n: 0, heading: 0 },
+      { t: 400, s: 18, n: 0.1, heading: 0 },
+    ];
+    const save = { version: 1 as const, best: { mesa: 33_200 }, ghosts: { mesa: ghost } };
+    assert.equal(save.best.mesa, 33_200);
+    assert.equal(save.ghosts.mesa?.length, 2);
+    assert.equal(medalFor("mesa", save.best.mesa), "gold");
+  });
+});
+
+describe("Black Hollow", () => {
+  it("compiles a closed grove ribbon with checkpoints and boosts", () => {
+    const def = TRACK_DEFS.hollow;
+    assert.equal(def.name, "Black Hollow");
+    assert.equal(def.env, "grove");
+    assert.equal(def.laps, 1);
+    assert.equal(def.closed, true);
+    assert.ok(def.thumb.includes("hollow"));
+
+    const track = getTrack("hollow");
+    assert.ok(track.samples.length > 80, `samples ${track.samples.length}`);
+    assert.ok(track.length > 800 && track.length < 1600, `length ${track.length}`);
+    assert.ok(track.checkpoints.length >= 3, `cps ${track.checkpoints.join(",")}`);
+    assert.ok(track.boosts.length >= 2, `boosts ${track.boosts.join(",")}`);
+    for (let i = 1; i < track.checkpoints.length; i++) {
+      assert.ok(track.checkpoints[i]! > track.checkpoints[i - 1]!, "checkpoints advance");
+    }
+    const first = track.samples[0]!;
+    const last = track.samples[track.samples.length - 1]!;
+    const seam = Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z);
+    assert.ok(seam < 18, `close seam ${seam}`);
+  });
+
+  it("has a rising medal ladder and ghost-ready save key", () => {
+    const m = TRACK_DEFS.hollow.medals;
+    assert.ok(m.author < m.gold && m.gold < m.silver && m.silver < m.bronze);
+    assert.equal(medalFor("hollow", m.author), "author");
+    assert.equal(medalFor("hollow", m.gold), "gold");
+    assert.equal(medalFor("hollow", m.silver), "silver");
+    assert.equal(medalFor("hollow", m.bronze), "bronze");
+    assert.equal(medalFor("hollow", m.bronze + 1), null);
+    const pace = medalPace("hollow", 0);
+    assert.equal(pace.holding, "author");
+    assert.ok((pace.remain ?? 0) > 0);
+  });
+
+  it("lists Red Mesa and Black Hollow after Arc Yard without rewriting the first five", () => {
+    const ids = allTrackDefs().map((t) => t.id);
+    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"]);
+    assert.equal(TRACK_DEFS.yard.name, "Arc Yard");
+    assert.equal(TRACK_DEFS.yard.env, "works");
+    assert.equal(TRACK_DEFS.helix.env, "night");
+    assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
+    assert.equal(TRACK_DEFS.mesa.env, "mesa");
+    assert.equal(TRACK_DEFS.hollow.env, "grove");
   });
 });

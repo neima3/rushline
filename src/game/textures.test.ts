@@ -44,14 +44,38 @@ describe("track look tokens", () => {
     assert.equal(themeDefaultSurface("canyon"), "dirt");
     assert.equal(themeDefaultSurface("alpine"), "ice");
     assert.equal(themeDefaultSurface("works"), "tech");
+    assert.equal(themeDefaultSurface("mesa"), "dirt");
+    assert.equal(themeDefaultSurface("grove"), "dirt");
     const plastic = roadSurfaceTint("stadium", "plastic");
     assert.equal(plastic.r, ROAD_TINT.stadium.r);
     assert.equal(plastic.g, ROAD_TINT.stadium.g);
     const dirtOnCanyon = roadSurfaceTint("canyon", "dirt");
     assert.equal(dirtOnCanyon.r, ROAD_TINT.canyon.r);
+    const dirtOnMesa = roadSurfaceTint("mesa", "dirt");
+    assert.equal(dirtOnMesa.r, ROAD_TINT.mesa.r);
     const icePatch = roadSurfaceTint("stadium", "ice");
     assert.ok(icePatch.b > plastic.b, "ice on Circuit should read cooler");
     assert.ok(SURFACE_ARCHETYPE.dirt.r > SURFACE_ARCHETYPE.dirt.b);
     assert.ok(SURFACE_ARCHETYPE.ice.b > SURFACE_ARCHETYPE.ice.r);
+  });
+
+  it("keeps mesa heat warmer than Circuit without matching Ridge dusk", () => {
+    const [r, g, b] = ASPHALT_BASE.mesa;
+    assert.ok(r > g && g > b, `mesa base should read warm ${r},${g},${b}`);
+    assert.ok(ASPHALT_BASE.mesa[0] > ASPHALT_BASE.canyon[0]);
+    assert.ok(ROAD_TINT.mesa.r > ROAD_TINT.canyon.r);
+    assert.ok(ROAD_TINT.mesa.r < ROAD_TINT.stadium.r);
+    const crown = roadCrown("mesa");
+    assert.ok(crown.edge > crown.mid);
+  });
+
+  it("keeps grove asphalt darker and greener than Helix without rewriting night tokens", () => {
+    const [r, g, b] = ASPHALT_BASE.grove;
+    assert.ok(g > r && g >= b, `grove base should read green ${r},${g},${b}`);
+    assert.ok(ASPHALT_BASE.grove[2] < ASPHALT_BASE.night[2]);
+    assert.ok(ROAD_TINT.grove.g > ROAD_TINT.grove.r);
+    assert.ok(ROAD_TINT.night.b > ROAD_TINT.night.r);
+    const crown = roadCrown("grove");
+    assert.ok(crown.edge > crown.mid);
   });
 });
