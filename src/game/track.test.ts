@@ -228,7 +228,8 @@ describe("Black Hollow", () => {
 
   it("lists Red Mesa and Black Hollow after Arc Yard without rewriting the first five", () => {
     const ids = allTrackDefs().map((t) => t.id);
-    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"]);
+    assert.deepEqual(ids.slice(0, 7), ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"]);
+    assert.equal(ids[7], "custom");
     assert.equal(TRACK_DEFS.yard.name, "Arc Yard");
     assert.equal(TRACK_DEFS.yard.env, "works");
     assert.equal(TRACK_DEFS.helix.env, "night");

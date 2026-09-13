@@ -10,7 +10,7 @@ import {
 } from "@/game/cup";
 import { COPY } from "@/game/help";
 import { TRACK_ENV_LABEL } from "@/game/flow";
-import { TRACK_DEFS } from "@/game/track";
+import { getTrackDef } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { CupId } from "@/game/types";
 import { cn, formatTime } from "@/lib/utils";
@@ -130,7 +130,7 @@ function EventCard({
   onEvent: (id: string) => void;
 }) {
   const progress = useGame((s) => s.cupProgress);
-  const track = TRACK_DEFS[event.trackId];
+  const track = getTrackDef(event.trackId);
   const unlocked = isEventUnlocked(progress, event);
   const cleared = isEventCleared(progress, event);
   const cupTime = progress.times[event.id];

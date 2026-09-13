@@ -1,6 +1,7 @@
 import * as THREE from "three";
+import { customDefFromSave, readActiveCustom } from "./editor.ts";
 import type { BuiltTrack, Medal, Sample, SurfaceKind, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
-import { TRACK_ORDER } from "./types.ts";
+import { TRACK_ORDER, type StockTrackId } from "./types.ts";
 import { defaultSurface } from "./feel.ts";
 import { roadCrown, roadSurfaceTint, surfaceBand, surfaceDashColor, surfaceShowsDash } from "./look";
 import { makeAsphaltRoughness, makeAsphaltTexture, makeCheckerTexture } from "./textures";
@@ -1324,7 +1325,7 @@ function hollowNodes() {
     .build();
 }
 
-export const TRACK_DEFS: Record<TrackId, TrackDef> = {
+export const TRACK_DEFS: Record<StockTrackId, TrackDef> = {
   circuit: {
     id: "circuit",
     name: "Green Circuit",
@@ -1413,7 +1414,38 @@ export const TRACK_DEFS: Record<TrackId, TrackDef> = {
 
 const builtCache = new Map<TrackId, BuiltTrack>();
 
+export function getTrackDef(id: TrackId): TrackDef {
+  if (id === "custom") return customDefFromSave(readActiveCustom());
+  return TRACK_DEFS[id];
+}
+
+export function invalidateCustomTrack() {
+  builtCache.delete("custom");
+}
+
+export function validateCustomBuild() {
+  const def = getTrackDef("custom");
+  const built = compileTrack(def);
+  const first = built.samples[0];
+  const last = built.samples[built.samples.length - 1];
+  const seam = first && last ? Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z) : Infinity;
+  const errors: string[] = [];
+  if (built.samples.length < 24) errors.push("Mesh did not build enough ribbon samples.");
+  if (built.length < 180) errors.push("Compiled ribbon is too short.");
+  if (seam > 22) errors.push("Loop does not close cleanly.");
+  if (built.checkpoints.length < 1) errors.push("Need a checkpoint so the lap can count.");
+  return { ok: errors.length === 0, errors, length: built.length, samples: built.samples.length, checkpoints: built.checkpoints.length, boosts: built.boosts.length };
+}
+
 export function getTrack(id: TrackId): BuiltTrack {
+  if (id === "custom") {
+    let custom = builtCache.get("custom");
+    if (!custom) {
+      custom = compileTrack(getTrackDef("custom"));
+      builtCache.set("custom", custom);
+    }
+    return custom;
+  }
   let t = builtCache.get(id);
   if (!t) {
     t = compileTrack(TRACK_DEFS[id]);
@@ -1429,11 +1461,11 @@ if (import.meta.hot) {
 }
 
 export function allTrackDefs(): TrackDef[] {
-  return TRACK_ORDER.map((id) => TRACK_DEFS[id]);
+  return [...TRACK_ORDER.map((id) => TRACK_DEFS[id]), getTrackDef("custom")];
 }
 
 export function medalFor(id: TrackId, time: number) {
-  const m = TRACK_DEFS[id].medals;
+  const m = getTrackDef(id).medals;
   if (time <= m.author) return "author" as const;
   if (time <= m.gold) return "gold" as const;
   if (time <= m.silver) return "silver" as const;
@@ -1449,7 +1481,7 @@ export type MedalPace = {
 
 /** During a run: the medal you are still on pace for, and ms until it drops. */
 export function medalPace(id: TrackId, time: number): MedalPace {
-  const m = TRACK_DEFS[id].medals;
+  const m = getTrackDef(id).medals;
   const ladder: { id: Medal; at: number }[] = [
     { id: "author", at: m.author },
     { id: "gold", at: m.gold },

@@ -1,7 +1,7 @@
 import { cupHeadline } from "@/game/cup";
 import { MEDAL_LABEL, resultsHeadline } from "@/game/flow";
 import { COPY } from "@/game/help";
-import { medalPace, TRACK_DEFS } from "@/game/track";
+import { getTrackDef, medalPace } from "@/game/track";
 import type { Medal, ResultsState, TrackId } from "@/game/types";
 import { cn, formatDelta, formatTime } from "@/lib/utils";
 import { keepPlayFocus, MedalRow } from "./chrome";
@@ -34,12 +34,12 @@ export function ResultsScreen({
   onRaceRival,
   onUiClick,
 }: Props) {
-  const track = TRACK_DEFS[results.trackId];
+  const track = getTrackDef(results.trackId);
   const cup = results.cup;
   const pbDelta = results.prevBest == null ? null : results.time - results.prevBest;
   const headline = cup ? cupHeadline(cup, results.medal) : resultsHeadline(results.medal, results.isPb);
-  const nextChallengeName = cup?.nextTrackId ? TRACK_DEFS[cup.nextTrackId].name : null;
-  const targetAt = cup ? TRACK_DEFS[results.trackId].medals[cup.target] : null;
+  const nextChallengeName = cup?.nextTrackId ? getTrackDef(cup.nextTrackId).name : null;
+  const targetAt = cup ? getTrackDef(results.trackId).medals[cup.target] : null;
 
   return (
     <div
@@ -255,7 +255,7 @@ function MedalCelebrate({ medal }: { medal: Medal | null }) {
 }
 
 function MedalBoard({ trackId, time, earned }: { trackId: TrackId; time: number; earned: Medal | null }) {
-  const medals = TRACK_DEFS[trackId].medals;
+  const medals = getTrackDef(trackId).medals;
   const pace = medalPace(trackId, time);
   const rows: { id: Medal; label: string; at: number }[] = [
     { id: "author", label: "Author", at: medals.author },

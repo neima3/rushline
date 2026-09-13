@@ -4,17 +4,21 @@ export type ThemeId = "stadium" | "canyon" | "night" | "alpine" | "works" | "mes
 
 export type Medal = "author" | "gold" | "silver" | "bronze";
 
-export type Phase = "menu" | "select" | "garage" | "cup" | "countdown" | "race" | "paused" | "results";
+export type Phase = "menu" | "select" | "garage" | "cup" | "editor" | "countdown" | "race" | "paused" | "results";
 
 export function isLobbyPhase(phase: Phase): boolean {
-  return phase === "menu" || phase === "select" || phase === "garage" || phase === "cup";
+  return phase === "menu" || phase === "select" || phase === "garage" || phase === "cup" || phase === "editor";
 }
 
 export type CameraMode = "chase" | "far" | "hood" | "cockpit";
 
-export type TrackId = "circuit" | "canyon" | "helix" | "summit" | "yard" | "mesa" | "hollow";
+export type StockTrackId = "circuit" | "canyon" | "helix" | "summit" | "yard" | "mesa" | "hollow";
 
-export const TRACK_ORDER: TrackId[] = ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"];
+export type TrackId = StockTrackId | "custom";
+
+export const TRACK_ORDER: StockTrackId[] = ["circuit", "canyon", "helix", "summit", "yard", "mesa", "hollow"];
+
+export const PLAYABLE_ORDER: TrackId[] = [...TRACK_ORDER, "custom"];
 
 /** Trackmania-style ribbon materials. Distinct grip, not just paint. */
 export type SurfaceKind = "plastic" | "dirt" | "ice" | "tech";
@@ -31,6 +35,10 @@ export type TrackNode = {
   checkpoint?: boolean;
   surface?: SurfaceKind;
 };
+
+export function isStockTrack(id: TrackId): id is StockTrackId {
+  return id !== "custom";
+}
 
 export type TrackDef = {
   id: TrackId;

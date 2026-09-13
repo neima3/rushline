@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { Camera, CircleHelp, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
-import { continueEvent, cupContinueLabel, getCupEvent } from "@/game/cup";
+import { continueEvent, CUP_EVENTS, cupContinueLabel, getCupEvent } from "@/game/cup";
 import { loadHints } from "@/game/flow";
 import { cameraLabel } from "@/game/camera";
 import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel, SURFACE_LABEL } from "@/game/feel";
 import { ghostHudTag } from "@/game/ghost-share";
-import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
+import { getTrack, getTrackDef, sampleAt } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { CameraMode, GhostSource, Medal, SurfaceKind, TrackId } from "@/game/types";
 import { cn, formatDelta, formatSpeed, formatTimeParts } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { Minimap } from "./Minimap";
 import { CupScreen } from "./overlay/CupScreen";
 import { FirstRunHint } from "./overlay/FirstRunHint";
 import { HelpScreen } from "./overlay/HelpScreen";
+import { EditorScreen } from "./overlay/EditorScreen";
 import { MenuScreen } from "./overlay/MenuScreen";
 import { PhotoScreen } from "./overlay/PhotoScreen";
 import { ResultsScreen } from "./overlay/ResultsScreen";
@@ -58,7 +59,7 @@ export function Overlay({ gameRef }: Props) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
-      {phase === "menu" || phase === "select" || phase === "garage" || phase === "cup" ? (
+      {phase === "menu" || phase === "select" || phase === "garage" || phase === "cup" || phase === "editor" ? (
         <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex items-center gap-2">
           <button
             type="button"
@@ -145,6 +146,25 @@ export function Overlay({ gameRef }: Props) {
           }}
           select={phase === "select"}
           garage={phase === "garage"}
+          onEditCustom={() => {
+            g()?.uiClick();
+            g()?.openEditor();
+          }}
+        />
+      ) : null}
+
+      {phase === "editor" ? (
+        <EditorScreen
+          ready={ready}
+          onBack={() => {
+            g()?.uiClick();
+            g()?.closeEditor();
+          }}
+          onPreview={(save) => {
+            g()?.previewCustom(save);
+          }}
+          onSave={(save) => Boolean(g()?.persistCustom(save))}
+          onDrive={(save) => Boolean(g()?.driveCustom(save))}
         />
       ) : null}
 
@@ -265,12 +285,12 @@ export function Overlay({ gameRef }: Props) {
       {!hideHud && phase === "paused" && !settingsOpen && !helpOpen ? (
         <Modal
           title="Paused"
-          subtitle={TRACK_DEFS[trackId].name}
+          subtitle={getTrackDef(trackId).name}
           chrome
           extra={
             <p className="mt-3 text-xs leading-relaxed text-muted">
               {cupEvent
-                ? `${cupEvent.cupId === "author" ? "Author" : "Gold"} Cup · Event ${cupEvent.index + 1}/5 on ${TRACK_DEFS[trackId].name}. ${pauseHint({ touch, cup: true })}`
+                ? `${cupEvent.cupId === "author" ? "Author" : "Gold"} Cup · Event ${cupEvent.index + 1}/${CUP_EVENTS[cupEvent.cupId].length} on ${getTrackDef(trackId).name}. ${pauseHint({ touch, cup: true })}`
                 : pauseHint({ touch })}
             </p>
           }
@@ -325,7 +345,7 @@ export function Overlay({ gameRef }: Props) {
       {!hideHud && phase === "results" && results ? (
         <ResultsScreen
           results={results}
-          nextName={TRACK_DEFS[results.nextTrackId].name}
+          nextName={getTrackDef(results.nextTrackId).name}
           onRetry={() => {
             g()?.uiClick();
             g()?.startRace(results.trackId);

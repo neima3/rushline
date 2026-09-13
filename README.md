@@ -27,8 +27,9 @@ Help (menu, pause, or Settings) opens the in-game controls sheet. It lists the k
 | **Arc Yard** | Works tech | ~952 m | Metal docks, gantry climb, freight drop |
 | **Red Mesa** | Desert dirt | ~1118 m | Dirt climb, plastic table, dirt edge drop |
 | **Black Hollow** | Forest dirt | ~819 m | Moonlit dirt pines, then a tech clearing sprint |
+| **Custom** | Your ribbon | editor | Closed Catmull-Rom loop you place yourself |
 
-Each track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost.
+Each stock track has author / gold / silver / bronze times, checkpoints, boost pads, and a personal-best ghost. **Custom** lives at the bottom of Tracks — **Edit ribbon** opens a lite editor (control points, height / width / bank, checkpoint and boost flags). Save stays on this device (`rushline-custom-v1`); Export / Import is JSON. Drive it in time trial. Rush Cup stays the stock seven.
 
 **Surfaces** change how the car grips. Plastic (Circuit, Mesa table) is the stadium baseline — slide-friendly but readable. Dirt (Ridge, Mesa climb/drop, Hollow pines) enters a slide earlier and pulls accel. Ice (White Pass) is the slipperiest: weak brakes, early slide, a high hiss. Tech (Helix, Yard, Hollow clearing) sticks later and stops harder. The HUD chip names the ribbon under the car.
 
@@ -98,7 +99,7 @@ npm run build      # production bundle
 npm run typecheck  # tsc --noEmit
 ```
 
-No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`. Cup campaign progress is stored separately in `rushline-cup-v1`. Imported rival ghosts use `rushline-ghost-share-v1`.
+No database or auth required. Personal-best times and ghosts persist in `localStorage` under `rushline-v1`. Garage liveries persist there too, and in `rushline-settings-v1`. Cup campaign progress is stored separately in `rushline-cup-v1`. Imported rival ghosts use `rushline-ghost-share-v1`. A custom ribbon lives in `rushline-custom-v1`.
 
 ## Project map
 
@@ -106,6 +107,7 @@ No database or auth required. Personal-best times and ghosts persist in `localSt
 src/game/            # simulation + rendering (pure Three.js, no R3F)
   Game.ts            # rAF loop, phases, HUD wiring
   track.ts           # Catmull-Rom spline, parallel transport, mesh build
+  editor.ts          # Custom ribbon save / control points / validation
   physics.ts         # grounded / airborne car, walls, boost, checkpoints
   scene.ts           # world, car mesh, camera, particles, environment
   input.ts           # keyboard + injected touch / gamepad actions
@@ -121,7 +123,7 @@ src/components/game/
   Overlay.tsx        # menu, HUD, results, pause, help
   SettingsPanel.tsx  # graphics / audio / camera / assists
   TouchPad.tsx       # mobile controls
-  overlay/           # menu, cup, help, photo, results
+  overlay/           # menu, cup, editor, help, photo, results
 public/textures/     # skyboxes + track thumbnails
 ```
 

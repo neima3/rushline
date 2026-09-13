@@ -7,10 +7,12 @@ import {
   type GhostFrame,
   type GhostPref,
   type GhostSource,
+  PLAYABLE_ORDER,
   type Phase,
   type TrackId,
 } from "./types";
-import { getTrack, medalFor, medalPace, sampleAt } from "./track";
+import { setCustomDraft, validateCustom, writeCustomSave, type CustomTrackSave } from "./editor.ts";
+import { getTrack, invalidateCustomTrack, medalFor, medalPace, sampleAt, validateCustomBuild } from "./track";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
@@ -50,7 +52,6 @@ import {
   readCupProgress,
   readLastSave,
   readSave,
-  TRACK_ORDER,
   useGame,
 } from "./store";
 import { readImportedGhost } from "./ghost-share";
@@ -451,6 +452,57 @@ export class Game {
     useGame.getState().setCupSession(event.id);
     useGame.getState().setCupFocus(event.id);
     this.startRace(event.trackId);
+  }
+
+  closeEditor() {
+    this.setPhase("select");
+    invalidateCustomTrack();
+    this.load("custom");
+  }
+
+  openEditor() {
+    this.clearPhoto();
+    useGame.getState().setSettingsOpen(false);
+    useGame.getState().setHelpOpen(false);
+    useGame.getState().setCupSession(null);
+    invalidateCustomTrack();
+    this.load("custom");
+    this.phase = "editor";
+    this.audio.setScene("editor");
+    this.countdown = -1;
+    this.acc = 0;
+    this.car.reset(this.track);
+    this.car.snap(this.curr);
+    copySnap(this.prev, this.curr);
+    this.world.snapCamera(this.curr, this.camera);
+    useGame.getState().setPhase("editor");
+    useGame.getState().setHud({ countdown: null });
+  }
+
+  previewCustom(save: CustomTrackSave) {
+    setCustomDraft(save);
+    invalidateCustomTrack();
+    if (this.phase !== "editor") return;
+    this.load("custom");
+    this.phase = "editor";
+    useGame.getState().setPhase("editor");
+  }
+
+  persistCustom(save: CustomTrackSave): boolean {
+    if (!validateCustom(save).ok) return false;
+    setCustomDraft(save);
+    invalidateCustomTrack();
+    if (!validateCustomBuild().ok) return false;
+    return writeCustomSave(save);
+  }
+
+  driveCustom(save: CustomTrackSave): boolean {
+    setCustomDraft(save);
+    invalidateCustomTrack();
+    if (!validateCustom(save).ok || !validateCustomBuild().ok) return false;
+    writeCustomSave(save);
+    this.beginTrial("custom");
+    return true;
   }
 
   openCup() {
@@ -1053,9 +1105,16 @@ export class Game {
       }
       if (yEdge) {
         this.audio.click();
-        const i = TRACK_ORDER.indexOf(this.trackId);
-        const next = TRACK_ORDER[(i + y + TRACK_ORDER.length) % TRACK_ORDER.length]!;
+        const i = Math.max(0, PLAYABLE_ORDER.indexOf(this.trackId));
+        const next = PLAYABLE_ORDER[(i + y + PLAYABLE_ORDER.length) % PLAYABLE_ORDER.length]!;
         this.load(next);
+      }
+      return;
+    }
+    if (this.phase === "editor") {
+      if (actions.back) {
+        this.audio.click();
+        this.closeEditor();
       }
       return;
     }

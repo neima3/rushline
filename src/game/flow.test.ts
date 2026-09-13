@@ -30,6 +30,7 @@ describe("nextTrackId", () => {
     assert.equal(nextTrackId("yard"), "mesa");
     assert.equal(nextTrackId("mesa"), "hollow");
     assert.equal(nextTrackId("hollow"), "circuit");
+    assert.equal(nextTrackId("custom"), "circuit");
   });
 });
 
