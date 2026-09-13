@@ -814,7 +814,7 @@ function MiniMap({
     if (sm.z > maxZ) maxZ = sm.z;
   }
   const pad = 8;
-  const size = 72;
+  const size = 86;
   const span = Math.max(maxX - minX, maxZ - minZ, 1);
   const to = (x: number, z: number) => {
     const u = (x - (minX + maxX) * 0.5) / span;
@@ -829,6 +829,8 @@ function MiniMap({
     .join(" ");
   const sm = sampleAt(track, s);
   const car = to(sm.x + sm.rx * n, sm.z + sm.rz * n);
+  const startSm = sampleAt(track, 2.2);
+  const start = to(startSm.x, startSm.z);
   const ghost =
     ghostS != null && ghostN != null
       ? (() => {
@@ -841,11 +843,12 @@ function MiniMap({
       data-minimap="1"
       className="pointer-events-none absolute top-[max(4.55rem,calc(env(safe-area-inset-top)+3.7rem))] left-[max(0.7rem,env(safe-area-inset-left))] md:hidden"
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="hud-minimap-mobile rounded-md">
-        <path d={d} fill="none" stroke="rgba(8,10,16,0.75)" strokeWidth="3.4" strokeLinejoin="round" />
-        <path d={d} fill="none" stroke="rgba(244,244,242,0.78)" strokeWidth="1.8" strokeLinejoin="round" />
-        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.3" fill="#5ee8ff" stroke="#081018" strokeWidth="0.7" /> : null}
-        <circle cx={car.x} cy={car.y} r="2.8" fill="#f4f4f2" stroke="#09090b" strokeWidth="0.8" />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="hud-minimap hud-minimap-mobile rounded-md p-1">
+        <path d={d} fill="none" stroke="rgba(4,6,10,0.9)" strokeWidth="4.4" strokeLinejoin="round" />
+        <path d={d} fill="none" stroke="rgba(244,244,242,0.88)" strokeWidth="2.2" strokeLinejoin="round" />
+        <circle cx={start.x} cy={start.y} r="2.2" fill="#c4a574" stroke="#081018" strokeWidth="0.7" />
+        {ghost ? <circle cx={ghost.x} cy={ghost.y} r="2.5" fill="#5ee8ff" stroke="#081018" strokeWidth="0.8" /> : null}
+        <circle cx={car.x} cy={car.y} r="3.1" fill="#f4f4f2" stroke="#09090b" strokeWidth="0.9" />
       </svg>
     </div>
   );

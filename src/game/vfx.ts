@@ -145,8 +145,8 @@ export class Vfx {
   }
 
   emitLand(snap: CarSnap, hard: boolean) {
-    const dustN = Math.max(0, Math.round((hard ? 16 : 8) * this.smokeScale));
-    const sparkN = Math.max(0, Math.round((hard ? 6 : 0) * this.sparkScale));
+    const dustN = Math.max(0, Math.round((hard ? 18 : 10) * this.smokeScale));
+    const sparkN = Math.max(0, Math.round((hard ? 7 : 0) * this.sparkScale));
     for (let i = 0; i < dustN; i++) this.spawn(this.smoke, this.smokeCap, snap, "dust");
     for (let i = 0; i < sparkN; i++) this.spawn(this.sparks, this.sparkCap, snap, "spark");
   }
@@ -197,13 +197,15 @@ export class Vfx {
     });
     mat.customProgramCacheKey = () => "rushline-vfx-life";
     mat.onBeforeCompile = (shader) => {
-      shader.vertexShader = `attribute float life;\nvarying float vLife;\n${shader.vertexShader}`.replace(
-        "void main() {",
-        "void main() {\n\tvLife = max(life, 0.0);",
-      );
+      shader.vertexShader = `attribute float life;\nvarying float vLife;\n${shader.vertexShader}`
+        .replace("void main() {", "void main() {\n\tvLife = max(life, 0.0);")
+        .replace(
+          "#include <project_vertex>",
+          "#include <project_vertex>\n\tgl_PointSize *= (0.34 + 0.78 * clamp(vLife, 0.0, 1.0));",
+        );
       shader.fragmentShader = `varying float vLife;\n${shader.fragmentShader}`.replace(
         "#include <color_fragment>",
-        "diffuseColor.a *= smoothstep(0.0, 0.11, vLife);\n#include <color_fragment>",
+        "diffuseColor.a *= smoothstep(0.0, 0.14, vLife) * smoothstep(0.0, 0.22, vLife);\n#include <color_fragment>",
       );
     };
     const points = new THREE.Points(geo, mat);
@@ -234,19 +236,19 @@ export class Vfx {
             : 0.52
           : 0;
     const along = kind === "slide" ? (Math.random() < 0.5 ? 0.62 : -0.58) : 0;
-    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" || kind === "dust" ? 1.15 : 0.55);
+    const side = (Math.random() - 0.5) * (kind === "smoke" || kind === "land" || kind === "dust" ? 1.35 : 0.55);
     const rx = -snap.fz;
     const rz = snap.fx;
     const puff = kind === "smoke" || kind === "land" || kind === "dust";
     cloud.life[slot] =
       kind === "dust"
-        ? 0.62 + Math.random() * 0.48
+        ? 0.68 + Math.random() * 0.5
         : kind === "smoke" || kind === "land"
-          ? 0.5 + Math.random() * 0.42
+          ? 0.52 + Math.random() * 0.44
           : kind === "slide"
-            ? 0.16 + Math.random() * 0.14
+            ? 0.18 + Math.random() * 0.16
             : kind === "trail" || kind === "turbo"
-              ? 0.26 + Math.random() * 0.2
+              ? 0.32 + Math.random() * 0.24
               : 0.24 + Math.random() * 0.28;
     cloud.pos[slot * 3] = snap.px - snap.fx * (rear - along) + rx * pipe + (puff ? rx : 1) * side * 0.35;
     cloud.pos[slot * 3 + 1] =
@@ -267,7 +269,7 @@ export class Vfx {
       cloud.vel[slot * 3 + 1] = 0.15 + Math.random() * 0.85;
       cloud.vel[slot * 3 + 2] = rz * out * (2.2 + Math.random() * 3.4) - snap.fz * (0.4 + Math.random());
     } else if (kind === "trail" || kind === "turbo") {
-      const punch = kind === "turbo" ? 9 : 7.2;
+      const punch = kind === "turbo" ? 10.2 : 7.8;
       cloud.vel[slot * 3] = -snap.fx * (punch + Math.random() * 4.5) + rx * (Math.random() - 0.5) * 0.45;
       cloud.vel[slot * 3 + 1] = 0.08 + Math.random() * 0.28;
       cloud.vel[slot * 3 + 2] = -snap.fz * (punch + Math.random() * 4.5) + rz * (Math.random() - 0.5) * 0.45;

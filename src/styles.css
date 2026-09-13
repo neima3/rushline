@@ -448,6 +448,16 @@ body {
   background: linear-gradient(160deg, #0c1814 0%, #1a3a28 50%, #6ad080 100%);
 }
 
+.track-card[data-track="ember"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #ff6a28;
+  background: linear-gradient(160deg, #3a1010 0%, #c04018 48%, #ff8040 100%);
+}
+
+.track-card[data-track="storm"] .track-card-thumb {
+  box-shadow: inset 3px 0 0 #7ec8e8;
+  background: linear-gradient(160deg, #101820 0%, #2a4050 50%, #88c0d8 100%);
+}
+
 .livery-card {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -490,11 +500,19 @@ body {
   .hud-chrome,
   .hud-chip,
   .play-control.hud-chip {
-    background: rgba(8, 10, 16, 0.82);
+    background: rgba(6, 8, 14, 0.9);
+    border-color: rgba(94, 232, 255, 0.36);
   }
 
   .hud-timer-plate {
     min-width: 8.2rem;
+  }
+
+  .hud-timer {
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.86),
+      0 0 16px rgba(94, 232, 255, 0.28),
+      0 3px 14px rgba(0, 0, 0, 0.62);
   }
 
   .hud-ghost-delta {
@@ -503,6 +521,16 @@ body {
 
   .hud-pace-chip {
     font-size: 0.88rem;
+    background: rgba(6, 8, 14, 0.82);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  }
+
+  .hud-minimap-mobile {
+    background: linear-gradient(180deg, rgba(8, 10, 16, 0.94), rgba(6, 8, 12, 0.88));
+    border: 1px solid rgba(94, 232, 255, 0.4);
+    box-shadow:
+      0 10px 22px rgba(0, 0, 0, 0.46),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
   }
 }
 

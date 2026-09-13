@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ASPHALT_BASE, ROAD_TINT, roadCrown, roadSurfaceTint, SURFACE_ARCHETYPE, themeDefaultSurface } from "./look.ts";
+import {
+  ASPHALT_BASE,
+  curbBlockHigh,
+  curbColor,
+  curbDims,
+  curbPeriod,
+  curbSidePainted,
+  edgeMark,
+  lipColor,
+  ROAD_TINT,
+  roadCrown,
+  roadSurfaceTint,
+  SURFACE_ARCHETYPE,
+  themeDefaultSurface,
+} from "./look.ts";
 
 describe("track look tokens", () => {
   it("keeps Circuit asphalt midtones charcoal under High day lights", () => {
@@ -89,6 +103,31 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.ember.r < ROAD_TINT.stadium.r);
     const crown = roadCrown("ember");
     assert.ok(crown.edge > crown.mid);
+  });
+
+  it("builds TM sausage curbs with a high block taller than the connector", () => {
+    const high = curbDims("stadium", true);
+    const low = curbDims("stadium", false);
+    assert.ok(high.height > low.height * 2, "sausage high should read as a block");
+    assert.ok(high.width > low.width);
+    assert.ok(curbBlockHigh("stadium", 0.2) !== curbBlockHigh("stadium", curbPeriod("stadium") + 0.2));
+    const red = curbColor("stadium", 1, true);
+    const white = curbColor("stadium", 1, false);
+    assert.ok(red.r > 0.9 && red.g < 0.2);
+    assert.ok(white.r > 0.95 && white.g > 0.95);
+    assert.ok(ASPHALT_BASE.stadium[0] < 110);
+    assert.ok(edgeMark("stadium").width > 0.12);
+    assert.ok(lipColor("stadium").r < 0.1);
+  });
+
+  it("keeps Helix neon curbs side-painted without changing night asphalt", () => {
+    assert.equal(curbSidePainted("night"), true);
+    assert.equal(curbSidePainted("stadium"), false);
+    const left = curbColor("night", -1, true);
+    const right = curbColor("night", 1, true);
+    assert.ok(left.b > left.r);
+    assert.ok(right.r > right.b);
+    assert.ok(ASPHALT_BASE.night[2] > ASPHALT_BASE.night[0]);
   });
 
   it("keeps storm asphalt cooler and wetter than Circuit without rewriting Helix", () => {
