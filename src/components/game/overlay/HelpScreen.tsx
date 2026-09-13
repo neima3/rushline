@@ -4,6 +4,7 @@ import {
   MENU_CONTROL_ROWS,
   PHOTO_CONTROL_ROWS,
   RACE_CONTROL_ROWS,
+  REPLAY_CONTROL_ROWS,
   type ControlRow,
 } from "@/game/help";
 import { cn } from "@/lib/utils";
@@ -86,6 +87,15 @@ export function HelpScreen({ touch, padConnected, onClose, onUiClick }: Props) {
             <BindTable rows={PHOTO_CONTROL_ROWS} />
             <ul className="space-y-1.5 text-sm leading-relaxed text-muted">
               {COPY.photoNotes.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title={COPY.replayTitle}>
+            <BindTable rows={REPLAY_CONTROL_ROWS} />
+            <ul className="space-y-1.5 text-sm leading-relaxed text-muted">
+              {COPY.replayNotes.map((line) => (
                 <li key={line}>{line}</li>
               ))}
             </ul>

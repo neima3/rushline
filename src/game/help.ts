@@ -35,6 +35,13 @@ export const PHOTO_CONTROL_ROWS: ControlRow[] = [
   { id: "exit", action: "Exit photo", keys: "F or Esc", pad: "B / Circle · Menu" },
 ];
 
+export const REPLAY_CONTROL_ROWS: ControlRow[] = [
+  { id: "play", action: "Play / pause", keys: "Space or Enter", pad: "A / Cross" },
+  { id: "scrub", action: "Scrub timeline", keys: "A / D or slider", pad: "Left stick" },
+  { id: "camera", action: "Cycle camera", keys: "C", pad: "View / Share / RB" },
+  { id: "exit", action: "Exit replay", keys: "Esc or Backspace", pad: "B / Circle · Menu" },
+];
+
 export const COPY = {
   productEyebrow: "Precision time trial",
   tagline: "Every checkpoint. Stay on the plastic. Beat the medals — or run Rush Cup.",
@@ -55,6 +62,7 @@ export const COPY = {
   menuTitle: "Menus",
   touchTitle: "Touch",
   photoTitle: "Photo mode",
+  replayTitle: "Replay viewer",
   padNote: `Inner deadzone ${Math.round(PAD_STICK_DEADZONE * 100)}% stick, ${Math.round(PAD_TRIGGER_DEADZONE * 100)}% trigger. A resting pad does not steal keyboard or touch. Hot-plug shows a banner; Track Assist is unchanged. Compatible pads rumble on boost, crash, turbo, land, and finish.`,
   touchItems: [
     "Left pad steers. Sensitivity and invert live in Settings.",
@@ -67,7 +75,13 @@ export const COPY = {
   photoNotes: [
     "Open from the camera button, Pause, Results, F, or LB + View.",
     "The HUD hides for the still. Capture saves a PNG to your downloads.",
-    "On a finished run you can follow the ghost and scrub the replay.",
+    "On a finished run you can follow the ghost and scrub the tape for a still.",
+    "Photo mode stays a still — Watch replay on Results is the spectator view.",
+  ],
+  replayNotes: [
+    "Open Watch replay from Results to follow the last run, shipped author ghost, PB, imported rival, or a hotseat tape.",
+    "The camera rides the tape. Pause, play, and scrub the timeline; Done returns to Results.",
+    "Photo mode is unchanged — open it from Results, Pause, F, or LB + View for orbit stills.",
   ],
   ghostTitle: "Ghost share",
   ghostBlurb: "Trackmania-style rival tapes. Export and import stay on this device — no account.",
@@ -90,6 +104,7 @@ export const COPY = {
     "Garage paint is cosmetic only. Steering Slow/Normal/Fast and audio mix live under Settings.",
     "Surfaces change grip: plastic slides, dirt bites late, ice is icy, tech sticks.",
     "Ghost share — export a PB or last-run JSON from Results or Tracks, then import a rival to race that circuit.",
+    "After a finish, Watch replay plays that tape as a spectator — last run, shipped author ghost, PB, imported rival, or a hotseat tape.",
   ],
   noMedal: "No medal this run. Bronze is the next target.",
   overlayError: "Overlay error",
@@ -116,6 +131,12 @@ export function photoHint(touch: boolean): string {
   return touch
     ? "Drag to orbit · HUD is hidden · Capture saves a PNG"
     : "Drag or WASD to orbit · Q/E zoom · Enter captures · F / Esc exits";
+}
+
+export function replayHint(touch: boolean): string {
+  return touch
+    ? "Play, scrub the timeline, then Done to return to results"
+    : "Space plays · A/D scrubs · C camera · Esc returns to results";
 }
 
 export function pauseHint(input: { touch: boolean; cup?: boolean }): string {

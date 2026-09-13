@@ -9,6 +9,7 @@ import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel, SURFACE_LABEL } from "@/game/feel";
 import { ghostHudTag } from "@/game/ghost-share";
+import { isReplaySource } from "@/game/replay";
 import { getTrack, getTrackDef, sampleAt } from "@/game/track";
 import { useGame } from "@/game/store";
 import type { CameraMode, GhostSource, Medal, SurfaceKind, TrackId } from "@/game/types";
@@ -22,6 +23,7 @@ import { HotseatScreen } from "./overlay/HotseatScreen";
 import { EditorScreen } from "./overlay/EditorScreen";
 import { MenuScreen } from "./overlay/MenuScreen";
 import { PhotoScreen } from "./overlay/PhotoScreen";
+import { ReplayScreen } from "./overlay/ReplayScreen";
 import { ResultsScreen } from "./overlay/ResultsScreen";
 import { keepPlayFocus, MedalRow, Modal } from "./overlay/chrome";
 
@@ -51,6 +53,7 @@ export function Overlay({ gameRef }: Props) {
   const touch = useGame((s) => s.touch);
   const trackId = useGame((s) => s.trackId);
   const photoMode = useGame((s) => s.photoMode);
+  const replayMode = useGame((s) => s.replayMode);
   const cupProgress = useGame((s) => s.cupProgress);
   const cupEventId = useGame((s) => s.cupEventId);
   const cupEvent = getCupEvent(cupEventId);
@@ -58,7 +61,7 @@ export function Overlay({ gameRef }: Props) {
   const hotseat = useGame((s) => s.hotseat);
   const [hintGone, setHintGone] = useState(() => loadHints().controlsDismissed);
   const g = () => gameRef.current;
-  const hideHud = photoMode;
+  const hideHud = photoMode || replayMode;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
@@ -229,7 +232,7 @@ export function Overlay({ gameRef }: Props) {
           surface={hud.surface}
           cupLabel={
             cupEvent
-              ? `CUP ${cupEvent.index + 1}/7 · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}`
+              ? `CUP ${cupEvent.index + 1}/${CUP_EVENTS[cupEvent.cupId].length} · ${cupEvent.target === "author" ? "AUTH" : "GOLD"}`
               : playMode === "hotseat"
                 ? `HOTSEAT · P${hotseat?.seat ?? 1}`
                 : null
@@ -427,6 +430,14 @@ export function Overlay({ gameRef }: Props) {
             g()?.uiClick();
             g()?.menu();
           }}
+          onReplay={
+            g()?.canReplay()
+              ? () => {
+                  g()?.uiClick();
+                  g()?.enterReplay();
+                }
+              : undefined
+          }
           onPhoto={() => {
             g()?.uiClick();
             g()?.enterPhoto();
@@ -460,6 +471,26 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
+      {replayMode ? (
+        <ReplayScreen
+          touch={touch}
+          onPlay={(v) => g()?.setReplayPlaying(v)}
+          onScrub={(u) => g()?.setReplayScrub(u)}
+          onSource={(source) => {
+            if (!isReplaySource(source)) return;
+            g()?.setReplaySource(source);
+          }}
+          onCamera={() => {
+            g()?.uiClick();
+            g()?.cycleCamera();
+          }}
+          onClose={() => {
+            g()?.uiClick();
+            g()?.exitReplay();
+          }}
+        />
+      ) : null}
+
       {!hideHud && settings.showFps && (phase === "race" || phase === "countdown" || phase === "paused") ? (
         <p className="absolute top-[max(0.95rem,env(safe-area-inset-top))] left-[max(4.6rem,calc(env(safe-area-inset-left)+3.8rem))] text-xs tabular-nums text-muted sm:left-[max(7.1rem,calc(env(safe-area-inset-left)+6.2rem))]">
           {fps} fps
@@ -479,7 +510,7 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {settingsOpen && !photoMode ? (
+      {settingsOpen && !photoMode && !replayMode ? (
         <SettingsPanel
           touch={touch}
           onClose={() => setSettingsOpen(false)}
@@ -489,7 +520,7 @@ export function Overlay({ gameRef }: Props) {
         />
       ) : null}
 
-      {helpOpen && !photoMode ? (
+      {helpOpen && !photoMode && !replayMode ? (
         <HelpScreen
           touch={touch}
           padConnected={pad.connected}

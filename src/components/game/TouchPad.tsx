@@ -18,11 +18,12 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
   const phase = useGame((s) => s.phase);
   const touch = useGame((s) => s.touch);
   const photoMode = useGame((s) => s.photoMode);
+  const replayMode = useGame((s) => s.replayMode);
   const rewindEnabled = useGame((s) => s.settings.rewindEnabled);
   const racing = phase === "race" || phase === "countdown";
   // Never gate on padActive — a phantom gamepad unmounts Accel and zeros throttle.
   // Photo mode hides the pads so orbit drag and Capture stay clean.
-  const visible = racing && !photoMode;
+  const visible = racing && !photoMode && !replayMode;
   const steerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

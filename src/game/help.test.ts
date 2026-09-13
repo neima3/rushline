@@ -6,10 +6,12 @@ import {
   MENU_CONTROL_ROWS,
   PHOTO_CONTROL_ROWS,
   RACE_CONTROL_ROWS,
+  REPLAY_CONTROL_ROWS,
   firstRunBody,
   pauseHint,
   photoHint,
   raceHint,
+  replayHint,
 } from "./help.ts";
 
 describe("help control sheet", () => {
@@ -48,6 +50,10 @@ describe("help control sheet", () => {
     assert.ok(COPY.touchItems.some((line) => /Left pad/.test(line)));
     assert.ok(COPY.touchItems.some((line) => /hold to restart/.test(line)));
     assert.ok(COPY.photoNotes.some((line) => /PNG/.test(line)));
+    assert.ok(COPY.photoNotes.some((line) => /Watch replay/.test(line)));
+    assert.ok(REPLAY_CONTROL_ROWS.some((row) => row.id === "play" && /Space/.test(row.keys)));
+    assert.ok(COPY.replayNotes.some((line) => /imported rival/.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /Watch replay/.test(line)));
     assert.match(COPY.tagline, /Rush Cup/);
     assert.match(COPY.cupBlurb, /Gold/);
     assert.match(COPY.garageBlurb, /livery/i);
@@ -77,6 +83,8 @@ describe("help control sheet", () => {
     assert.match(firstRunBody({ touch: false, padActive: true }), /Help/);
     assert.match(photoHint(false), /WASD/);
     assert.match(photoHint(true), /PNG/);
+    assert.match(replayHint(false), /Space/);
+    assert.match(replayHint(true), /timeline/);
     assert.match(pauseHint({ touch: false }), /Esc resumes/);
     assert.match(pauseHint({ touch: true, cup: true }), /Help/);
   });

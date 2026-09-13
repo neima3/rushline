@@ -17,6 +17,7 @@ import {
   type Medal,
   type PadInfo,
   type Phase,
+  type GhostSource,
   type PlayMode,
   type ResultsState,
   type SaveData,
@@ -207,6 +208,14 @@ type GameStore = {
   photoGhost: boolean;
   photoScrub: number;
   photoFollowGhost: boolean;
+  replayMode: boolean;
+  replayPlaying: boolean;
+  replayScrub: number;
+  replaySource: GhostSource;
+  replayLabel: string;
+  replayTime: number;
+  replayDuration: number;
+  replayChoices: { source: GhostSource; label: string }[];
   playMode: PlayMode;
   cupEventId: string | null;
   cupFocusId: string;
@@ -236,6 +245,18 @@ type GameStore = {
   setPhotoGhost: (v: boolean) => void;
   setPhotoScrub: (v: number) => void;
   setPhotoFollowGhost: (v: boolean) => void;
+  setReplayMode: (v: boolean) => void;
+  setReplayPlaying: (v: boolean) => void;
+  setReplayScrub: (v: number) => void;
+  setReplayHud: (p: {
+    playing?: boolean;
+    scrub?: number;
+    source?: GhostSource;
+    label?: string;
+    time?: number;
+    duration?: number;
+    choices?: { source: GhostSource; label: string }[];
+  }) => void;
   setCupSession: (eventId: string | null) => void;
   setCupFocus: (id: string) => void;
   setPlayMode: (mode: PlayMode) => void;
@@ -272,6 +293,14 @@ export const useGame = create<GameStore>((set) => ({
   photoGhost: false,
   photoScrub: 1,
   photoFollowGhost: false,
+  replayMode: false,
+  replayPlaying: false,
+  replayScrub: 0,
+  replaySource: "none",
+  replayLabel: "",
+  replayTime: 0,
+  replayDuration: 0,
+  replayChoices: [],
   playMode: "trial",
   cupEventId: null,
   cupFocusId: "gold-circuit",
@@ -329,6 +358,33 @@ export const useGame = create<GameStore>((set) => ({
   setPhotoGhost: (photoGhost) => set({ photoGhost }),
   setPhotoScrub: (photoScrub) => set({ photoScrub: Math.max(0, Math.min(1, photoScrub)) }),
   setPhotoFollowGhost: (photoFollowGhost) => set({ photoFollowGhost }),
+  setReplayMode: (replayMode) =>
+    set(
+      replayMode
+        ? { replayMode: true }
+        : {
+            replayMode: false,
+            replayPlaying: false,
+            replayScrub: 0,
+            replaySource: "none",
+            replayLabel: "",
+            replayTime: 0,
+            replayDuration: 0,
+            replayChoices: [],
+          },
+    ),
+  setReplayPlaying: (replayPlaying) => set({ replayPlaying }),
+  setReplayScrub: (replayScrub) => set({ replayScrub: Math.max(0, Math.min(1, replayScrub)) }),
+  setReplayHud: (p) =>
+    set((s) => ({
+      replayPlaying: p.playing ?? s.replayPlaying,
+      replayScrub: p.scrub != null ? Math.max(0, Math.min(1, p.scrub)) : s.replayScrub,
+      replaySource: p.source ?? s.replaySource,
+      replayLabel: p.label ?? s.replayLabel,
+      replayTime: p.time ?? s.replayTime,
+      replayDuration: p.duration ?? s.replayDuration,
+      replayChoices: p.choices ?? s.replayChoices,
+    })),
   setCupSession: (cupEventId) =>
     set({
       playMode: cupEventId ? "cup" : "trial",

@@ -18,6 +18,7 @@ type Props = {
   onCup?: () => void;
   onMenu: () => void;
   onPhoto?: () => void;
+  onReplay?: () => void;
   onRaceRival?: () => void;
   onUiClick?: () => void;
   onHotseatNext?: () => void;
@@ -33,6 +34,7 @@ export function ResultsScreen({
   onCup,
   onMenu,
   onPhoto,
+  onReplay,
   onRaceRival,
   onUiClick,
   onHotseatNext,
@@ -204,6 +206,16 @@ export function ResultsScreen({
               className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
             >
               Cup
+            </button>
+          ) : null}
+          {onReplay ? (
+            <button
+              type="button"
+              onMouseDown={keepPlayFocus}
+              onClick={onReplay}
+              className="h-11 rounded-md border border-border bg-bg-elevated text-sm font-medium text-fg"
+            >
+              Watch replay
             </button>
           ) : null}
           {onPhoto ? (
