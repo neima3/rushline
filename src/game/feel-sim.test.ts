@@ -98,6 +98,51 @@ describe("mobile feel sims", () => {
     assert.equal(helixNearGate(helix, s), false);
   });
 
+  it("commits a slide through a steer dip, then snaps out on release", () => {
+    const helix = getTrack("helix");
+    const car = new CarSim();
+    car.reset(helix);
+    car.s = 36;
+    car.n = 0;
+    car.speed = 18;
+    car.heading = 0.52;
+    car.step(helix, { ...cruise, steer: 1, slide: 1 }, 1 / 60);
+    const committed = Math.abs(car.heading);
+    assert.ok(committed > 0.4, `committed heading ${car.heading}`);
+    for (let i = 0; i < 18; i++) car.step(helix, { ...cruise, steer: 0.08, slide: 1 }, 1 / 60);
+    assert.ok(Math.abs(car.heading) > committed * 0.55, `lost the slide on a dip ${car.heading}`);
+    const held = Math.abs(car.heading);
+    for (let i = 0; i < 18; i++) car.step(helix, { ...cruise, steer: 0, slide: 0 }, 1 / 60);
+    assert.ok(Math.abs(car.heading) < held * 0.45, `exit still mushy ${car.heading} vs ${held}`);
+  });
+
+  it("air settle damps residual yaw and ribbon-pull is extra gravity, not hover", () => {
+    const canyon = getTrack("canyon");
+    const car = new CarSim();
+    car.reset(canyon);
+    const sm = sampleAt(canyon, 90);
+    car.airborne = true;
+    car.s = sm.s;
+    car.n = 0;
+    car.heading = 0.42;
+    car.px = sm.x + sm.ux * 8;
+    car.py = sm.y + sm.uy * 8;
+    car.pz = sm.z + sm.uz * 8;
+    car.vx = sm.tx * 16;
+    car.vy = sm.ty * 16 - 2;
+    car.vz = sm.tz * 16;
+    car.fx = sm.tx;
+    car.fy = sm.ty;
+    car.fz = sm.tz;
+    const startVy = car.vy;
+    const startHead = Math.abs(car.heading);
+    for (let i = 0; i < 12; i++) car.step(canyon, idle, 1 / 60);
+    assert.equal(car.airborne, true, "must stay in the air for the line check");
+    assert.ok(Math.abs(car.heading) < startHead * 0.75, `air yaw did not settle ${car.heading}`);
+    const gravityOnly = startVy - 30 * (12 / 60);
+    assert.ok(car.vy < gravityOnly - 0.35, `expected extra drop, vy ${car.vy} vs gravity ${gravityOnly}`);
+  });
+
   it("medal pace drops Author then Gold without rewriting finish medals", () => {
     const grid = medalPace("circuit", 0);
     assert.equal(grid.holding, "author");

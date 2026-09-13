@@ -280,3 +280,136 @@ export function blendHold(speed: number, trip: number, cruise: number, hold: num
   const t = smoothstep((speed - trip) / span);
   return cruise + (hold - cruise) * t;
 }
+
+/**
+ * Digital WASD is a switch — apply immediately. Analog (touch / pad) eases
+ * so a thumb twitch is not full lock, but still reaches target in ~4 frames.
+ */
+export function steerFilter(prev: number, target: number, dt: number, analog: boolean): number {
+  const goal = clamp(target, -1, 1);
+  if (!analog) return goal;
+  const rate = 16.5;
+  return prev + (goal - prev) * Math.min(1, rate * Math.max(0, dt));
+}
+
+/** First third of lock bites; full lock stays controllable. Does not rewrite steerCurve. */
+export function steerBite(steerAbs: number): number {
+  const a = Math.abs(steerAbs);
+  if (a < 0.06) return 1;
+  if (a < 0.38) return 1.2 - a * 0.32;
+  return 1.04;
+}
+
+/**
+ * TM dirt / plastic: once Slide + steer commits, stay in the slide until
+ * Slide is released. A brief steer dip must not dump you back to grip.
+ */
+export function slideCommitted(slideHeld: boolean, steerAbs: number, speedAbs: number, latched: boolean): boolean {
+  if (!slideHeld || speedAbs < 6.5) return false;
+  if (latched) return true;
+  return steerAbs > driftSteerThreshold(true) && speedAbs > 8;
+}
+
+export function slideYawLimit(drifting: boolean, slideHeld: boolean): number {
+  if (drifting) return 0.88;
+  if (slideHeld) return 0.5;
+  return 0.33;
+}
+
+/** Catch the slide on release — snap back to grip instead of sticky mush. */
+export function slideReleaseSnap(exiting: boolean, steerAbs: number): number {
+  if (!exiting) return 0;
+  return steerAbs < 0.14 ? 7.4 : 2.6;
+}
+
+/** Residual air yaw dies when you let go — line the drop, don't hover. */
+export function airYawSettle(steerAbs: number, airTime: number): number {
+  if (steerAbs > 0.1) return 0;
+  return airTime > 0.7 ? 2.9 : 1.55;
+}
+
+/**
+ * Extra gravity when high above the ribbon and falling toward it.
+ * Rewards a lined Ridge / Helix drop without adding hover thrust.
+ */
+export function airRibbonPull(height: number, into: number, airTime: number): number {
+  if (airTime < 0.1 || height < 1.35) return 0;
+  if (into > 1.2) return 0;
+  return clamp((height - 1.35) * 3.2, 0, 7.5);
+}
+
+export type GhostSample = { t: number; s: number };
+
+function alongS(from: number, to: number, length: number, closed: boolean): number {
+  if (!closed) return to - from;
+  const L = Math.max(1, length);
+  return (((to - from) % L) + L) % L;
+}
+
+/** Ghost clock at a track-s. Used for a stable TM-style live split. */
+export function ghostTimeAtS(frames: GhostSample[] | null | undefined, s: number, length: number, closed: boolean): number | null {
+  if (!frames || frames.length < 2) return null;
+  const L = Math.max(1, length);
+  const target = closed ? (((s % L) + L) % L) : s;
+  let bestI = -1;
+  let bestSpan = Infinity;
+  for (let i = 0; i < frames.length - 1; i++) {
+    const a = frames[i]!;
+    const b = frames[i + 1]!;
+    const span = alongS(a.s, b.s, L, closed);
+    if (span <= 1e-5 || span > L * 0.45) continue;
+    const da = alongS(a.s, target, L, closed);
+    if (da <= span + 0.4 && span < bestSpan) {
+      bestSpan = span;
+      bestI = i;
+    }
+  }
+  if (bestI >= 0) {
+    const a = frames[bestI]!;
+    const b = frames[bestI + 1]!;
+    const full = alongS(a.s, b.s, L, closed);
+    const u = clamp(alongS(a.s, target, L, closed) / full, 0, 1);
+    return a.t + (b.t - a.t) * u;
+  }
+  let nearest = frames[0]!;
+  let nd = Infinity;
+  for (const f of frames) {
+    const d = alongS(f.s, target, L, closed);
+    const wrap = closed ? Math.min(d, L - d) : Math.abs(f.s - target);
+    if (wrap < nd) {
+      nd = wrap;
+      nearest = f;
+    }
+  }
+  return nd < 12 ? nearest.t : null;
+}
+
+/** Positive = ghost was here earlier (you are behind). Same sign as ghostSplitMs. */
+export function ghostRaceSplitMs(playerTime: number, ghostTime: number | null): number | null {
+  if (ghostTime == null || !Number.isFinite(playerTime) || !Number.isFinite(ghostTime)) return null;
+  return playerTime - ghostTime;
+}
+
+export function ghostDeltaSmooth(prev: number | null, next: number | null, dt: number): number | null {
+  if (next == null) return null;
+  if (prev == null) return next;
+  const k = 1 - Math.exp(-8 * Math.max(0, dt));
+  return prev + (next - prev) * k;
+}
+
+export function ghostLead(deltaMs: number | null): "ahead" | "behind" | "even" | null {
+  if (deltaMs == null || !Number.isFinite(deltaMs)) return null;
+  if (deltaMs > 48) return "behind";
+  if (deltaMs < -48) return "ahead";
+  return "even";
+}
+
+export function cpFlashHoldMs(): number {
+  return 1380;
+}
+
+export function cpFlashLabel(kind: "cp" | "lap" | "finish", gate: number): string {
+  if (kind === "finish") return "FINISH";
+  if (kind === "lap") return "LAP";
+  return `CP ${Math.max(1, gate)}`;
+}

@@ -672,7 +672,7 @@ export class World {
     this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
-  applyGhost(track: BuiltTrack, frames: GhostFrame[] | null, time: number) {
+  applyGhost(track: BuiltTrack, frames: GhostFrame[] | null, time: number, playerS = 0, splitMs: number | null = null) {
     if (!frames || frames.length < 2 || this.ghostOpacity <= 0.01) {
       this.ghost.group.visible = false;
       return;
@@ -701,6 +701,11 @@ export class World {
     _fwd.set(fx, fy, fz);
     _up.set(sm.ux, sm.uy, sm.uz);
     this.ghost.group.quaternion.setFromRotationMatrix(_lookMat(_fwd, _up));
+    this.ghost.setGhostRace(splitMs, playerS, s);
+  }
+
+  flashTiming(snap: CarSnap, kind: "cp" | "lap" | "finish") {
+    this.vfx.emitCheckpoint(snap, kind === "finish");
   }
 
   updateCamera(

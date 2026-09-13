@@ -4,12 +4,13 @@ import type { Actions, BuiltTrack, CarSnap } from "./types";
 import { crossedGate, nearestSample, sampleAt } from "./track";
 import {
   airPitchAccel,
+  airRibbonPull,
   airTurnRate,
+  airYawSettle,
   boostPadPunch,
   boostPunchWindow,
   canLandWindow,
   curbSnap,
-  driftSteerThreshold,
   headingReturn,
   landLockTime,
   landSpeedKeep,
@@ -18,7 +19,11 @@ import {
   openingHeadingBleed,
   openingLandLock,
   plantLateral,
+  slideCommitted,
+  slideReleaseSnap,
+  slideYawLimit,
   stayPlanted,
+  steerBite,
   steerCurve,
 } from "./feel.ts";
 
@@ -90,6 +95,7 @@ export class CarSim {
   /** Medium matches the shipped phone racing-line assists. */
   trackAssist: TrackAssist = "medium";
   private wasSlide = false;
+  private slideLatched = false;
   private airTime = 0;
   private landLock = 0;
   private airBlend = 0;
@@ -123,6 +129,7 @@ export class CarSim {
     this.justRespawn = false;
     this.skipInterp = true;
     this.wasSlide = false;
+    this.slideLatched = false;
     this.airTime = 0;
     this.landLock = openingLandLock(track.def.id, this.trackAssist);
     this.airBlend = 0;
@@ -155,6 +162,7 @@ export class CarSim {
     this.boostPunch = 0;
     this.justRespawn = true;
     this.wasSlide = false;
+    this.slideLatched = false;
     this.skipInterp = true;
     this.airTime = 0;
     this.landLock = 0;
@@ -329,9 +337,14 @@ export class CarSim {
     const steer = steerCurve(actions.steer);
     const steerAbs = Math.abs(steer);
     const slideHeld = actions.slide >= 0.2;
-    const drifting = slideHeld && steerAbs > driftSteerThreshold(slideHeld) && speedAbs > 8;
+    const drifting = slideCommitted(slideHeld, steerAbs, speedAbs, this.slideLatched);
+    this.slideLatched = drifting;
 
-    if (this.wasSlide && !slideHeld) this.releaseTurbo();
+    if (this.wasSlide && !slideHeld) {
+      this.releaseTurbo();
+      const snapOut = slideReleaseSnap(true, steerAbs);
+      if (snapOut) this.heading *= 1 - snapOut * dt;
+    }
     if (drifting) {
       this.driftCharge = Math.min(1, this.driftCharge + dt * (0.78 + steerAbs * 0.82));
     } else if (!slideHeld) {
@@ -345,13 +358,14 @@ export class CarSim {
     if (drifting) turn *= 1 + this.driftCharge * 0.05;
     if (actions.brake > 0.3 && this.speed > 8) turn *= 1.1;
     turn *= landSteerScale(this.landLock);
+    turn *= steerBite(steerAbs);
     this.heading += steer * turn * reverse * dt;
     const bleed = openingHeadingBleed(track.def.id, this.s, steerAbs, drifting, this.trackAssist);
     if (bleed) this.heading *= 1 - bleed * dt;
 
     const align = headingReturn(steerAbs, drifting, this.trackAssist);
     this.heading *= 1 - align * dt * (drifting ? 1 : 1 - steerAbs * 0.92);
-    const maxYaw = drifting ? 0.76 : slideHeld ? 0.48 : 0.33;
+    const maxYaw = slideYawLimit(drifting, slideHeld);
     this.heading = clamp(this.heading, -maxYaw, maxYaw);
 
     this.s += this.speed * Math.cos(this.heading) * dt;
@@ -461,6 +475,8 @@ export class CarSim {
     const airTurn = airTurnRate();
     const steer = steerCurve(actions.steer);
     this.heading += steer * airTurn * dt;
+    const settle = airYawSettle(Math.abs(steer), this.airTime);
+    if (settle > 0) this.heading *= 1 - settle * dt;
     this.heading = clamp(this.heading, -0.7, 0.7);
 
     const yaw = steer * airTurn * 0.62 * dt;
@@ -498,6 +514,7 @@ export class CarSim {
     const into = this.vx * near.ux + this.vy * near.uy + this.vz * near.uz;
     const half = near.width * 0.5 + 1.35;
     const along = this.vx * near.tx + this.vy * near.ty + this.vz * near.tz;
+    this.vy -= airRibbonPull(height, into, this.airTime) * dt;
     this.s += along * dt;
     if (track.def.closed) {
       const L = track.length;
@@ -554,6 +571,7 @@ export class CarSim {
     if (this.wasSlide && actions.slide < 0.2) this.releaseTurbo();
     else if (actions.slide < 0.2) this.driftCharge *= Math.max(0, 1 - 2.4 * dt);
     this.wasSlide = actions.slide >= 0.2;
+    if (actions.slide < 0.2) this.slideLatched = false;
 
     _fwd.set(this.vx, this.vy, this.vz);
     if (_fwd.lengthSq() < 0.4) _fwd.set(this.fx, this.fy, this.fz);

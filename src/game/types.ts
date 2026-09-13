@@ -125,7 +125,9 @@ export type HudState = {
   ghostS: number | null;
   ghostN: number | null;
   ghostDelta: number | null;
+  ghostLead: "ahead" | "behind" | "even" | null;
   medalRemain: number | null;
+  cpFlash: { kind: "cp" | "lap" | "finish"; delta: number | null; label: string } | null;
 };
 
 export type ResultsState = {
