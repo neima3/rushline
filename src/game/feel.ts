@@ -187,7 +187,7 @@ export function landSteerScale(landLock: number): number {
   return 0.62 + 0.38 * (1 - Math.min(1, landLock / 0.2));
 }
 
-/** Air yaw — enough to line Ridge / Helix / Mesa drops without hover-steer. */
+/** Air yaw — enough to line Ridge / Helix / Ember drops without hover-steer. */
 export function airTurnRate(): number {
   return 2.48;
 }
@@ -434,7 +434,7 @@ export function airYawSettle(steerAbs: number, airTime: number): number {
 
 /**
  * Extra gravity when high above the ribbon and falling toward it.
- * Rewards a lined Ridge / Helix / Mesa drop without adding hover thrust.
+ * Rewards a lined Ridge / Helix / Ember drop without adding hover thrust.
  */
 export function airRibbonPull(height: number, into: number, airTime: number): number {
   if (airTime < 0.1 || height < 1.35) return 0;

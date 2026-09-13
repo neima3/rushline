@@ -295,8 +295,8 @@ describe("mobile feel sims", () => {
     assert.ok(Math.abs(car.n) < sm.width * 0.45, `n ${car.n}`);
   });
 
-  it("plants Helix and Mesa short drops with speed and a centered n", () => {
-    for (const id of ["helix", "mesa"] as const) {
+  it("plants Helix, Mesa, and Ember short drops with speed and a centered n", () => {
+    for (const id of ["helix", "mesa", "ember"] as const) {
       const track = getTrack(id);
       const car = new CarSim();
       car.reset(track);
