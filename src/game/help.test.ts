@@ -1,18 +1,27 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { PAD_MAP } from "./gamepad.ts";
 import {
   COPY,
+  FEATURE_MAP,
+  FEATURE_MAP_IDS,
   MENU_CONTROL_ROWS,
   PHOTO_CONTROL_ROWS,
   RACE_CONTROL_ROWS,
   REPLAY_CONTROL_ROWS,
+  TRACK_VIBES,
+  featureMapIdsMatchPlayable,
   firstRunBody,
   pauseHint,
   photoHint,
   raceHint,
   replayHint,
+  trackVibeIds,
 } from "./help.ts";
+import { PLAYABLE_ORDER } from "./types.ts";
+
+const README = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
 
 describe("help control sheet", () => {
   it("documents every live race binding against PAD_MAP", () => {
@@ -89,5 +98,90 @@ describe("help control sheet", () => {
     assert.match(replayHint(true), /timeline/);
     assert.match(pauseHint({ touch: false }), /Esc resumes/);
     assert.match(pauseHint({ touch: true, cup: true }), /Help/);
+  });
+});
+
+describe("TM-depth feature map", () => {
+  it("lists nine stock tracks plus Custom with vibes", () => {
+    assert.equal(featureMapIdsMatchPlayable(), true);
+    assert.deepEqual(trackVibeIds(), [...PLAYABLE_ORDER]);
+    assert.equal(TRACK_VIBES.length, 10);
+    assert.equal(TRACK_VIBES.filter((row) => row.id !== "custom").length, 9);
+    const names = TRACK_VIBES.map((row) => row.name);
+    for (const name of [
+      "Green Circuit",
+      "Ridge Drop",
+      "Night Helix",
+      "White Pass",
+      "Arc Yard",
+      "Red Mesa",
+      "Black Hollow",
+      "Ember Caldera",
+      "Storm Dock",
+      "Custom",
+    ]) {
+      assert.ok(names.includes(name), `missing track ${name}`);
+    }
+    for (const row of TRACK_VIBES) {
+      assert.ok(row.vibe.length > 2, `${row.id} vibe`);
+      assert.ok(row.signature.length > 8, `${row.id} signature`);
+    }
+  });
+
+  it("catalogs every TM-depth feature Help and README must ship", () => {
+    assert.deepEqual(FEATURE_MAP_IDS, [
+      "rewind",
+      "surfaces",
+      "cameras",
+      "respawn",
+      "ghost-share",
+      "author-ghosts",
+      "editor",
+      "hotseat",
+      "validated",
+      "stock-laps",
+      "replay",
+      "photo",
+      "cup",
+      "garage",
+    ]);
+    const text = FEATURE_MAP.map((row) => `${row.name} ${row.blurb}`).join("\n");
+    assert.match(text, /Backspace/);
+    assert.match(text, /Chase → Far → Hood → Cabin/);
+    assert.match(text, /last checkpoint/);
+    assert.match(text, /author-line ghost/i);
+    assert.match(text, /Editor 1\.1/);
+    assert.match(text, /click-to-place checkpoints and boost pads/);
+    assert.match(text, /undo\/redo/);
+    assert.match(text, /snap-to-grid/);
+    assert.match(text, /flythrough/);
+    assert.match(text, /P2 races P1/);
+    assert.match(text, /not online anti-cheat/);
+    assert.match(text, /1 \/ 2 \/ 3/);
+    assert.match(text, /Watch replay/);
+    assert.match(text, /Ivory/);
+    assert.match(COPY.helpEyebrow, /Feature map/i);
+    assert.match(COPY.helpBlurb, /TM-depth/);
+    assert.match(COPY.featureTitle, /TM-depth/);
+  });
+
+  it("keeps README aligned with the Help feature map and control rows", () => {
+    assert.match(README, /## Feature map/);
+    assert.match(README, /## Tracks/);
+    assert.match(README, /## Controls/);
+    for (const track of TRACK_VIBES) {
+      assert.ok(README.includes(track.name), `README missing ${track.name}`);
+      assert.ok(README.includes(track.vibe), `README missing vibe ${track.vibe}`);
+    }
+    for (const row of FEATURE_MAP) {
+      assert.ok(README.includes(`**${row.name}**`) || README.includes(row.name), `README missing feature ${row.name}`);
+    }
+    for (const row of RACE_CONTROL_ROWS) {
+      assert.ok(README.includes(row.keys), `README missing keys ${row.keys}`);
+      assert.ok(README.includes(row.pad), `README missing pad ${row.pad}`);
+    }
+    assert.match(README, /Hold R or Delete/);
+    assert.match(README, /LB \+ Y/);
+    assert.match(README, /Chase → Far → Hood → Cabin/);
   });
 });

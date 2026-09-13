@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import {
   COPY,
+  FEATURE_MAP,
   MENU_CONTROL_ROWS,
   PHOTO_CONTROL_ROWS,
   RACE_CONTROL_ROWS,
   REPLAY_CONTROL_ROWS,
+  TRACK_VIBES,
   type ControlRow,
 } from "@/game/help";
 import { cn } from "@/lib/utils";
@@ -64,6 +66,36 @@ export function HelpScreen({ touch, padConnected, onClose, onUiClick }: Props) {
           data-allow-scroll
           className="min-h-0 flex-1 overflow-auto overscroll-contain px-5 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         >
+          <Section title={COPY.featureTitle}>
+            <ul className="space-y-2.5">
+              {FEATURE_MAP.map((row) => (
+                <li key={row.id} className="text-sm leading-relaxed">
+                  <span className="font-medium text-fg">{row.name}</span>
+                  <span className="text-muted"> — {row.blurb}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title={COPY.tracksTitle}>
+            <ul className="overflow-hidden rounded-lg border border-border bg-bg-elevated">
+              {TRACK_VIBES.map((track, i) => (
+                <li
+                  key={track.id}
+                  className={cn("px-3.5 py-2.5", i > 0 && "border-t border-border/80")}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                    <span className="font-medium text-fg">{track.name}</span>
+                    <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">
+                      {track.vibe}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted">{track.signature}</p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
           <Section title={COPY.driveTitle}>
             <BindTable rows={RACE_CONTROL_ROWS} />
             <p className="text-xs leading-relaxed text-subtle">{COPY.padNote}</p>
