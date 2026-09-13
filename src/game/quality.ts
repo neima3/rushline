@@ -184,6 +184,17 @@ export function themeLightLevels(
       bloomThreshold: Math.max(quality.bloomThreshold, 0.94),
     };
   }
+  if (theme === "works") {
+    // Sodium twilight. Own ladder — never fall through to Circuit High or Helix.
+    return {
+      sun: 1.12,
+      hemi: 0.68,
+      exposure: 0.98,
+      env: quality.environment ? 0.22 : 0,
+      bloomMul: 0.34,
+      bloomThreshold: Math.max(quality.bloomThreshold, 0.91),
+    };
+  }
   const high = quality.tier === "high";
   const med = quality.tier === "medium";
   return {

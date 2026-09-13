@@ -41,6 +41,7 @@ export const GRADE: Record<ThemeId, GradeLook> = {
   canyon: { vignette: 0.26, contrast: 1.07, saturation: 1.08, tint: 0xfff1e4 },
   night: { vignette: 0.3, contrast: 1.08, saturation: 1.1, tint: 0xf2e8ff },
   alpine: { vignette: 0.2, contrast: 1.05, saturation: 0.98, tint: 0xe8f4ff },
+  works: { vignette: 0.24, contrast: 1.065, saturation: 1.06, tint: 0xffe4c8 },
 };
 
 export type SkyLook = {
@@ -55,6 +56,7 @@ export const SKY_LOOK: Record<ThemeId, SkyLook> = {
   canyon: { horizon: 0xffa060, zenith: 0xffc8a0, haze: 0.52, sunGlow: 0.2 },
   night: { horizon: 0x4a3878, zenith: 0x1a1438, haze: 0.34, sunGlow: 0.05 },
   alpine: { horizon: 0xd4e6f4, zenith: 0xf4f8fc, haze: 0.36, sunGlow: 0.11 },
+  works: { horizon: 0xff8a48, zenith: 0x2a3040, haze: 0.42, sunGlow: 0.18 },
 };
 
 export const GATE_LOOK = {

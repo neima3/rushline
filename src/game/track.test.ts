@@ -48,11 +48,68 @@ describe("White Pass", () => {
 
   it("lists White Pass after the original three without rewriting them", () => {
     const ids = allTrackDefs().map((t) => t.id);
-    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit"]);
+    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard"]);
     assert.equal(TRACK_DEFS.circuit.name, "Green Circuit");
     assert.equal(TRACK_DEFS.canyon.name, "Ridge Drop");
     assert.equal(TRACK_DEFS.helix.name, "Night Helix");
     assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
     assert.equal(TRACK_DEFS.helix.env, "night");
+  });
+});
+
+describe("Arc Yard", () => {
+  it("compiles a closed works ribbon with checkpoints and boosts", () => {
+    const def = TRACK_DEFS.yard;
+    assert.equal(def.name, "Arc Yard");
+    assert.equal(def.env, "works");
+    assert.equal(def.laps, 1);
+    assert.equal(def.closed, true);
+    assert.ok(def.thumb.includes("yard"));
+
+    const track = getTrack("yard");
+    assert.ok(track.samples.length > 80, `samples ${track.samples.length}`);
+    assert.ok(track.length > 800 && track.length < 1600, `length ${track.length}`);
+    assert.ok(track.checkpoints.length >= 3, `cps ${track.checkpoints.join(",")}`);
+    assert.ok(track.boosts.length >= 2, `boosts ${track.boosts.join(",")}`);
+    for (let i = 1; i < track.checkpoints.length; i++) {
+      assert.ok(track.checkpoints[i]! > track.checkpoints[i - 1]!, "checkpoints advance");
+    }
+    const first = track.samples[0]!;
+    const last = track.samples[track.samples.length - 1]!;
+    const seam = Math.hypot(first.x - last.x, first.y - last.y, first.z - last.z);
+    assert.ok(seam < 18, `close seam ${seam}`);
+  });
+
+  it("has a rising medal ladder and ghost-ready save key", () => {
+    const m = TRACK_DEFS.yard.medals;
+    assert.ok(m.author < m.gold && m.gold < m.silver && m.silver < m.bronze);
+    assert.equal(medalFor("yard", m.author), "author");
+    assert.equal(medalFor("yard", m.gold), "gold");
+    assert.equal(medalFor("yard", m.silver), "silver");
+    assert.equal(medalFor("yard", m.bronze), "bronze");
+    assert.equal(medalFor("yard", m.bronze + 1), null);
+    const pace = medalPace("yard", 0);
+    assert.equal(pace.holding, "author");
+    assert.ok((pace.remain ?? 0) > 0);
+  });
+
+  it("stores an Arc Yard ghost on the same save shape as the other tracks", () => {
+    const ghost = [
+      { t: 0, s: 6, n: 0, heading: 0 },
+      { t: 400, s: 18, n: 0.1, heading: 0 },
+    ];
+    const save = { version: 1 as const, best: { yard: 32_400 }, ghosts: { yard: ghost } };
+    assert.equal(save.best.yard, 32_400);
+    assert.equal(save.ghosts.yard?.length, 2);
+    assert.equal(medalFor("yard", save.best.yard), "gold");
+  });
+
+  it("lists Arc Yard after White Pass without rewriting the first four", () => {
+    const ids = allTrackDefs().map((t) => t.id);
+    assert.deepEqual(ids, ["circuit", "canyon", "helix", "summit", "yard"]);
+    assert.equal(TRACK_DEFS.summit.name, "White Pass");
+    assert.equal(TRACK_DEFS.summit.env, "alpine");
+    assert.equal(TRACK_DEFS.helix.env, "night");
+    assert.equal(TRACK_DEFS.circuit.medals.author, 50_000);
   });
 });

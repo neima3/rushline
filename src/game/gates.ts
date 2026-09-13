@@ -28,14 +28,32 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
   const mats: THREE.Material[] = [];
   const textures: THREE.Texture[] = [];
   const night = theme === "night";
+  const works = theme === "works";
+  const neon = night || works;
   const h = finish ? 4.05 : 3.55;
   const w = sm.width * 0.5 + 0.42;
-  const postCol = finish ? (night ? 0xe8e4ff : GATE_LOOK.startPost) : night ? GATE_LOOK.cpNight : GATE_LOOK.cpDay;
-  const emit = finish ? GATE_LOOK.startEmissive : night ? GATE_LOOK.cpEmissiveNight : GATE_LOOK.cpEmissiveDay;
+  const postCol = finish
+    ? night
+      ? 0xe8e4ff
+      : works
+        ? 0xffd0a0
+        : GATE_LOOK.startPost
+    : night
+      ? GATE_LOOK.cpNight
+      : works
+        ? 0x4ee8d4
+        : GATE_LOOK.cpDay;
+  const emit = finish
+    ? GATE_LOOK.startEmissive
+    : night
+      ? GATE_LOOK.cpEmissiveNight
+      : works
+        ? 0x1aa890
+        : GATE_LOOK.cpEmissiveDay;
   const mat = new THREE.MeshStandardMaterial({
     color: postCol,
     emissive: emit,
-    emissiveIntensity: finish ? (night ? 0.7 : 0.42) : night ? 1.15 : 0.85,
+    emissiveIntensity: finish ? (neon ? 0.7 : 0.42) : neon ? 1.15 : 0.85,
     roughness: 0.22,
     metalness: 0.55,
   });
@@ -60,9 +78,9 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
   group.add(p1, p2, bar, b1, b2);
 
   const glow = new THREE.MeshBasicMaterial({
-    color: night ? 0x5ee8ff : finish ? 0xc4a574 : 0x3a80d0,
+    color: night ? 0x5ee8ff : works ? 0x4ee8d4 : finish ? 0xc4a574 : 0x3a80d0,
     transparent: true,
-    opacity: night ? 0.85 : 0.72,
+    opacity: neon ? 0.85 : 0.72,
     fog: true,
   });
   mats.push(glow);
@@ -89,12 +107,12 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
     plane(w * 1.2, 0.24, plateMat, h - 1.02, 0.05);
   } else {
     const panelMat = new THREE.MeshBasicMaterial({
-      color: night ? 0x0c1020 : 0x111318,
+      color: night ? 0x0c1020 : works ? 0x161210 : 0x111318,
       fog: true,
       side: THREE.DoubleSide,
     });
     const pinMat = new THREE.MeshBasicMaterial({
-      color: night ? 0x5ee8ff : 0xf4f4f2,
+      color: night ? 0x5ee8ff : works ? 0x4ee8d4 : 0xf4f4f2,
       fog: true,
       side: THREE.DoubleSide,
     });

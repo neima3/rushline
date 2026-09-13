@@ -28,4 +28,14 @@ describe("track look tokens", () => {
     const crown = roadCrown("alpine");
     assert.ok(crown.edge > crown.mid);
   });
+
+  it("keeps works asphalt darker and warmer than Circuit without matching Helix", () => {
+    const [r, g, b] = ASPHALT_BASE.works;
+    assert.ok(r < ASPHALT_BASE.stadium[0] && r > ASPHALT_BASE.night[0]);
+    assert.ok(r >= g && g >= b, `works base should read warm ${r},${g},${b}`);
+    assert.ok(ROAD_TINT.works.r < ROAD_TINT.stadium.r);
+    assert.ok(ROAD_TINT.works.r < ROAD_TINT.night.b);
+    const crown = roadCrown("works");
+    assert.ok(crown.edge > crown.mid);
+  });
 });

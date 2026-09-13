@@ -106,6 +106,15 @@ describe("quality presets", () => {
     assert.ok(alpineLow.near < 80);
     assert.ok(alpineLow.far < 440);
     assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5 }), NIGHT_FOG);
+
+    const works = themeLightLevels("works", QUALITY_PRESETS.high);
+    assert.notEqual(works.sun, high.sun);
+    assert.notEqual(works.exposure, helix.exposure);
+    assert.ok(works.bloomMul < 0.5 && works.bloomMul > alpine.bloomMul);
+    const worksLow = fogWindow("works", { fogNearMul: 0.52, fogFarMul: 0.5 });
+    assert.ok(worksLow.near < 80);
+    assert.ok(worksLow.far < 440);
+    assert.deepEqual(fogWindow("night", { fogNearMul: 0.52, fogFarMul: 0.5 }), NIGHT_FOG);
   });
 
   it("treats the ribbon edge as curb and ignores air", () => {
