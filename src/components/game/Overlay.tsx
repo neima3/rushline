@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import { Camera, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
+import { Camera, CircleHelp, Flag, Gamepad2, Pause, Settings, Volume2, VolumeX } from "lucide-react";
 import type { Game } from "@/game/Game";
 import { continueEvent, cupContinueLabel, getCupEvent } from "@/game/cup";
 import { loadHints } from "@/game/flow";
+import { pauseHint, raceHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { formatPaceRemain, medalPaceLabel } from "@/game/feel";
 import { getTrack, sampleAt, TRACK_DEFS } from "@/game/track";
@@ -14,6 +15,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
 import { CupScreen } from "./overlay/CupScreen";
 import { FirstRunHint } from "./overlay/FirstRunHint";
+import { HelpScreen } from "./overlay/HelpScreen";
 import { MenuScreen } from "./overlay/MenuScreen";
 import { PhotoScreen } from "./overlay/PhotoScreen";
 import { ResultsScreen } from "./overlay/ResultsScreen";
@@ -38,6 +40,8 @@ export function Overlay({ gameRef }: Props) {
   const pad = useGame((s) => s.pad);
   const settingsOpen = useGame((s) => s.settingsOpen);
   const setSettingsOpen = useGame((s) => s.setSettingsOpen);
+  const helpOpen = useGame((s) => s.helpOpen);
+  const setHelpOpen = useGame((s) => s.setHelpOpen);
   const settings = useGame((s) => s.settings);
   const fps = useGame((s) => s.fps);
   const touch = useGame((s) => s.touch);
@@ -53,18 +57,32 @@ export function Overlay({ gameRef }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 text-fg">
       {phase === "menu" || phase === "select" || phase === "garage" || phase === "cup" ? (
-        <button
-          type="button"
-          className="pointer-events-auto play-control absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
-          onClick={() => {
-            g()?.uiClick();
-            setSettingsOpen(true);
-          }}
-          aria-label="Settings"
-        >
-          <Settings className="size-4" strokeWidth={1.75} />
-          <span className="text-xs font-medium uppercase tracking-widest text-muted">Settings</span>
-        </button>
+        <div className="pointer-events-auto absolute top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex items-center gap-2">
+          <button
+            type="button"
+            className="play-control flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
+            onClick={() => {
+              g()?.uiClick();
+              setHelpOpen(true);
+            }}
+            aria-label="Help"
+          >
+            <CircleHelp className="size-4" strokeWidth={1.75} />
+            <span className="text-xs font-medium uppercase tracking-widest text-muted">Help</span>
+          </button>
+          <button
+            type="button"
+            className="play-control flex h-11 items-center gap-2 rounded-md border border-border bg-surface/90 px-3 text-fg"
+            onClick={() => {
+              g()?.uiClick();
+              setSettingsOpen(true);
+            }}
+            aria-label="Settings"
+          >
+            <Settings className="size-4" strokeWidth={1.75} />
+            <span className="text-xs font-medium uppercase tracking-widest text-muted">Settings</span>
+          </button>
+        </div>
       ) : null}
 
       {phase === "menu" || phase === "select" || phase === "garage" ? (
@@ -113,6 +131,10 @@ export function Overlay({ gameRef }: Props) {
           onSettings={() => {
             g()?.uiClick();
             setSettingsOpen(true);
+          }}
+          onHelp={() => {
+            g()?.uiClick();
+            setHelpOpen(true);
           }}
           select={phase === "select"}
           garage={phase === "garage"}
@@ -222,7 +244,7 @@ export function Overlay({ gameRef }: Props) {
         </div>
       ) : null}
 
-      {!hideHud && phase === "paused" && !settingsOpen ? (
+      {!hideHud && phase === "paused" && !settingsOpen && !helpOpen ? (
         <Modal
           title="Paused"
           subtitle={TRACK_DEFS[trackId].name}
@@ -230,10 +252,8 @@ export function Overlay({ gameRef }: Props) {
           extra={
             <p className="mt-3 text-xs leading-relaxed text-muted">
               {cupEvent
-                ? `${cupEvent.cupId === "author" ? "Author" : "Gold"} Cup · Event ${cupEvent.index + 1}/5 on ${TRACK_DEFS[trackId].name}.`
-                : touch
-                  ? "Options opens graphics, camera, and Track Assist. Resume keeps your run."
-                  : "Esc resumes. Options opens graphics, camera, and Track Assist."}
+                ? `${cupEvent.cupId === "author" ? "Author" : "Gold"} Cup · Event ${cupEvent.index + 1}/5 on ${TRACK_DEFS[trackId].name}. ${pauseHint({ touch, cup: true })}`
+                : pauseHint({ touch })}
             </p>
           }
           actions={[
@@ -250,6 +270,13 @@ export function Overlay({ gameRef }: Props) {
               onClick: () => {
                 g()?.uiClick();
                 g()?.enterPhoto();
+              },
+            },
+            {
+              label: "Help",
+              onClick: () => {
+                g()?.uiClick();
+                setHelpOpen(true);
               },
             },
             {
@@ -360,8 +387,18 @@ export function Overlay({ gameRef }: Props) {
         <SettingsPanel
           touch={touch}
           onClose={() => setSettingsOpen(false)}
+          onOpenHelp={() => setHelpOpen(true)}
           onUiClick={() => g()?.uiClick()}
           onMute={(v) => g()?.setMuted(v)}
+        />
+      ) : null}
+
+      {helpOpen && !photoMode ? (
+        <HelpScreen
+          touch={touch}
+          padConnected={pad.connected}
+          onClose={() => setHelpOpen(false)}
+          onUiClick={() => g()?.uiClick()}
         />
       ) : null}
 
@@ -371,9 +408,7 @@ export function Overlay({ gameRef }: Props) {
 
       {!hideHud && phase === "race" && hintGone ? (
         <p className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">
-          {pad.connected
-            ? padRaceHint(pad.xbox)
-            : "WASD steer and throttle · Space slide · R respawn · C camera · F photo · Esc pause"}
+          {pad.connected ? padRaceHint(pad.xbox) : raceHint("keyboard")}
         </p>
       ) : null}
 

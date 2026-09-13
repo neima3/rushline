@@ -1,5 +1,6 @@
 import { cupHeadline } from "@/game/cup";
 import { MEDAL_LABEL, resultsHeadline } from "@/game/flow";
+import { COPY } from "@/game/help";
 import { medalPace, TRACK_DEFS } from "@/game/track";
 import type { Medal, ResultsState, TrackId } from "@/game/types";
 import { cn, formatDelta, formatTime } from "@/lib/utils";
@@ -203,7 +204,7 @@ function CompareChip({
 
 function MedalCelebrate({ medal }: { medal: Medal | null }) {
   if (!medal) {
-    return <p className="mt-5 text-sm text-subtle">No medal this run — hunt bronze on the next.</p>;
+    return <p className="mt-5 text-sm text-subtle">{COPY.noMedal}</p>;
   }
   const tone =
     medal === "author"

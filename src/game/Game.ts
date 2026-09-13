@@ -135,8 +135,13 @@ export class Game {
     this.canvas.style.outline = "none";
     this.input.attach(this.canvas);
     this.input.onPauseHotkey = () => {
-      if (useGame.getState().settingsOpen) {
-        useGame.getState().setSettingsOpen(false);
+      const store = useGame.getState();
+      if (store.settingsOpen) {
+        store.setSettingsOpen(false);
+        return;
+      }
+      if (store.helpOpen) {
+        store.setHelpOpen(false);
         return;
       }
       if (this.phase === "race" || this.phase === "countdown") this.pause();
@@ -151,7 +156,8 @@ export class Game {
       this.setCamera(this.camera === "chase" ? "hood" : "chase");
     };
     this.input.onPhotoHotkey = () => {
-      if (useGame.getState().settingsOpen) return;
+      const store = useGame.getState();
+      if (store.settingsOpen || store.helpOpen) return;
       this.togglePhoto();
     };
     this.audio.attach();
@@ -440,6 +446,8 @@ export class Game {
 
   startRace(id?: TrackId, pref: GhostPref = "auto") {
     this.clearPhoto();
+    useGame.getState().setSettingsOpen(false);
+    useGame.getState().setHelpOpen(false);
     this.ghostPref = pref;
     if (id) this.load(id);
     else this.load(this.trackId);
@@ -573,8 +581,11 @@ export class Game {
       }
     }
 
-    if (store.settingsOpen) {
-      if (actions.back || actions.confirm || actions.pause) useGame.getState().setSettingsOpen(false);
+    if (store.settingsOpen || store.helpOpen) {
+      if (actions.back || actions.confirm || actions.pause) {
+        useGame.getState().setSettingsOpen(false);
+        useGame.getState().setHelpOpen(false);
+      }
     } else if (this.photoMode) {
       this.handlePhotoPad(actions, dt);
     } else {
@@ -811,7 +822,7 @@ export class Game {
 
   enterPhoto() {
     if (this.photoMode) return;
-    if (useGame.getState().settingsOpen) return;
+    if (useGame.getState().settingsOpen || useGame.getState().helpOpen) return;
     if (this.phase !== "race" && this.phase !== "countdown" && this.phase !== "paused" && this.phase !== "results") {
       return;
     }

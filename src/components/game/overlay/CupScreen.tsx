@@ -8,6 +8,7 @@ import {
   isEventUnlocked,
   type CupEvent,
 } from "@/game/cup";
+import { COPY } from "@/game/help";
 import { TRACK_ENV_LABEL } from "@/game/flow";
 import { TRACK_DEFS } from "@/game/track";
 import { useGame } from "@/game/store";
@@ -39,11 +40,9 @@ export function CupScreen({ ready, onContinue, onEvent, onBack }: Props) {
         className="overlay-enter flex max-h-full w-full max-w-xl flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0"
       >
         <header className="overlay-stagger-1">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">Challenge</p>
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">{COPY.cupEyebrow}</p>
           <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSH CUP</h1>
-          <p className="mt-3 max-w-sm text-pretty text-muted">
-            A short medal campaign. Clear Gold on every track, then hunt Author. Progress stays on this device.
-          </p>
+          <p className="mt-3 max-w-sm text-pretty text-muted">{COPY.cupBlurb}</p>
           <p className="mt-3 text-xs uppercase tracking-[0.16em] text-subtle">
             Gold {goldDone}/{CUP_EVENTS.gold.length}
             <span className="mx-2 text-border">·</span>

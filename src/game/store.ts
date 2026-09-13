@@ -172,6 +172,7 @@ type GameStore = {
   recents: Partial<Record<TrackId, number[]>>;
   settings: Settings;
   settingsOpen: boolean;
+  helpOpen: boolean;
   fps: number;
   photoMode: boolean;
   photoCapturing: boolean;
@@ -194,6 +195,7 @@ type GameStore = {
   setPad: (p: PadInfo) => void;
   setPadBanner: (text: string | null) => void;
   setSettingsOpen: (v: boolean) => void;
+  setHelpOpen: (v: boolean) => void;
   hydrateSettings: (s: Settings) => void;
   patchSettings: (p: Partial<Settings>) => void;
   setQuality: (q: Quality) => void;
@@ -230,6 +232,7 @@ export const useGame = create<GameStore>((set) => ({
   recents: {},
   settings: bootSettings,
   settingsOpen: false,
+  helpOpen: false,
   fps: 0,
   photoMode: false,
   photoCapturing: false,
@@ -256,7 +259,8 @@ export const useGame = create<GameStore>((set) => ({
   setTouch: (touch) => set({ touch }),
   setPad: (pad) => set({ pad }),
   setPadBanner: (padBanner) => set({ padBanner }),
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setSettingsOpen: (settingsOpen) => set((s) => ({ settingsOpen, helpOpen: settingsOpen ? false : s.helpOpen })),
+  setHelpOpen: (helpOpen) => set((s) => ({ helpOpen, settingsOpen: helpOpen ? false : s.settingsOpen })),
   hydrateSettings: (settings) => set({ settings, autoThrottle: settings.autoThrottle }),
   patchSettings: (p) =>
     set((s) => {

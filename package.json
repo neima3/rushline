@@ -16,7 +16,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/game/auto-throttle.test.ts src/game/feel.test.ts src/game/settings.test.ts src/game/quality.test.ts src/game/clock.test.ts src/game/textures.test.ts src/game/presentation.test.ts src/game/webgl.test.ts src/game/gamepad.test.ts src/game/ghost.test.ts src/game/audio.test.ts src/game/flow.test.ts src/game/photo.test.ts src/game/livery.test.ts src/game/cup.test.ts && node --experimental-strip-types --import ./scripts/ts-ext-hooks.mjs --test src/game/respawn.test.ts src/game/feel-sim.test.ts src/game/persist.test.ts src/game/input.test.ts src/game/track.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/game/auto-throttle.test.ts src/game/feel.test.ts src/game/settings.test.ts src/game/quality.test.ts src/game/clock.test.ts src/game/textures.test.ts src/game/presentation.test.ts src/game/webgl.test.ts src/game/gamepad.test.ts src/game/ghost.test.ts src/game/audio.test.ts src/game/flow.test.ts src/game/photo.test.ts src/game/livery.test.ts src/game/cup.test.ts src/game/help.test.ts && node --experimental-strip-types --import ./scripts/ts-ext-hooks.mjs --test src/game/respawn.test.ts src/game/feel-sim.test.ts src/game/persist.test.ts src/game/input.test.ts src/game/track.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
