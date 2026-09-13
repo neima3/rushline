@@ -57,7 +57,16 @@ Freeze a still with the HUD hidden.
 - Drag or WASD to orbit; **Q / E** (or − / =) zoom; wheel zooms on desktop
 - **Enter** or **Capture still** saves a PNG
 - **C** resets the orbit; **F** or **Esc** exits
-- After a finish you can follow the ghost and scrub the replay
+- After a finish you can follow the ghost and scrub the tape for a still
+
+## Replay viewer
+
+Watch a finished tape as a spectator — last run, the shipped author ghost, a PB, an imported rival, or a hotseat tape.
+
+- Open **Watch replay** from Results
+- The chase camera follows the car on the tape (C still cycles Chase → Far → Hood → Cabin)
+- Pause / play, scrub the timeline, then **Done** to return to Results
+- Photo mode stays a still: orbit, capture PNG, optional ghost scrub. Replay does not replace it.
 
 ## Audio
 
@@ -127,6 +136,7 @@ src/game/            # simulation + rendering (pure Three.js, no R3F)
   laps.ts            # stock 1 / 2 / 3 lap override
   validate.ts        # local no-rewind badge
   photo.ts           # photo orbit / still export
+  replay.ts          # spectator catalog + timeline clock
   store.ts           # zustand phase / HUD / save
   audio.ts           # Web Audio engine + stingers
 src/components/game/
@@ -134,7 +144,7 @@ src/components/game/
   Overlay.tsx        # menu, HUD, results, pause, help
   SettingsPanel.tsx  # graphics / audio / camera / assists
   TouchPad.tsx       # mobile controls
-  overlay/           # menu, cup, editor, help, photo, results
+  overlay/           # menu, cup, editor, help, photo, replay, results
 public/textures/     # skyboxes + track thumbnails
 ```
 

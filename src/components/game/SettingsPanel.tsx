@@ -288,7 +288,7 @@ export function SettingsPanel({
             <div className="rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5 text-xs leading-relaxed text-muted">
               <p className="text-sm font-medium text-fg">Keyboard, touch, and gamepad</p>
               <p className="mt-1">
-                Full bindings — including photo mode and menu navigation — live on the Help sheet so they stay in sync
+                Full bindings — including photo mode, the replay viewer, and menu navigation — live on the Help sheet so they stay in sync
                 with the code.
               </p>
               {onOpenHelp ? (

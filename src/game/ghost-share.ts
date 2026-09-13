@@ -7,7 +7,7 @@ export const GHOST_KIND = "rushline-ghost";
 export const GHOST_FILE_VERSION = 1;
 export const SHARE_KEY = "rushline-ghost-share-v1";
 
-export type GhostShareSource = "pb" | "last" | "import";
+export type GhostShareSource = "pb" | "last" | "import" | "author";
 
 export type GhostTapeRow = [t: number, s: number, n: number, heading: number];
 
@@ -152,7 +152,8 @@ export function decodeGhostFile(raw: unknown): GhostDecodeResult {
   if (typeof time !== "number" || !Number.isFinite(time) || time <= 0) return { ok: false, error: "time" };
   const frames = framesFromPayload(o);
   if (!frames) return { ok: false, error: "frames" };
-  const source: GhostShareSource = o.source === "last" || o.source === "import" ? o.source : "pb";
+  const source: GhostShareSource =
+    o.source === "last" || o.source === "import" || o.source === "author" ? o.source : "pb";
   const trackId = (o.trackId ?? o.track) as TrackId;
   return {
     ok: true,

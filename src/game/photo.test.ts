@@ -70,6 +70,11 @@ describe("ghost scrub", () => {
     assert.equal(ghostScrubTime(tape, 4), 1200);
     assert.equal(ghostScrubTime(null, 0.5), null);
   });
+
+  it("stays a still helper — replay clock does not change photo scrub math", () => {
+    assert.deepEqual(ghostScrubSpan(tape), { start: 200, end: 1200 });
+    assert.equal(ghostScrubTime(tape, 0.25), 450);
+  });
 });
 
 describe("still export helpers", () => {

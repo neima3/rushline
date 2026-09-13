@@ -33,6 +33,17 @@ import {
 } from "./feel";
 import { authorGhostFor } from "./author-ghost";
 import { compactFrames, pickRaceGhost, sampleGhost, shouldRecord } from "./ghost";
+import {
+  ghostSpeedAt,
+  listReplayTapes,
+  pickReplayTape,
+  replayDurationMs,
+  replayProgress,
+  replayTimeAt,
+  stepReplayClock,
+  type ReplaySource,
+  type ReplayTape,
+} from "./replay";
 import { padConnectCopy } from "./gamepad";
 import { applyTouchDrive, autoThrottleCap, clampTouchSpeed } from "./auto-throttle";
 import { COUNTDOWN_S, countdownPausedAt, countdownRemaining, wallClockMs } from "./clock";
@@ -137,6 +148,14 @@ export class Game {
   private photoOrbit: PhotoOrbit = defaultPhotoOrbit();
   private photoScrub = 1;
   private photoFollowGhost = false;
+  private replayMode = false;
+  private replayPlaying = false;
+  private replayTime = 0;
+  private replaySnapCam = false;
+  private replayTape: ReplayTape | null = null;
+  private replayTapes: ReplayTape[] = [];
+  private replayVis: CarSnap = emptySnap();
+  private replaySlidePrev = 0;
   private rewind = new RewindTape();
   private rewinding = false;
   private usedRewind = false;
@@ -170,12 +189,17 @@ export class Game {
         this.photoOrbit = defaultPhotoOrbit();
         return;
       }
+      if (this.replayMode) {
+        this.setCamera(nextCamera(this.camera));
+        return;
+      }
       if (isLobbyPhase(this.phase)) return;
       this.setCamera(nextCamera(this.camera));
     };
     this.input.onPhotoHotkey = () => {
       const store = useGame.getState();
       if (store.settingsOpen || store.helpOpen) return;
+      if (this.replayMode) return;
       this.togglePhoto();
     };
     this.audio.attach();
@@ -535,6 +559,7 @@ export class Game {
 
   openEditor() {
     this.clearPhoto();
+    this.clearReplay();
     useGame.getState().setSettingsOpen(false);
     useGame.getState().setHelpOpen(false);
     useGame.getState().setCupSession(null);
@@ -580,6 +605,7 @@ export class Game {
 
   openCup() {
     this.clearPhoto();
+    this.clearReplay();
     const progress = readCupProgress();
     const focus = getCupEvent(useGame.getState().cupFocusId);
     const next = continueEvent(progress) ?? focus ?? CUP_EVENTS.gold[0]!;
@@ -600,6 +626,7 @@ export class Game {
 
   startRace(id?: TrackId, pref: GhostPref = "auto") {
     this.clearPhoto();
+    this.clearReplay();
     useGame.getState().setSettingsOpen(false);
     useGame.getState().setHelpOpen(false);
     this.ghostPref = pref;
@@ -684,6 +711,7 @@ export class Game {
 
   menu() {
     this.clearPhoto();
+    this.clearReplay();
     this.phase = "menu";
     this.audio.setScene("menu");
     this.countdown = -1;
@@ -752,6 +780,8 @@ export class Game {
       }
     } else if (this.photoMode) {
       this.handlePhotoPad(actions, dt);
+    } else if (this.replayMode) {
+      this.handleReplayPad(actions, dt);
     } else {
       this.handleMenuPad(actions);
       if (actions.photo) this.togglePhoto();
@@ -782,7 +812,7 @@ export class Game {
       this.releaseRewind(now);
     }
 
-    const simulate = !this.photoMode && (this.phase === "race" || this.phase === "countdown") && !this.rewinding;
+    const simulate = !this.photoMode && !this.replayMode && (this.phase === "race" || this.phase === "countdown") && !this.rewinding;
     if (!this.photoMode && this.phase === "countdown") {
       const prevC = Math.ceil(this.countdown);
       this.countdown = countdownRemaining(this.countdownAt, now);
@@ -867,27 +897,44 @@ export class Game {
 
     const alpha = Math.max(0, Math.min(1, this.acc / FIXED_DT));
     const vis = lerpSnap(this.prev, this.curr, alpha, this.vis);
-    this.world.applyCar(vis, this.photoMode ? 0 : dt, this.photoMode ? 0 : actions.steer, this.photoMode ? 0 : actions.brake);
+    if (this.replayMode) this.stepReplay(dt);
+    const replaySnap = this.replayMode ? this.applyReplayPose() : null;
+    const camSnap = replaySnap ?? vis;
+    const freezeCar = this.photoMode || this.replayMode;
+    this.world.applyCar(camSnap, freezeCar && !this.replayMode ? 0 : dt, freezeCar ? 0 : actions.steer, freezeCar ? 0 : actions.brake);
     this.car.clearFeelPulses();
     const ghostTime = this.photoGhostTime() ?? this.time;
-    this.world.applyGhost(this.track, this.ghost, ghostTime, this.car.s, this.ghostSmooth);
-    this.world.stepParticles(this.photoMode ? 0 : dt);
-    const attract = !this.photoMode && isLobbyPhase(this.phase);
+    this.world.applyGhost(
+      this.track,
+      this.replayMode ? null : this.ghost,
+      ghostTime,
+      this.car.s,
+      this.replayMode ? null : this.ghostSmooth,
+    );
+    this.world.stepParticles(this.photoMode || this.replayMode ? 0 : dt);
+    const attract = !this.photoMode && !this.replayMode && isLobbyPhase(this.phase);
     if (this.photoMode) {
       this.world.applyPhotoCamera(this.photoLookTarget(vis), this.photoOrbit);
+    } else if (this.replayMode) {
+      if (this.replaySnapCam) {
+        this.world.snapCamera(camSnap, this.camera);
+        this.replaySnapCam = false;
+      } else {
+        this.world.updateCamera(camSnap, dt, this.camera, false, 0, this.track, this.reduced, 0);
+      }
     } else {
       this.world.updateCamera(vis, dt, this.camera, attract, this.attractS, this.track, this.reduced, actions.steer);
     }
-    this.audio.setScene(this.photoMode ? "paused" : this.phase);
-    const racing = !this.photoMode && (this.phase === "race" || this.phase === "countdown");
+    this.audio.setScene(this.photoMode || this.replayMode ? "paused" : this.phase);
+    const racing = !this.photoMode && !this.replayMode && (this.phase === "race" || this.phase === "countdown");
     this.audio.setEngine(
-      vis.speed,
-      this.photoMode ? 0 : actions.throttle,
-      vis.boost,
-      vis.airborne,
-      vis.slide,
+      camSnap.speed,
+      this.photoMode || this.replayMode ? 0 : actions.throttle,
+      camSnap.boost,
+      camSnap.airborne,
+      camSnap.slide,
       racing,
-      vis.surface,
+      camSnap.surface,
     );
     if (!this.world.contextLost) this.world.render();
 
@@ -1042,6 +1089,7 @@ export class Game {
 
   enterPhoto() {
     if (this.photoMode) return;
+    if (this.replayMode) this.clearReplay();
     if (this.rewinding) this.releaseRewind(performance.now());
     if (useGame.getState().settingsOpen || useGame.getState().helpOpen) return;
     if (this.phase !== "race" && this.phase !== "countdown" && this.phase !== "paused" && this.phase !== "results") {
@@ -1151,6 +1199,207 @@ export class Game {
       }
     }
     return vis;
+  }
+
+  collectReplayTapes(): ReplayTape[] {
+    const persisted = readLastSave().runs[this.trackId] ?? null;
+    const live =
+      this.recording.length >= 2
+        ? { time: useGame.getState().results?.time ?? this.time, frames: this.recording }
+        : null;
+    const last = persisted ?? live;
+    const save = readSave();
+    const pbFrames = save.ghosts[this.trackId];
+    const pbTime = save.best[this.trackId];
+    const pb = pbFrames && pbTime != null ? { time: pbTime, frames: pbFrames } : null;
+    const authorFrames = authorGhostFor(this.trackId);
+    const author = authorFrames
+      ? { time: this.track.def.medals.author, frames: authorFrames }
+      : null;
+    const store = useGame.getState();
+    const p1 = store.playMode === "hotseat" ? store.hotseat?.p1 : null;
+    const hotseat = p1 && p1.frames.length >= 2 ? { time: p1.time, frames: p1.frames } : null;
+    return listReplayTapes({
+      trackId: this.trackId,
+      last,
+      pb,
+      imported: readImportedGhost(this.trackId),
+      author,
+      hotseat,
+    });
+  }
+
+  canReplay() {
+    return this.collectReplayTapes().length > 0;
+  }
+
+  enterReplay(prefer?: ReplaySource) {
+    if (this.photoMode) this.exitPhoto();
+    if (useGame.getState().settingsOpen || useGame.getState().helpOpen) return false;
+    if (this.phase !== "results") return false;
+    const tapes = this.collectReplayTapes();
+    const tape = pickReplayTape(tapes, prefer);
+    if (!tape) return false;
+    this.replayTapes = tapes;
+    this.replayTape = tape;
+    this.replayMode = true;
+    this.replayPlaying = true;
+    const start = replayTimeAt(tape.frames, 0);
+    this.replayTime = start ?? tape.frames[0]!.t;
+    this.replaySnapCam = true;
+    useGame.getState().setReplayMode(true);
+    this.syncReplayHud();
+    this.input.touchSteer = 0;
+    this.input.touchThrottle = 0;
+    this.input.touchBrake = 0;
+    this.input.touchSlide = 0;
+    return true;
+  }
+
+  exitReplay() {
+    if (!this.replayMode) return;
+    this.clearReplay();
+    this.lastT = performance.now();
+    this.world.snapCamera(this.curr, this.camera);
+    this.capturePlayFocus();
+  }
+
+  setReplayPlaying(v: boolean) {
+    if (!this.replayMode || !this.replayTape) return;
+    const spanEnd = replayTimeAt(this.replayTape.frames, 1);
+    if (v && spanEnd != null && this.replayTime >= spanEnd - 8) {
+      const start = replayTimeAt(this.replayTape.frames, 0);
+      this.replayTime = start ?? this.replayTape.frames[0]!.t;
+      this.replaySnapCam = true;
+    }
+    this.replayPlaying = v;
+    this.syncReplayHud();
+  }
+
+  toggleReplayPlaying() {
+    this.setReplayPlaying(!this.replayPlaying);
+  }
+
+  setReplayScrub(u: number) {
+    if (!this.replayMode || !this.replayTape) return;
+    const t = replayTimeAt(this.replayTape.frames, u);
+    if (t == null) return;
+    this.replayTime = t;
+    this.replayPlaying = false;
+    this.replaySnapCam = true;
+    this.syncReplayHud();
+  }
+
+  setReplaySource(source: ReplaySource) {
+    if (!this.replayMode) return;
+    const tape = pickReplayTape(this.replayTapes, source);
+    if (!tape) return;
+    this.replayTape = tape;
+    const start = replayTimeAt(tape.frames, 0);
+    this.replayTime = start ?? tape.frames[0]!.t;
+    this.replayPlaying = true;
+    this.replaySnapCam = true;
+    this.syncReplayHud();
+  }
+
+  private stepReplay(dt: number) {
+    if (!this.replayTape) return;
+    const next = stepReplayClock(this.replayTime, dt * 1000, this.replayPlaying, this.replayTape.frames);
+    this.replayTime = next.time;
+    this.replayPlaying = next.playing;
+    this.syncReplayHud();
+  }
+
+  private applyReplayPose(): CarSnap | null {
+    const tape = this.replayTape;
+    if (!tape) return null;
+    const pose = sampleGhost(tape.frames, this.replayTime, this.track.length, this.track.def.closed);
+    if (!pose) return null;
+    const sm = sampleAt(this.track, pose.s);
+    const ch = Math.cos(pose.heading);
+    const sh = Math.sin(pose.heading);
+    const fx = sm.tx * ch - sm.rx * sh;
+    const fy = sm.ty * ch - sm.ry * sh;
+    const fz = sm.tz * ch - sm.rz * sh;
+    const snap = this.replayVis;
+    snap.s = pose.s;
+    snap.n = pose.n;
+    snap.heading = pose.heading;
+    snap.speed = ghostSpeedAt(tape.frames, this.replayTime, this.track.length);
+    snap.airborne = false;
+    snap.px = sm.x + sm.rx * pose.n + sm.ux * 0.38;
+    snap.py = sm.y + sm.ry * pose.n + sm.uy * 0.38;
+    snap.pz = sm.z + sm.rz * pose.n + sm.uz * 0.38;
+    snap.yaw = pose.heading;
+    snap.boost = 0;
+    snap.slide = 0;
+    snap.driftCharge = 0;
+    snap.justTurbo = false;
+    snap.justLand = false;
+    snap.justBoost = false;
+    snap.surface = sm.surface;
+    snap.fx = fx;
+    snap.fy = fy;
+    snap.fz = fz;
+    snap.ux = sm.ux;
+    snap.uy = sm.uy;
+    snap.uz = sm.uz;
+    return snap;
+  }
+
+  private syncReplayHud() {
+    const tape = this.replayTape;
+    const frames = tape?.frames ?? null;
+    useGame.getState().setReplayHud({
+      playing: this.replayPlaying,
+      scrub: replayProgress(frames, this.replayTime),
+      source: tape?.source ?? "none",
+      label: tape?.label ?? "",
+      time: this.replayTime,
+      duration: replayDurationMs(frames),
+      choices: this.replayTapes.map((t) => ({ source: t.source, label: t.label })),
+    });
+  }
+
+  private clearReplay() {
+    this.replayMode = false;
+    this.replayPlaying = false;
+    this.replayTime = 0;
+    this.replaySnapCam = false;
+    this.replayTape = null;
+    this.replayTapes = [];
+    this.replaySlidePrev = 0;
+    useGame.getState().setReplayMode(false);
+  }
+
+  private handleReplayPad(
+    actions: {
+      confirm: boolean;
+      back: boolean;
+      pause: boolean;
+      camera: boolean;
+      photo: boolean;
+      steer: number;
+      slide: number;
+    },
+    dt: number,
+  ) {
+    if (actions.back || actions.pause) {
+      this.exitReplay();
+      return;
+    }
+    if (actions.photo) return;
+    const slideEdge = actions.slide > 0.5 && this.replaySlidePrev <= 0.5;
+    this.replaySlidePrev = actions.slide;
+    if (actions.confirm || slideEdge) {
+      this.toggleReplayPlaying();
+      return;
+    }
+    if (actions.camera) this.cycleCamera();
+    if (Math.abs(actions.steer) > 0.35 && this.replayTape) {
+      const u = replayProgress(this.replayTape.frames, this.replayTime) + actions.steer * dt * 0.22;
+      this.setReplayScrub(u);
+    }
   }
 
   private handlePhotoPad(actions: { confirm: boolean; back: boolean; pause: boolean; camera: boolean; photo: boolean; steer: number; throttle: number; brake: number }, dt: number) {
@@ -1312,6 +1561,7 @@ export class Game {
 
   dispose() {
     this.clearPhoto();
+    this.clearReplay();
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.raf = 0;

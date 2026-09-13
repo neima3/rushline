@@ -93,6 +93,16 @@ describe("ghost file encode/decode", () => {
     assert.equal(ghostHudTag("hotseat"), "P1");
   });
 
+  it("round-trips an author-tagged ghost file", () => {
+    const file = encodeGhostFile({ trackId: "circuit", time: 50_000, source: "author", frames: rec(20) });
+    assert.equal(file.source, "author");
+    const decoded = decodeGhostFile(file);
+    assert.equal(decoded.ok, true);
+    if (!decoded.ok) return;
+    assert.equal(decoded.file.source, "author");
+    assert.equal(decoded.file.trackId, "circuit");
+  });
+
   it("accepts Ember Caldera and Storm Dock keys from the nine-track campaign", () => {
     assert.deepEqual(TRACK_ORDER.slice(-2), ["ember", "storm"]);
     assert.equal(isTrackId("ember"), true);
