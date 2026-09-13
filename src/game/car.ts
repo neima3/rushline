@@ -173,6 +173,23 @@ export function makeCar(ghost: boolean): CarRig {
   });
   flameMat.blending = THREE.AdditiveBlending;
   flameMat.depthWrite = false;
+  const markerMat = mat({
+    color: 0xffc878,
+    roughness: 0.28,
+    metalness: 0.35,
+    emissive: 0xffc878,
+    emissiveIntensity: 0.22,
+  });
+  const underglowMat = new THREE.MeshBasicMaterial({
+    color: 0x5ee8ff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    fog: true,
+  });
+  mats.push(underglowMat);
+  baseOpacity.push(0);
 
   const add = (mesh: THREE.Mesh, parent: THREE.Object3D = body) => {
     mesh.castShadow = !ghost;
@@ -255,6 +272,19 @@ export function makeCar(ghost: boolean): CarRig {
     const ring = add(mesh(new THREE.RingGeometry(0.13, 0.155, 14), carbon));
     ring.position.set(x + (x < 0 ? -0.002 : 0.002), 0.4, 0.06);
     ring.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+    const marker = add(mesh(new THREE.BoxGeometry(0.04, 0.035, 0.72), markerMat));
+    marker.position.set(x, 0.28, -0.02);
+  }
+  let underglow: THREE.Mesh | null = null;
+  if (!ghost) {
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.28, 2.05), underglowMat);
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.y = 0.04;
+    glow.renderOrder = -1;
+    glow.castShadow = false;
+    glow.receiveShadow = false;
+    body.add(glow);
+    underglow = glow;
   }
 
   for (const x of [-0.38, 0.38]) {
@@ -477,6 +507,14 @@ export function makeCar(ghost: boolean): CarRig {
     (carbon as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.7;
     (rim as THREE.MeshPhysicalMaterial).envMapIntensity = env * 0.85;
     (carbon as THREE.MeshStandardMaterial).color.setHex(night ? 0x12182a : grove ? 0x121814 : storm ? 0x121820 : 0x1a1a1e);
+    const markerHex = night ? 0x5ee8ff : grove ? 0x7ee8a0 : storm ? 0x88d0ff : next === "ember" ? 0xff7030 : 0xffc878;
+    (markerMat as THREE.MeshStandardMaterial).color.setHex(markerHex);
+    (markerMat as THREE.MeshStandardMaterial).emissive.setHex(markerHex);
+    (markerMat as THREE.MeshStandardMaterial).emissiveIntensity = dark ? 1.15 : 0.22;
+    if (underglow) {
+      underglowMat.color.setHex(markerHex);
+      underglowMat.opacity = dark ? 0.2 : next === "ember" ? 0.08 : 0;
+    }
     paintLivery(liveryId);
     if (boostLight) boostLight.color.setHex(night ? 0x4ef0ff : grove ? 0x6ef0a0 : storm ? 0x88d0ff : next === "ember" ? 0xff6020 : 0xff7a2a);
   };

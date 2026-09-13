@@ -3,7 +3,19 @@ import { customDefFromSave, readActiveCustom } from "./editor.ts";
 import type { BuiltTrack, Medal, Sample, SurfaceKind, ThemeId, TrackDef, TrackId, TrackNode } from "./types";
 import { TRACK_ORDER, type StockTrackId } from "./types.ts";
 import { defaultSurface } from "./feel.ts";
-import { roadCrown, roadSurfaceTint, surfaceBand, surfaceDashColor, surfaceShowsDash } from "./look";
+import {
+  curbBlockHigh,
+  curbColor,
+  curbDims,
+  edgeMark,
+  lipColor,
+  lipWidth,
+  roadCrown,
+  roadSurfaceTint,
+  surfaceBand,
+  surfaceDashColor,
+  surfaceShowsDash,
+} from "./look";
 import { makeAsphaltRoughness, makeAsphaltTexture, makeCheckerTexture } from "./textures";
 import type { TextureBudget } from "./quality";
 
@@ -753,44 +765,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     strip(roadPos, roadNrm, roadCol, roadUv, alx, aly, alz, amx, amy, amz, blx, bly, blz, bmx, bmy, bmz, a.ux, a.uy, a.uz, colL, u0, u1);
     strip(roadPos, roadNrm, roadCol, roadUv, amx, amy, amz, arx, ary, arz, bmx, bmy, bmz, brx, bry, brz, a.ux, a.uy, a.uz, colM, u0, u1);
 
-    const stripe = Math.floor(a.s / 2.0) % 2 === 0;
-    const cw =
-      theme === "stadium"
-        ? 0.78
-        : theme === "canyon"
-          ? 0.62
-          : theme === "alpine"
-            ? 0.7
-            : theme === "works"
-              ? 0.64
-              : theme === "mesa"
-                ? 0.66
-                : theme === "grove"
-                  ? 0.58
-                  : theme === "ember"
-                    ? 0.64
-                    : theme === "storm"
-                      ? 0.6
-                      : 0.55;
-    const ch =
-      theme === "stadium"
-        ? 0.28
-        : theme === "canyon"
-          ? 0.16
-          : theme === "alpine"
-            ? 0.22
-            : theme === "works"
-              ? 0.18
-              : theme === "mesa"
-                ? 0.17
-                : theme === "grove"
-                  ? 0.14
-                  : theme === "ember"
-                    ? 0.16
-                    : theme === "storm"
-                      ? 0.15
-                      : 0.13;
-    const lift = theme === "stadium" ? 0.05 : theme === "alpine" ? 0.04 : theme === "works" ? 0.035 : theme === "mesa" ? 0.03 : theme === "ember" ? 0.032 : 0.025;
+    const sausage = curbBlockHigh(theme, (a.s + b.s) * 0.5);
+    const { width: cw, height: ch, lift } = curbDims(theme, sausage);
     for (const side of [-1, 1] as const) {
       const aox = side < 0 ? alx : arx;
       const aoy = side < 0 ? aly : ary;
@@ -798,42 +774,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       const box = side < 0 ? blx : brx;
       const boy = side < 0 ? bly : bry;
       const boz = side < 0 ? blz : brz;
-      const curbA =
-        theme === "night"
-          ? side < 0
-            ? { r: 0.18, g: 0.96, b: 1 }
-            : { r: 1, g: 0.22, b: 0.68 }
-          : theme === "works"
-            ? side < 0
-              ? { r: 0.12, g: 0.94, b: 0.86 }
-              : { r: 1, g: 0.48, b: 0.08 }
-            : theme === "grove"
-              ? side < 0
-                ? { r: 0.42, g: 0.92, b: 0.58 }
-                : { r: 0.86, g: 0.72, b: 0.28 }
-              : theme === "mesa"
-                ? stripe
-                  ? { r: 0.96, g: 0.42, b: 0.12 }
-                  : { r: 0.98, g: 0.86, b: 0.52 }
-                : theme === "ember"
-                  ? stripe
-                    ? { r: 1, g: 0.28, b: 0.08 }
-                    : { r: 0.98, g: 0.62, b: 0.18 }
-                  : theme === "storm"
-                    ? side < 0
-                      ? { r: 0.28, g: 0.72, b: 0.92 }
-                      : { r: 0.86, g: 0.9, b: 0.96 }
-                    : stripe
-                  ? theme === "stadium"
-                    ? { r: 1, g: 0.1, b: 0.06 }
-                    : theme === "alpine"
-                      ? { r: 0.42, g: 0.72, b: 0.94 }
-                      : { r: 0.98, g: 0.2, b: 0.1 }
-                  : theme === "stadium"
-                    ? { r: 1, g: 1, b: 1 }
-                    : theme === "alpine"
-                      ? { r: 0.96, g: 0.98, b: 1 }
-                      : { r: 0.99, g: 0.97, b: 0.92 };
+      const curbA = curbColor(theme, side, sausage);
       const aex = aox + a.rx * side * cw + a.ux * ch;
       const aey = aoy + a.ry * side * cw + a.uy * ch;
       const aez = aoz + a.rz * side * cw + a.uz * ch;
@@ -870,21 +811,8 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       pushTri(curbPos, curbNrm, curbCol, null, aox, aoy, aoz, bex, bey, bez, aex, aey, aez, nx, ny, nz, curbA);
       pushTri(curbPos, curbNrm, curbCol, null, aox, aoy, aoz, box, boy, boz, bex, bey, bez, nx, ny, nz, curbA);
 
-      const lip = theme === "stadium" ? 0.18 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.15 : theme === "ember" ? 0.16 : 0.12;
-      const lipCol =
-        theme === "night"
-          ? { r: 0.07, g: 0.09, b: 0.14 }
-          : theme === "works"
-            ? { r: 0.1, g: 0.08, b: 0.07 }
-            : theme === "grove"
-              ? { r: 0.06, g: 0.1, b: 0.08 }
-              : theme === "mesa"
-                ? { r: 0.16, g: 0.1, b: 0.05 }
-                : theme === "ember"
-                  ? { r: 0.18, g: 0.08, b: 0.04 }
-                  : theme === "storm"
-                    ? { r: 0.08, g: 0.1, b: 0.14 }
-                    : { r: 0.07, g: 0.07, b: 0.08 };
+      const lip = lipWidth(theme);
+      const lipCol = lipColor(theme);
       const l0x = aox - a.rx * side * lip + a.ux * 0.03;
       const l0y = aoy - a.ry * side * lip + a.uy * 0.03;
       const l0z = aoz - a.rz * side * lip + a.uz * 0.03;
@@ -1002,26 +930,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       strip(markPos, markNrm, markCol, markUv, ly0x, ly0y, ly0z, ly1x, ly1y, ly1z, ly2x, ly2y, ly2z, ly3x, ly3y, ly3z, a.ux, a.uy, a.uz, white, u0, u1);
     }
 
-    const edgeW = theme === "canyon" ? 0.26 : theme === "stadium" ? 0.14 : theme === "alpine" ? 0.16 : theme === "works" ? 0.14 : theme === "mesa" ? 0.2 : theme === "ember" ? 0.22 : theme === "storm" ? 0.16 : 0.1;
-    const inset = theme === "canyon" ? 0.12 : theme === "mesa" ? 0.14 : theme === "ember" ? 0.13 : 0.22;
-    const edgeCol =
-      theme === "stadium"
-        ? { r: 1, g: 1, b: 0.98 }
-        : theme === "night"
-          ? { r: 0.62, g: 0.96, b: 1 }
-          : theme === "alpine"
-            ? { r: 0.88, g: 0.94, b: 1 }
-            : theme === "works"
-              ? { r: 0.28, g: 0.92, b: 0.86 }
-              : theme === "mesa"
-                ? { r: 0.98, g: 0.78, b: 0.32 }
-                : theme === "grove"
-                  ? { r: 0.52, g: 0.88, b: 0.62 }
-                  : theme === "ember"
-                    ? { r: 1, g: 0.48, b: 0.16 }
-                    : theme === "storm"
-                      ? { r: 0.62, g: 0.84, b: 0.96 }
-                      : { r: 0.98, g: 0.96, b: 0.9 };
+    const { width: edgeW, inset, color: edgeCol } = edgeMark(theme);
     for (const side of [-1, 1] as const) {
       const e0x = a.x + a.rx * side * (ha - inset) + a.ux * 0.025;
       const e0y = a.y + a.ry * side * (ha - inset) + a.uy * 0.025;
@@ -1159,17 +1068,40 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   const boostMat = new THREE.MeshStandardMaterial({
     color: theme === "night" ? 0x6ec8ff : theme === "works" ? 0x4ee8d4 : theme === "grove" ? 0x7ee8a0 : theme === "ember" ? 0xff7a30 : theme === "storm" ? 0x7ec8e8 : 0xe8c56a,
     emissive: theme === "night" ? 0x3a8cff : theme === "works" ? 0x1aa890 : theme === "grove" ? 0x2a8850 : theme === "ember" ? 0xc04010 : theme === "storm" ? 0x2a6088 : 0xc9a44a,
-    emissiveIntensity: 1.15,
-    roughness: 0.3,
-    metalness: 0.25,
+    emissiveIntensity: 1.35,
+    roughness: 0.28,
+    metalness: 0.28,
     side: THREE.DoubleSide,
+  });
+  const boostPadMat = new THREE.MeshStandardMaterial({
+    color: theme === "night" ? 0x3a80c8 : theme === "ember" ? 0xc05018 : 0xc9a44a,
+    emissive: theme === "night" ? 0x1a4a88 : theme === "works" ? 0x0a6058 : theme === "ember" ? 0x801808 : theme === "storm" ? 0x184060 : 0x6a4a10,
+    emissiveIntensity: 0.55,
+    roughness: 0.42,
+    metalness: 0.18,
+    transparent: true,
+    opacity: 0.38,
+    side: THREE.DoubleSide,
+    depthWrite: false,
   });
   const chevron = new THREE.BufferGeometry();
   const cv = new Float32Array([0, 0.5, 0, -0.45, -0.5, 0, 0.45, -0.5, 0]);
   chevron.setAttribute("position", new THREE.BufferAttribute(cv, 3));
   chevron.computeVertexNormals();
+  const padGeo = new THREE.PlaneGeometry(1, 1);
   for (const bs of track.boosts) {
     const sm = sampleAt(track, bs);
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(sm.rx, sm.ry, sm.rz).normalize(),
+      new THREE.Vector3(sm.tx, sm.ty, sm.tz).normalize(),
+      new THREE.Vector3(sm.ux, sm.uy, sm.uz).normalize(),
+    );
+    const pad = new THREE.Mesh(padGeo, boostPadMat);
+    pad.position.set(sm.x + sm.ux * 0.03, sm.y + sm.uy * 0.03, sm.z + sm.uz * 0.03);
+    pad.scale.set(sm.width * 0.62, 3.4, 1);
+    pad.quaternion.setFromRotationMatrix(basis);
+    pad.renderOrder = 1;
+    group.add(pad);
     for (let k = 0; k < 3; k++) {
       const mesh = new THREE.Mesh(chevron, boostMat);
       const along = (k - 1) * 1.15;
@@ -1179,18 +1111,15 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
         sm.z + sm.tz * along + sm.uz * 0.05,
       );
       mesh.scale.set(sm.width * 0.22, 1.1, 1);
-      const x = new THREE.Vector3(sm.rx, sm.ry, sm.rz).normalize();
-      const y = new THREE.Vector3(sm.tx, sm.ty, sm.tz).normalize();
-      const z = new THREE.Vector3(sm.ux, sm.uy, sm.uz).normalize();
-      mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+      mesh.quaternion.setFromRotationMatrix(basis);
       group.add(mesh);
     }
   }
 
   return {
     group,
-    materials: [roadMat, curbMat, wallMat, markMat, railMat, postMat, boostMat, gridMat],
-    geos: [roadGeo, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, grid.geometry as THREE.BufferGeometry],
+    materials: [roadMat, curbMat, wallMat, markMat, railMat, postMat, boostMat, boostPadMat, gridMat],
+    geos: [roadGeo, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, padGeo, grid.geometry as THREE.BufferGeometry],
     textures: asphaltRough ? [asphalt, asphaltRough, checker] : [asphalt, checker],
   };
 }

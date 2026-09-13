@@ -24,14 +24,14 @@ export function Minimap({ trackId, s, n, heading, ghostS, ghostN }: Props) {
       aria-hidden
     >
       <svg viewBox="0 0 100 100" className="size-full">
-        <path d={map.d} fill="none" stroke="rgba(8,10,16,0.7)" strokeWidth="4.2" strokeLinejoin="round" />
-        <path d={map.d} fill="none" stroke="rgba(244,244,242,0.72)" strokeWidth="2.6" strokeLinejoin="round" />
-        <circle cx={map.start.x} cy={map.start.y} r="2.1" fill="#c4a574" stroke="rgba(8,10,16,0.7)" strokeWidth="0.7" />
+        <path d={map.d} fill="none" stroke="rgba(4,6,10,0.88)" strokeWidth="5" strokeLinejoin="round" />
+        <path d={map.d} fill="none" stroke="rgba(244,244,242,0.86)" strokeWidth="2.7" strokeLinejoin="round" />
+        <circle cx={map.start.x} cy={map.start.y} r="2.3" fill="#c4a574" stroke="rgba(8,10,16,0.85)" strokeWidth="0.8" />
         {ghost ? (
-          <circle cx={ghost.x} cy={ghost.y} r="2.5" fill="#5ee8ff" stroke="rgba(8,10,16,0.85)" strokeWidth="0.8" />
+          <circle cx={ghost.x} cy={ghost.y} r="2.6" fill="#5ee8ff" stroke="rgba(8,10,16,0.9)" strokeWidth="0.85" />
         ) : null}
         <g transform={`translate(${car.x} ${car.y}) rotate(${(yaw * 180) / Math.PI})`}>
-          <polygon points="0,-3.6 2.5,3.3 -2.5,3.3" fill="#f4f4f2" stroke="#09090b" strokeWidth="0.7" />
+          <polygon points="0,-3.7 2.6,3.4 -2.6,3.4" fill="#f4f4f2" stroke="#09090b" strokeWidth="0.75" />
         </g>
       </svg>
     </div>

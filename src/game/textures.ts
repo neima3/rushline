@@ -52,14 +52,15 @@ export function makeAsphaltTexture(theme: ThemeId, opts?: TextureMakeOpts): THRE
       const dirtRut = theme === "canyon" ? Math.sin(x * 0.11) * 12 + ((y >> 4) % 2 === 0 ? 6 : -4) : 0;
       const wear = theme === "stadium" ? Math.max(0, 10 - Math.abs(x - 128) * 0.08) : 0;
       const edgeGrime = theme === "stadium" ? Math.max(0, (Math.abs(x - 128) / 128) * 22) : 0;
-      d[i] = Math.max(0, Math.min(255, base[0] + n + oil - edgeGrime + seam + panel + iceStreak * 0.7 + dirtRut + wear));
+      const groove = theme === "stadium" && x % 32 < 2 ? 10 : theme === "storm" && y % 18 < 1 ? 8 : 0;
+      d[i] = Math.max(0, Math.min(255, base[0] + n + oil - edgeGrime - groove + seam + panel + iceStreak * 0.7 + dirtRut + wear));
       d[i + 1] = Math.max(
         0,
-        Math.min(255, base[1] + n * 0.88 - edgeGrime + seam * 0.55 + panel * 0.9 + iceStreak * 0.9 + dirtRut * 0.7 + wear * 0.7),
+        Math.min(255, base[1] + n * 0.88 - edgeGrime - groove + seam * 0.55 + panel * 0.9 + iceStreak * 0.9 + dirtRut * 0.7 + wear * 0.7),
       );
       d[i + 2] = Math.max(
         0,
-        Math.min(255, base[2] + n * 0.78 - oil - edgeGrime + seam + panel * 1.1 + iceStreak + dirtRut * 0.4 + wear * 0.5),
+        Math.min(255, base[2] + n * 0.78 - oil - edgeGrime - groove + seam + panel * 1.1 + iceStreak + dirtRut * 0.4 + wear * 0.5),
       );
       d[i + 3] = 255;
     }
@@ -104,8 +105,9 @@ export function makeAsphaltRoughness(theme: ThemeId, opts?: TextureMakeOpts): TH
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
       const grit = hash(x * 19 + y * 11) * 46;
-      const oil = Math.sin((x + y) * 0.07) * (theme === "night" ? 10 : 22);
-      const v = Math.max(40, Math.min(220, mid + grit - oil));
+      const oil = Math.sin((x + y) * 0.07) * (theme === "night" ? 10 : theme === "storm" ? 16 : 22);
+      const groove = theme === "stadium" && x % 32 < 2 ? 18 : 0;
+      const v = Math.max(40, Math.min(220, mid + grit - oil + groove));
       d[i] = d[i + 1] = d[i + 2] = v;
       d[i + 3] = 255;
     }
