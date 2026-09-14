@@ -50,10 +50,12 @@ export type SurfaceFeel = {
 };
 
 const SURFACE_FEEL: Record<SurfaceKind, SurfaceFeel> = {
-  plastic: { grip: 1, slideEntry: 1, accel: 1, brake: 0.97, drag: 1, turn: 1.06, yaw: 1.04 },
-  dirt: { grip: 0.62, slideEntry: 0.5, accel: 0.8, brake: 0.74, drag: 1.24, turn: 1.16, yaw: 1.24 },
-  ice: { grip: 0.34, slideEntry: 0.32, accel: 0.88, brake: 0.46, drag: 0.76, turn: 1.28, yaw: 1.42 },
-  tech: { grip: 1.1, slideEntry: 1.14, accel: 1.04, brake: 1.06, drag: 0.94, turn: 0.92, yaw: 0.9 },
+  // Plastic slides on request. Dirt holds then breaks late. Ice goes early
+  // with weak brakes. Tech sticks until you really ask.
+  plastic: { grip: 1, slideEntry: 0.94, accel: 1, brake: 0.97, drag: 1, turn: 1.09, yaw: 1.05 },
+  dirt: { grip: 0.6, slideEntry: 0.82, accel: 0.8, brake: 0.72, drag: 1.26, turn: 1.2, yaw: 1.3 },
+  ice: { grip: 0.32, slideEntry: 0.31, accel: 0.88, brake: 0.42, drag: 0.74, turn: 1.34, yaw: 1.5 },
+  tech: { grip: 1.14, slideEntry: 1.24, accel: 1.04, brake: 1.08, drag: 0.92, turn: 0.88, yaw: 0.86 },
 };
 
 export function defaultSurface(id: TrackId): SurfaceKind {
@@ -95,16 +97,16 @@ export function shapeTouchSteer(raw: number): number {
   const a = Math.abs(x);
   if (a <= TOUCH_STEER_DEADZONE) return 0;
   const t = (a - TOUCH_STEER_DEADZONE) / (1 - TOUCH_STEER_DEADZONE);
-  const shaped = t * t * 0.08 + t * 0.92;
+  const shaped = t * t * 0.04 + t * 0.96;
   return Math.sign(x) * clamp(shaped, 0, 1);
 }
 
-/** Shared steer curve. Deadzone kept; mid-lock nearly linear so WASD/pad bite. */
+/** Shared steer curve. Deadzone kept; mid-lock linear so WASD/pad bite at speed. */
 export function steerCurve(x: number) {
   const s = Math.sign(x);
   const a = Math.abs(x);
   if (a < 0.06) return 0;
-  return s * (a * a * 0.1 + a * 0.9);
+  return s * (a * a * 0.06 + a * 0.94);
 }
 
 /**
@@ -184,17 +186,17 @@ export function driftSteerThreshold(slideHeld: boolean): number {
 /** After a plant, bleed steer so the nose does not flick off the ribbon. */
 export function landSteerScale(landLock: number): number {
   if (landLock <= 0) return 1;
-  return 0.62 + 0.38 * (1 - Math.min(1, landLock / 0.2));
+  return 0.58 + 0.42 * (1 - Math.min(1, landLock / 0.2));
 }
 
-/** Air yaw — enough to line Ridge / Helix / Ember drops without hover-steer. */
+/** Air yaw — line Ridge / Helix / Ember drops; damp so it is not hover-steer. */
 export function airTurnRate(): number {
-  return 2.48;
+  return 2.36;
 }
 
 /** Side slip while air-steering so a lined drop actually moves onto the ribbon. */
 export function airLatRate(): number {
-  return 3.35;
+  return 3.2;
 }
 
 /** Trackmania-style air pitch: throttle dives, brake lifts. */
@@ -219,7 +221,7 @@ export function canLandWindow(): { min: number; max: number } {
 
 export function landLockTime(impact: number, magnet: boolean): number {
   if (magnet) return 0.16;
-  return 0.13 + Math.min(0.1, Math.max(0, impact) * 0.007);
+  return 0.12 + Math.min(0.1, Math.max(0, impact) * 0.007);
 }
 
 /**
@@ -229,7 +231,7 @@ export function landLockTime(impact: number, magnet: boolean): number {
 export function landHeadingMix(airSteerAbs: number, magnet: boolean): { keep: number; fromVel: number } {
   if (magnet) return { keep: 0.72, fromVel: 0 };
   const a = clamp(airSteerAbs, 0, 1);
-  const keep = 0.28 + a * 0.32;
+  const keep = 0.22 + a * 0.36;
   return { keep, fromVel: 1 - keep };
 }
 
@@ -352,16 +354,21 @@ export function steerFilter(prev: number, target: number, dt: number, analog: bo
   const goal = clamp(target, -1, 1);
   if (!analog) return goal;
   const releasing = Math.abs(goal) < Math.abs(prev) - 0.02;
-  const rate = releasing ? 26 : 21;
+  const rate = releasing ? 30 : 23;
   return prev + (goal - prev) * Math.min(1, rate * Math.max(0, dt));
+}
+
+/** High-speed authority. A little fade so lock stays readable, not mush. */
+export function steerSpeedScale(speedNorm: number): number {
+  return 1 - 0.08 * clamp(speedNorm, 0, 1);
 }
 
 /** First third of lock bites; full lock stays controllable. Does not rewrite steerCurve. */
 export function steerBite(steerAbs: number): number {
   const a = Math.abs(steerAbs);
   if (a < 0.06) return 1;
-  if (a < 0.38) return 1.26 - a * 0.38;
-  return 1.04;
+  if (a < 0.38) return 1.28 - a * 0.4;
+  return 1.05;
 }
 
 /**
@@ -387,7 +394,12 @@ export function slideCommitted(
   if (!slideHeld || speedAbs < 6.5) return false;
   if (latched) return true;
   const gate = driftSteerThreshold(true) * Math.max(0.18, entry);
-  return steerAbs > gate && speedAbs > 8;
+  return steerAbs > gate && speedAbs > slideSpeedGate(entry);
+}
+
+/** Ice breaks earlier / slower; tech needs more speed before it lets go. */
+export function slideSpeedGate(entry = 1): number {
+  return 8 + (entry - 1) * 2.2;
 }
 
 export function slideYawLimit(drifting: boolean, slideHeld: boolean, yawScale = 1): number {
@@ -411,25 +423,26 @@ export function slideReleaseSnap(exiting: boolean, steerAbs: number, grip = 1): 
  */
 export function slideSteerMul(steer: number, heading: number, drifting: boolean): number {
   if (!drifting || Math.abs(steer) < 0.1 || Math.abs(heading) < 0.06) return 1;
-  if (Math.sign(steer) === Math.sign(heading)) return 1.08;
-  return 0.84;
+  if (Math.sign(steer) === Math.sign(heading)) return 1.1;
+  return 0.8;
 }
 
 /** Extra heading catch when you countersteer out of a committed slide. */
 export function slideCounterAlign(steer: number, heading: number, drifting: boolean): number {
   if (!drifting || Math.abs(steer) < 0.1 || Math.abs(heading) < 0.06) return 0;
   if (Math.sign(steer) !== -Math.sign(heading)) return 0;
-  return 3.1 * Math.abs(steer);
+  return 3.4 * Math.abs(steer);
 }
 
-export function slideExitHold(): number {
-  return 0.12;
+/** Tech snaps sooner; ice stays loose a beat longer. Plastic stays 0.12. */
+export function slideExitHold(grip = 1): number {
+  return clamp(0.16 - grip * 0.04, 0.08, 0.16);
 }
 
 /** Residual air yaw dies when you let go — line the drop, don't hover. */
 export function airYawSettle(steerAbs: number, airTime: number): number {
   if (steerAbs > 0.1) return 0;
-  return airTime > 0.7 ? 3.2 : 1.85;
+  return airTime > 0.7 ? 3.55 : 2.1;
 }
 
 /**
@@ -439,7 +452,7 @@ export function airYawSettle(steerAbs: number, airTime: number): number {
 export function airRibbonPull(height: number, into: number, airTime: number): number {
   if (airTime < 0.1 || height < 1.35) return 0;
   if (into > 1.2) return 0;
-  return clamp((height - 1.35) * 3.6, 0, 8.2);
+  return clamp((height - 1.35) * 3.8, 0, 8.6);
 }
 
 export type GhostSample = { t: number; s: number };
