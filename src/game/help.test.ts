@@ -70,6 +70,8 @@ describe("help control sheet", () => {
     assert.match(COPY.garageBlurb, /livery/i);
     assert.match(COPY.ghostTitle, /Ghost share/i);
     assert.ok(COPY.ghostNotes.some((line) => /author-line ghost/i.test(line)));
+    assert.ok(COPY.ghostNotes.some((line) => /PASSED/.test(line) && /OVERTAKEN/.test(line)));
+    assert.ok(COPY.playNotes.some((line) => /PASSED/.test(line) && /lights-out/.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /export/i.test(line) && /JSON/i.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /import/i.test(line)));
     assert.ok(COPY.ghostNotes.some((line) => /never overwrites/i.test(line)));
@@ -150,6 +152,7 @@ describe("TM-depth feature map", () => {
     assert.match(text, /Chase → Far → Hood → Cabin/);
     assert.match(text, /last checkpoint/);
     assert.match(text, /author-line ghost/i);
+    assert.match(text, /PASSED \/ OVERTAKEN/);
     assert.match(text, /Editor 1\.1/);
     assert.match(text, /click-to-place checkpoints and boost pads/);
     assert.match(text, /undo\/redo/);

@@ -565,6 +565,17 @@ export class GameAudio {
     this.blip(1320, 0.13, "sine", 0.07, 0.04);
   }
 
+  /** Soft rival pass — gained is a lift, lost is a drop. */
+  ghostPass(kind: "gained" | "lost") {
+    if (kind === "gained") {
+      this.blip(980, 0.08, "triangle", 0.07);
+      this.blip(1320, 0.1, "sine", 0.045, 0.03);
+    } else {
+      this.blip(420, 0.1, "triangle", 0.055);
+      this.blip(280, 0.12, "sine", 0.04, 0.04);
+    }
+  }
+
   finish(medal: Medal | null = null) {
     this.blip(523.25, 0.14, "triangle", 0.1);
     this.blip(659.25, 0.14, "triangle", 0.1, 0.09);
