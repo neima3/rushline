@@ -33,6 +33,7 @@ import {
   steerBite,
   steerCurve,
   steerHoldAlign,
+  steerSpeedScale,
   surfaceFeel,
 } from "./feel.ts";
 
@@ -44,8 +45,8 @@ const MAX_BOOST = 56;
 const MAX_REV = 14;
 const DRAG = 0.26;
 const COAST = 0.74;
-const TURN = 2.92;
-const DRIFT_TURN = 3.22;
+const TURN = 3.02;
+const DRIFT_TURN = 3.3;
 const RIDE = 0.38;
 const GRAVITY = 30;
 const FIXED = 1 / 60;
@@ -353,7 +354,7 @@ export class CarSim {
     const speedAbs = Math.abs(this.speed);
     const speedNorm = Math.min(1, speedAbs / MAX_SPEED);
     const spdF = THREE.MathUtils.smoothstep(speedAbs, 0.35, 5.5);
-    const speedSteer = 1 - 0.12 * speedNorm;
+    const speedSteer = steerSpeedScale(speedNorm);
     const reverse = this.speed >= 0 ? 1 : -1;
     const steer = steerCurve(actions.steer);
     const steerAbs = Math.abs(steer);
@@ -363,7 +364,7 @@ export class CarSim {
 
     if (this.wasSlide && !slideHeld) {
       this.releaseTurbo();
-      this.slideExit = slideExitHold();
+      this.slideExit = slideExitHold(feel.grip);
     }
     if (this.slideExit > 0 && !drifting) {
       const snapOut = slideReleaseSnap(true, steerAbs, feel.grip);

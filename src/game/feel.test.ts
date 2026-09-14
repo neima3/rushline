@@ -37,7 +37,9 @@ import {
   landHeadingMix,
   slideCommitted,
   slideCounterAlign,
+  slideExitHold,
   slideReleaseSnap,
+  slideSpeedGate,
   slideSteerMul,
   slideYawLimit,
   steerHoldAlign,
@@ -47,6 +49,7 @@ import {
   steerBite,
   steerCurve,
   steerFilter,
+  steerSpeedScale,
   TOUCH_STEER_DEADZONE,
   trackAssistScale,
 } from "./feel.ts";
@@ -125,6 +128,13 @@ function curbPull(assist: TrackAssist) {
 }
 
 describe("trackAssistScale", () => {
+  it("keeps the shipped Off / Low / Medium / High multipliers", () => {
+    assert.deepEqual(trackAssistScale("off"), { heading: 0, plant: 0, curbPull: 0, curbHeading: 0 });
+    assert.deepEqual(trackAssistScale("low"), { heading: 0.4, plant: 0.35, curbPull: 0.4, curbHeading: 0.35 });
+    assert.deepEqual(trackAssistScale("medium"), { heading: 1, plant: 1, curbPull: 1, curbHeading: 1 });
+    assert.deepEqual(trackAssistScale("high"), { heading: 1.5, plant: 1.65, curbPull: 1.55, curbHeading: 1.45 });
+  });
+
   it("is monotonic Off < Low < Medium < High on every knob", () => {
     const scales = LEVELS.map((level) => trackAssistScale(level));
     for (const key of ["heading", "plant", "curbPull", "curbHeading"] as const) {
@@ -308,6 +318,13 @@ describe("steer response (TM snap, analog ease)", () => {
     assert.equal(steerHoldAlign(0.8, false), 0);
     assert.equal(steerHoldAlign(0.2, true), 1);
   });
+
+  it("keeps high-speed lock readable instead of fading to mush", () => {
+    assert.equal(steerSpeedScale(0), 1);
+    assert.ok(steerSpeedScale(1) > 0.9);
+    assert.ok(steerSpeedScale(1) < 1);
+    assert.ok(steerSpeedScale(0.5) > steerSpeedScale(1));
+  });
 });
 
 describe("slide commit / exit", () => {
@@ -360,6 +377,24 @@ describe("surface grip types", () => {
     assert.equal(slideCommitted(true, 0.2, 14, false, plastic), false);
     assert.equal(slideCommitted(true, 0.2, 14, false, ice), true);
     assert.equal(slideCommitted(true, 0.08, 14, false, ice), false);
+  });
+
+  it("dirt bites late, ice early, tech later still", () => {
+    const ice = surfaceFeel("ice").slideEntry;
+    const dirt = surfaceFeel("dirt").slideEntry;
+    const plastic = surfaceFeel("plastic").slideEntry;
+    const tech = surfaceFeel("tech").slideEntry;
+    assert.equal(slideCommitted(true, 0.2, 14, false, ice), true);
+    assert.equal(slideCommitted(true, 0.2, 14, false, dirt), false);
+    assert.equal(slideCommitted(true, 0.28, 14, false, dirt), true);
+    assert.equal(slideCommitted(true, 0.28, 14, false, plastic), true);
+    assert.equal(slideCommitted(true, 0.28, 14, false, tech), false);
+    assert.ok(slideSpeedGate(ice) < slideSpeedGate(dirt));
+    assert.ok(slideSpeedGate(dirt) < slideSpeedGate(plastic));
+    assert.ok(slideSpeedGate(plastic) < slideSpeedGate(tech));
+    assert.ok(slideExitHold(tech) < slideExitHold(plastic));
+    assert.ok(slideExitHold(plastic) < slideExitHold(ice));
+    assert.equal(slideExitHold(1), 0.12);
   });
 });
 
