@@ -110,11 +110,13 @@ export function MenuScreen({
         ref={scrollCue.ref}
         data-allow-scroll
         className={cn(
-          "overlay-enter flex max-h-full w-full max-w-xl flex-col overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0",
-          picking ? "gap-4" : "gap-6",
+          "overlay-enter flex max-h-full w-full max-w-xl flex-col overflow-auto overscroll-contain px-5 md:ml-10 md:max-w-lg md:px-0",
+          picking
+            ? "gap-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(3.25rem,calc(env(safe-area-inset-top)+2.75rem))] sm:gap-4"
+            : "gap-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))]",
         )}
       >
-        <header className="overlay-stagger-1">
+        <header className={cn("overlay-stagger-1", picking && "hidden sm:block")}>
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">{COPY.productEyebrow}</p>
           <h1
             className={cn(
@@ -228,8 +230,8 @@ export function MenuScreen({
             <p className="mt-1 hidden text-xs text-subtle md:block">{COPY.menuHint}</p>
           </div>
         ) : (
-          <div className="overlay-stagger-2 flex flex-col gap-2">
-            <div className="flex flex-col gap-1">
+          <div data-track-list className="overlay-stagger-2 flex flex-col gap-1.5 sm:gap-2">
+            <div className="flex flex-col gap-0.5 sm:gap-1">
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
                 {hotseatSelect ? COPY.selectHotseatEyebrow : COPY.selectEyebrow}
               </p>
@@ -251,12 +253,17 @@ export function MenuScreen({
               const selected = t.id === trackId;
               const body = (
                 <>
-                  <span className="track-card-thumb relative h-[6.25rem] w-28 shrink-0 overflow-hidden sm:h-[5.5rem] sm:w-28">
-                    <img src={t.thumb} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                  <span className="track-card-thumb relative h-16 w-[4.5rem] shrink-0 overflow-hidden sm:h-[5.5rem] sm:w-28">
+                    <img
+                      src={t.thumb}
+                      alt=""
+                      className="block size-full min-h-full min-w-full object-cover"
+                      crossOrigin="anonymous"
+                    />
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col justify-center px-3.5 py-2.5 sm:py-2">
+                  <span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2 sm:px-3.5">
                     <span className="flex items-center gap-2">
-                      <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
+                      <span className="font-display text-xl leading-none tracking-tight sm:text-2xl">{t.name}</span>
                       {t.id === "custom" ? (
                         <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">
                           Custom
@@ -267,26 +274,30 @@ export function MenuScreen({
                         </span>
                       ) : null}
                     </span>
-                    <span className="mt-1 text-[11px] uppercase tracking-[0.16em] text-subtle">
+                    <span className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-subtle sm:mt-1 sm:text-[11px] sm:tracking-[0.16em]">
                       {TRACK_ENV_LABEL[t.env]} · {raceLaps} {raceLaps === 1 ? "lap" : "laps"}
                     </span>
-                    <span className="mt-1 line-clamp-2 text-xs text-muted sm:line-clamp-1">{t.blurb}</span>
-                    <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">
+                    <span className="mt-1 hidden text-xs text-muted sm:line-clamp-1 sm:block">{t.blurb}</span>
+                    <span className="mt-1 flex flex-col gap-1 text-xs tabular-nums text-subtle sm:mt-2">
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <MedalRow medal={medal} />
+                        <MedalRow medal={medal} compact />
                         <span>Best {formatTime(pb ?? -1)}</span>
-                        {last != null && last !== pb ? <span>· Last {formatTime(last)}</span> : null}
+                        {last != null && last !== pb ? (
+                          <span className="hidden sm:inline">· Last {formatTime(last)}</span>
+                        ) : null}
                       </span>
-                      {imports[t.id] != null ? (
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
-                          Rival {formatTime(imports[t.id]!)}
-                        </span>
-                      ) : t.id !== "custom" && pb == null ? (
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
-                          Author ghost {formatTime(t.medals.author)}
-                        </span>
-                      ) : null}
-                      <TrackMedalTimes trackId={t.id} recents={recents[t.id]} medals={raceMedals} />
+                      <span className="hidden flex-col gap-1 sm:flex">
+                        {imports[t.id] != null ? (
+                          <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
+                            Rival {formatTime(imports[t.id]!)}
+                          </span>
+                        ) : t.id !== "custom" && pb == null ? (
+                          <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
+                            Author ghost {formatTime(t.medals.author)}
+                          </span>
+                        ) : null}
+                        <TrackMedalTimes trackId={t.id} recents={recents[t.id]} medals={raceMedals} />
+                      </span>
                     </span>
                     {t.id === "custom" ? (
                       <span className="mt-2 flex flex-wrap gap-2">
