@@ -1,16 +1,43 @@
-import { useState } from "react";
-import { Car, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Users, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Car, ChevronDown, CircleHelp, Gamepad2, Gauge, Pencil, Settings, Users, Volume2, VolumeX } from "lucide-react";
 import { LIVERY_ORDER, liveryDef } from "@/game/livery";
 import { resolveRaceLaps, scaleMedals } from "@/game/laps";
 import { allTrackDefs, getTrackDef, medalFromTimes } from "@/game/track";
 import { TRACK_ENV_LABEL } from "@/game/flow";
-import { COPY } from "@/game/help";
+import { COPY, selectListHint } from "@/game/help";
 import { padRaceHint } from "@/game/gamepad";
 import { useGame } from "@/game/store";
-import type { TrackId } from "@/game/types";
+import { TRACK_ORDER, type TrackId } from "@/game/types";
 import { cn, formatTime } from "@/lib/utils";
 import { keepPlayFocus, MedalRow } from "./chrome";
 import { GhostShare } from "./GhostShare";
+
+function useOverflowBelow(active: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [below, setBelow] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !active) {
+      setBelow(false);
+      return;
+    }
+    const update = () => {
+      setBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 28);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [active]);
+
+  return { ref, below };
+}
 
 type Props = {
   ready: boolean;
@@ -71,6 +98,8 @@ export function MenuScreen({
   const featured = getTrackDef(trackId);
   const imports = useGame((s) => s.imports);
   const stockLaps = useGame((s) => s.settings.stockLaps);
+  const picking = select && !garage;
+  const scrollCue = useOverflowBelow(picking);
 
   return (
     <div
@@ -78,19 +107,36 @@ export function MenuScreen({
       className="pointer-events-auto absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-bg via-bg/78 to-transparent md:justify-center"
     >
       <div
+        ref={scrollCue.ref}
         data-allow-scroll
-        className="overlay-enter flex max-h-full w-full max-w-xl flex-col gap-6 overflow-auto overscroll-contain px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] md:ml-10 md:max-w-lg md:px-0"
+        className={cn(
+          "overlay-enter flex max-h-full w-full max-w-xl flex-col overflow-auto overscroll-contain px-5 md:ml-10 md:max-w-lg md:px-0",
+          picking
+            ? "gap-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(3.25rem,calc(env(safe-area-inset-top)+2.75rem))] sm:gap-4"
+            : "gap-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))]",
+        )}
       >
-        <header className="overlay-stagger-1">
+        <header className={cn("overlay-stagger-1", picking && "hidden sm:block")}>
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted">{COPY.productEyebrow}</p>
-          <h1 className="font-display text-6xl leading-none tracking-tight md:text-7xl">RUSHLINE</h1>
-          <p className="mt-3 max-w-sm text-pretty text-muted">{COPY.tagline}</p>
-          <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/80 bg-bg/50 px-3 py-1 text-xs text-subtle">
-            <Gamepad2 className="size-3.5" />
-            {pad.connected
-              ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start · ${padRaceHint(pad.xbox)}`
-              : COPY.padIdle}
-          </p>
+          <h1
+            className={cn(
+              "font-display leading-none tracking-tight",
+              picking ? "text-5xl md:text-6xl" : "text-6xl md:text-7xl",
+            )}
+          >
+            RUSHLINE
+          </h1>
+          {!picking ? (
+            <>
+              <p className="mt-3 max-w-sm text-pretty text-muted">{COPY.tagline}</p>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/80 bg-bg/50 px-3 py-1 text-xs text-subtle">
+                <Gamepad2 className="size-3.5" />
+                {pad.connected
+                  ? `${pad.xbox ? "Xbox controller" : "Controller"} connected — A to start · ${padRaceHint(pad.xbox)}`
+                  : COPY.padIdle}
+              </p>
+            </>
+          ) : null}
         </header>
 
         {garage ? (
@@ -184,10 +230,15 @@ export function MenuScreen({
             <p className="mt-1 hidden text-xs text-subtle md:block">{COPY.menuHint}</p>
           </div>
         ) : (
-          <div className="overlay-stagger-2 flex flex-col gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
-              {hotseatSelect ? COPY.selectHotseatEyebrow : COPY.selectEyebrow}
-            </p>
+          <div data-track-list className="overlay-stagger-2 flex flex-col gap-1.5 sm:gap-2">
+            <div className="flex flex-col gap-0.5 sm:gap-1">
+              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted">
+                {hotseatSelect ? COPY.selectHotseatEyebrow : COPY.selectEyebrow}
+              </p>
+              <p data-track-scroll-hint className="text-xs text-subtle">
+                {selectListHint(TRACK_ORDER.length)}
+              </p>
+            </div>
             {allTrackDefs().map((t, i) => {
               const pb = best[t.id];
               const last = lastTimes[t.id];
@@ -202,12 +253,17 @@ export function MenuScreen({
               const selected = t.id === trackId;
               const body = (
                 <>
-                  <span className="track-card-thumb relative h-[6.5rem] w-28 shrink-0 overflow-hidden sm:w-32">
-                    <img src={t.thumb} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                  <span className="track-card-thumb relative h-16 w-[4.5rem] shrink-0 overflow-hidden sm:h-[5.5rem] sm:w-28">
+                    <img
+                      src={t.thumb}
+                      alt=""
+                      className="block size-full min-h-full min-w-full object-cover"
+                      crossOrigin="anonymous"
+                    />
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
+                  <span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2 sm:px-3.5">
                     <span className="flex items-center gap-2">
-                      <span className="font-display text-2xl leading-none tracking-tight">{t.name}</span>
+                      <span className="font-display text-xl leading-none tracking-tight sm:text-2xl">{t.name}</span>
                       {t.id === "custom" ? (
                         <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted">
                           Custom
@@ -218,26 +274,30 @@ export function MenuScreen({
                         </span>
                       ) : null}
                     </span>
-                    <span className="mt-1 text-[11px] uppercase tracking-[0.16em] text-subtle">
+                    <span className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-subtle sm:mt-1 sm:text-[11px] sm:tracking-[0.16em]">
                       {TRACK_ENV_LABEL[t.env]} · {raceLaps} {raceLaps === 1 ? "lap" : "laps"}
                     </span>
-                    <span className="mt-1 text-xs text-muted">{t.blurb}</span>
-                    <span className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-subtle">
+                    <span className="mt-1 hidden text-xs text-muted sm:line-clamp-1 sm:block">{t.blurb}</span>
+                    <span className="mt-1 flex flex-col gap-1 text-xs tabular-nums text-subtle sm:mt-2">
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <MedalRow medal={medal} />
+                        <MedalRow medal={medal} compact />
                         <span>Best {formatTime(pb ?? -1)}</span>
-                        {last != null && last !== pb ? <span>· Last {formatTime(last)}</span> : null}
+                        {last != null && last !== pb ? (
+                          <span className="hidden sm:inline">· Last {formatTime(last)}</span>
+                        ) : null}
                       </span>
-                      {imports[t.id] != null ? (
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
-                          Rival {formatTime(imports[t.id]!)}
-                        </span>
-                      ) : t.id !== "custom" && pb == null ? (
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
-                          Author ghost {formatTime(t.medals.author)}
-                        </span>
-                      ) : null}
-                      <TrackMedalTimes trackId={t.id} recents={recents[t.id]} medals={raceMedals} />
+                      <span className="hidden flex-col gap-1 sm:flex">
+                        {imports[t.id] != null ? (
+                          <span className="text-[11px] uppercase tracking-[0.14em] text-ok">
+                            Rival {formatTime(imports[t.id]!)}
+                          </span>
+                        ) : t.id !== "custom" && pb == null ? (
+                          <span className="text-[11px] uppercase tracking-[0.14em] text-muted">
+                            Author ghost {formatTime(t.medals.author)}
+                          </span>
+                        ) : null}
+                        <TrackMedalTimes trackId={t.id} recents={recents[t.id]} medals={raceMedals} />
+                      </span>
                     </span>
                     {t.id === "custom" ? (
                       <span className="mt-2 flex flex-wrap gap-2">
@@ -301,6 +361,19 @@ export function MenuScreen({
           </div>
         )}
       </div>
+      {picking && scrollCue.below ? (
+        <div
+          data-track-more
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-start px-5 md:pl-10 md:pr-0"
+        >
+          <div className="flex h-20 w-full max-w-xl flex-col items-center justify-end bg-gradient-to-t from-bg via-bg/80 to-transparent pb-3 md:max-w-lg">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-bg/85 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+              <ChevronDown className="size-3.5" />
+              {COPY.selectMoreHint}
+            </span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

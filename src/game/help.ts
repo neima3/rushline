@@ -1,5 +1,5 @@
 import { PAD_MAP, PAD_STICK_DEADZONE, PAD_TRIGGER_DEADZONE, padRaceHint } from "./gamepad.ts";
-import { PLAYABLE_ORDER, type TrackId } from "./types.ts";
+import { PLAYABLE_ORDER, TRACK_ORDER, type TrackId } from "./types.ts";
 
 export type ControlRow = {
   id: string;
@@ -162,6 +162,11 @@ export function featureMapIdsMatchPlayable(): boolean {
   return trackVibeIds().join(",") === PLAYABLE_ORDER.join(",");
 }
 
+/** Tracks-menu cue — stock count only; Custom stays a separate card. */
+export function selectListHint(stockCount = TRACK_ORDER.length): string {
+  return `${stockCount} circuits · scroll`;
+}
+
 export const COPY = {
   productEyebrow: "Precision time trial",
   tagline: "Every checkpoint. Stay on the plastic. Beat the medals — or run Rush Cup.",
@@ -174,6 +179,7 @@ export const COPY = {
   cupEyebrow: "Campaign",
   selectEyebrow: "Select circuit",
   selectHotseatEyebrow: "Hotseat — P1 then P2",
+  selectMoreHint: "More circuits",
   editorEyebrow: "Editor 1.1",
   helpTitle: "Help",
   helpEyebrow: "Feature map",

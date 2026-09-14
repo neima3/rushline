@@ -13,13 +13,14 @@ import {
   TRACK_VIBES,
   featureMapIdsMatchPlayable,
   firstRunBody,
+  selectListHint,
   pauseHint,
   photoHint,
   raceHint,
   replayHint,
   trackVibeIds,
 } from "./help.ts";
-import { PLAYABLE_ORDER } from "./types.ts";
+import { PLAYABLE_ORDER, TRACK_ORDER } from "./types.ts";
 
 const README = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
 
@@ -80,6 +81,8 @@ describe("help control sheet", () => {
     assert.ok(COPY.playNotes.some((line) => /Hotseat/.test(line)));
     assert.ok(COPY.playNotes.some((line) => /Validated/.test(line)));
     assert.match(COPY.selectHotseatEyebrow, /Hotseat/);
+    assert.equal(selectListHint(), `${TRACK_ORDER.length} circuits · scroll`);
+    assert.match(COPY.selectMoreHint, /More circuits/);
   });
 
   it("keeps runtime hint strings aligned with the sheet", () => {
