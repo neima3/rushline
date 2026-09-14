@@ -32,7 +32,6 @@ import { raceValidated } from "./validate";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
-  ghostDeltaSmooth,
   ghostLead,
   ghostRaceSplitMs,
   ghostSplitMs,
@@ -42,10 +41,9 @@ import {
   alongDelta,
   ghostLightsOutMul,
   ghostPassHoldMs,
-  ghostPassKind,
   ghostPassLabel,
   ghostProximityMul,
-  nextDecisiveLead,
+  stepGhostPassState,
   type DecisiveLead,
 } from "./ghost-race";
 import { authorGhostFor } from "./author-ghost";
@@ -971,17 +969,19 @@ export class Game {
       if (rawSplit == null) {
         rawSplit = ghostSplitMs(ghostPose.s, this.car.s, vis.speed, this.track.length, this.track.def.closed);
       }
-      const lead = ghostLead(rawSplit);
-      if (!this.rewinding) {
-        const pass = ghostPassKind(this.ghostDecisive, lead);
-        if (pass) {
-          this.ghostPass = { kind: pass, label: ghostPassLabel(pass) };
-          this.ghostPassUntil = now + ghostPassHoldMs();
-          this.audio.ghostPass(pass);
-          this.world.addTrauma(pass === "gained" ? 0.08 : 0.05);
-        }
+      const passStep = stepGhostPassState(
+        { decisive: this.ghostDecisive, smooth: this.ghostSmooth },
+        rawSplit,
+        dt,
+      );
+      this.ghostSmooth = passStep.smooth;
+      if (!this.rewinding && passStep.pass) {
+        this.ghostPass = { kind: passStep.pass, label: ghostPassLabel(passStep.pass) };
+        this.ghostPassUntil = now + ghostPassHoldMs();
+        this.audio.ghostPass(passStep.pass);
+        this.world.addTrauma(passStep.pass === "gained" ? 0.08 : 0.05);
       }
-      this.ghostDecisive = nextDecisiveLead(this.ghostDecisive, lead);
+      this.ghostDecisive = passStep.decisive;
     } else if (this.phase === "countdown") {
       this.ghostDecisive = null;
     }
@@ -1039,14 +1039,8 @@ export class Game {
       const ghost = sampleGhost(this.ghost, this.time, this.track.length, this.track.def.closed);
       let ghostDelta: number | null = null;
       if (ghost && this.phase === "race") {
-        const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
-        ghostDelta = ghostRaceSplitMs(this.time, atS);
-        if (ghostDelta == null) {
-          ghostDelta = ghostSplitMs(ghost.s, this.car.s, vis.speed, this.track.length, this.track.def.closed);
-        }
-        this.ghostSmooth = ghostDeltaSmooth(this.ghostSmooth, ghostDelta, this.hudAcc || 0.08);
         ghostDelta = this.ghostSmooth;
-      } else {
+      } else if (this.phase !== "race") {
         this.ghostSmooth = null;
       }
       const flash = now < this.cpFlashUntil ? this.cpFlash : null;

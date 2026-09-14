@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { ghostDeltaSmooth, ghostLead } from "./feel.ts";
 import {
   alongDelta,
   ghostLightsOutMul,
@@ -10,6 +11,7 @@ import {
   ghostProximityMul,
   GHOST_LIGHTS_FADE_MS,
   nextDecisiveLead,
+  stepGhostPassState,
 } from "./ghost-race.ts";
 
 describe("alongDelta", () => {
@@ -69,5 +71,64 @@ describe("ghost pass", () => {
     assert.equal(ghostPassLabel("gained"), "PASSED");
     assert.equal(ghostPassLabel("lost"), "OVERTAKEN");
     assert.ok(ghostPassHoldMs() > 800);
+  });
+
+  it("toasts on HUD-style smoothed AHEAD→BEHIND flips, not raw split in the even band", () => {
+    const dt = 0.08;
+    let smooth: number | null = 90;
+    let decisive = nextDecisiveLead(null, ghostLead(smooth));
+    assert.equal(decisive, "behind");
+
+    for (let i = 0; i < 24; i++) {
+      const raw = 25;
+      decisive = nextDecisiveLead(decisive, ghostLead(raw));
+      smooth = ghostDeltaSmooth(smooth, raw, dt);
+      assert.equal(ghostPassKind(decisive, ghostLead(raw)), null);
+    }
+    assert.ok(ghostLead(smooth) === "behind" || ghostLead(smooth) === "even");
+
+    smooth = -60;
+    assert.equal(ghostLead(smooth), "ahead");
+    assert.equal(ghostPassKind(decisive, ghostLead(25)), null);
+    assert.equal(ghostPassKind(decisive, ghostLead(smooth)), "gained");
+
+    decisive = nextDecisiveLead(decisive, ghostLead(smooth));
+    smooth = 70;
+    assert.equal(ghostLead(smooth), "behind");
+    assert.equal(ghostPassKind(decisive, ghostLead(-25)), null);
+    assert.equal(ghostPassKind(decisive, ghostLead(smooth)), "lost");
+  });
+
+  it("steps pass state from smoothed split each frame", () => {
+    let state = stepGhostPassState({ decisive: "behind", smooth: 100 }, null, 0);
+    let gained = false;
+    for (let i = 0; i < 12; i++) {
+      state = stepGhostPassState(state, -90, 0.016);
+      if (state.pass === "gained") gained = true;
+    }
+    assert.ok(gained);
+    assert.equal(state.lead, "ahead");
+
+    let lost = false;
+    for (let i = 0; i < 12; i++) {
+      state = stepGhostPassState(state, 90, 0.016);
+      if (state.pass === "lost") lost = true;
+    }
+    assert.ok(lost);
+    assert.equal(state.lead, "behind");
+  });
+
+  it("does not toast on tiny smoothed oscillations inside the even band", () => {
+    let state = stepGhostPassState({ decisive: "behind", smooth: 80 }, null, 0);
+    const dt = 0.016;
+    let passes = 0;
+    for (let i = 0; i < 120; i++) {
+      const raw = 40 + Math.sin(i * 0.7) * 6;
+      const step = stepGhostPassState(state, raw, dt);
+      state = step;
+      if (step.pass) passes += 1;
+    }
+    assert.equal(passes, 0);
+    assert.equal(state.decisive, "behind");
   });
 });
