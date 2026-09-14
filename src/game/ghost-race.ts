@@ -1,3 +1,4 @@
+import { ghostDeltaSmooth, ghostLead } from "./feel.ts";
 import type { GhostLead, GhostPassKind } from "./types";
 
 export type { GhostPassKind };
@@ -64,6 +65,24 @@ export function ghostPassKind(lastDecisive: DecisiveLead | null, next: GhostLead
 export function nextDecisiveLead(prev: DecisiveLead | null, lead: GhostLead): DecisiveLead | null {
   if (lead === "ahead" || lead === "behind") return lead;
   return prev;
+}
+
+export type GhostPassState = {
+  decisive: DecisiveLead | null;
+  smooth: number | null;
+};
+
+/** Same smoothed split the HUD uses — raw split alone can sit in the even band while status flips. */
+export function stepGhostPassState(
+  state: GhostPassState,
+  rawDeltaMs: number | null,
+  dt: number,
+): GhostPassState & { pass: GhostPassKind | null; lead: GhostLead } {
+  const smooth = ghostDeltaSmooth(state.smooth, rawDeltaMs, dt);
+  const lead = ghostLead(smooth);
+  const pass = ghostPassKind(state.decisive, lead);
+  const decisive = nextDecisiveLead(state.decisive, lead);
+  return { decisive, smooth, pass, lead };
 }
 
 export function ghostPassLabel(kind: GhostPassKind): string {
