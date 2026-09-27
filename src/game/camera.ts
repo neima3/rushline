@@ -89,11 +89,12 @@ export function camSnapOffsets(
   return { dist, lift, look: far ? 14 : 12, lookY: 0.7, hideCar: false };
 }
 
-export function camLiveFollow(mode: CameraMode, airborne: boolean, boost: number): number {
+export function camLiveFollow(mode: CameraMode, airborne: boolean, boost: number, padJuice = 0): number {
   if (mode === "cockpit") return 16;
   if (mode === "hood") return 14;
   const far = mode === "far";
-  return (airborne ? 8.8 : far ? 9.4 : 11.2) + (boost > 0.05 ? 1.8 : 0);
+  const pad = padJuice > 0.05 ? 2.2 + padJuice * 2.6 : 0;
+  return (airborne ? 9.2 : far ? 9.6 : 12.6) + (boost > 0.05 ? 2.1 : 0) + pad;
 }
 
 export function camLiveLook(mode: CameraMode, speed: number, boost: number, airborne: boolean): number {
