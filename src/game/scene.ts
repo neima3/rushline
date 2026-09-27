@@ -1196,7 +1196,7 @@ export class World {
                     ? 0x68a0c8
                     : 0x8ab4d8,
     );
-    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.16 : worksFill ? 0.22 : mesaFill ? 0.18 : groveFill ? 0.42 : emberFill ? 0.26 : stormFill ? 0.4 : 0;
+    this.fill.intensity = nightFill ? 0.5 : alpineFill ? 0.19 : worksFill ? 0.24 : mesaFill ? 0.2 : groveFill ? 0.44 : emberFill ? 0.28 : stormFill ? 0.44 : 0;
     this.fill.position.set(12, -42, 18);
     this.fill.target.position.set(0, 0, 0);
     this.fill2.color.set(
@@ -1216,7 +1216,7 @@ export class World {
                     ? 0xb8d8f0
                     : 0xb8c8dc,
     );
-    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.08 : worksFill ? 0.14 : mesaFill ? 0.1 : groveFill ? 0.24 : emberFill ? 0.14 : stormFill ? 0.22 : 0;
+    this.fill2.intensity = nightFill ? 0.28 : alpineFill ? 0.1 : worksFill ? 0.16 : mesaFill ? 0.12 : groveFill ? 0.26 : emberFill ? 0.16 : stormFill ? 0.26 : 0;
     this.fill2.position.set(-22, 36, -14);
     this.fill2.target.position.set(0, 0, 0);
     for (const o of this.nightLights) {

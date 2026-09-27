@@ -310,7 +310,13 @@ export function makeGroundTexture(theme: ThemeId, opts?: TextureMakeOpts): THREE
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const n = hash(x * 3 + y * 11) * 28 + hash((x >> 3) + (y >> 2) * 17) * 16;
+      let n = hash(x * 3 + y * 11) * 28 + hash((x >> 3) + (y >> 2) * 17) * 16;
+      if (theme === "alpine") n += Math.sin(y * 0.09) * 10;
+      if (theme === "works") n += (Math.floor(x / 18) + Math.floor(y / 18)) % 2 === 0 ? 6 : -4;
+      if (theme === "mesa") n += Math.sin((x + y) * 0.06) * 12;
+      if (theme === "grove") n *= 0.82;
+      if (theme === "ember") n += hash(x * 5 + y * 9) * 14;
+      if (theme === "storm") n += Math.sin(x * 0.11) * 8 + (hash(x + y * 7) > 0.92 ? -18 : 0);
       d[i] = Math.max(0, Math.min(255, base[0] + n - 10));
       d[i + 1] = Math.max(0, Math.min(255, base[1] + n * 0.7));
       d[i + 2] = Math.max(0, Math.min(255, base[2] + n * 0.35));
@@ -318,6 +324,67 @@ export function makeGroundTexture(theme: ThemeId, opts?: TextureMakeOpts): THREE
     }
   }
   ctx.putImageData(img, 0, 0);
+
+  if (theme === "alpine") {
+    ctx.globalAlpha = 0.16;
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#eef4f8" : "#c8d4de";
+      ctx.fillRect(hash(i * 3) * size, hash(i * 5) * size, size * 0.24, size * 0.07);
+    }
+    ctx.globalAlpha = 1;
+  } else if (theme === "works") {
+    ctx.strokeStyle = "rgba(255,138,64,0.12)";
+    ctx.lineWidth = 1;
+    const step = size / 8;
+    for (let x = 0; x <= size; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, size);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= size; y += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(size, y);
+      ctx.stroke();
+    }
+  } else if (theme === "mesa") {
+    ctx.globalAlpha = 0.12;
+    for (let i = 0; i < 10; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#f0c878" : "#d89848";
+      const y = hash(i * 9) * size;
+      ctx.fillRect(0, y, size, size * 0.06);
+    }
+    ctx.globalAlpha = 1;
+  } else if (theme === "grove") {
+    ctx.globalAlpha = 0.1;
+    for (let i = 0; i < 22; i++) {
+      ctx.fillStyle = "#1a3828";
+      ctx.beginPath();
+      ctx.arc(hash(i * 4) * size, hash(i * 6) * size, 4 + hash(i) * 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (theme === "ember") {
+    ctx.globalAlpha = 0.14;
+    for (let i = 0; i < 18; i++) {
+      ctx.fillStyle = hash(i) > 0.5 ? "#3a1810" : "#5a2818";
+      ctx.fillRect(hash(i * 2) * size, hash(i * 7) * size, 3 + hash(i + 1) * 6, 2 + hash(i + 3) * 5);
+    }
+    ctx.globalAlpha = 1;
+  } else if (theme === "storm") {
+    ctx.globalAlpha = 0.18;
+    for (let i = 0; i < 12; i++) {
+      ctx.fillStyle = "#142028";
+      const x = hash(i * 8) * size;
+      const y = hash(i * 11) * size;
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.08, size * 0.05, hash(i) * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   return tex(c, 48, opts?.anisotropy ?? 8);
 }
 
