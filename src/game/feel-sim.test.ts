@@ -398,6 +398,40 @@ describe("surface feel on track", () => {
     assert.equal(plas.airborne, false);
   });
 
+  it("keeps a Circuit lock readable at speed", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    car.s = 80;
+    car.n = 0;
+    car.speed = 34;
+    car.heading = 0;
+    for (let i = 0; i < 16; i++) car.step(circuit, { ...cruise, steer: 1 }, 1 / 60);
+    assert.equal(car.airborne, false);
+    assert.ok(Math.abs(car.heading) > 0.2, `high-speed lock ${car.heading}`);
+    assert.ok(Math.abs(car.n) < sampleAt(circuit, car.s).width * 0.48, `n ${car.n}`);
+  });
+
+  it("ice takes a light slide that dirt still holds", () => {
+    const summit = getTrack("summit");
+    const canyon = getTrack("canyon");
+    const run = (track: ReturnType<typeof getTrack>) => {
+      const car = new CarSim();
+      car.reset(track);
+      car.s = 90;
+      car.n = 0;
+      car.speed = 18;
+      car.heading = 0;
+      for (let i = 0; i < 18; i++) car.step(track, { ...cruise, steer: 0.18, slide: 1 }, 1 / 60);
+      return car;
+    };
+    const ice = run(summit);
+    const dirt = run(canyon);
+    assert.equal(ice.surface, "ice");
+    assert.equal(dirt.surface, "dirt");
+    assert.ok(Math.abs(ice.heading) > Math.abs(dirt.heading) * 1.08, `ice ${ice.heading} vs dirt ${dirt.heading}`);
+  });
+
   it("ice yaws more than tech for the same steer pulse", () => {
     const summit = getTrack("summit");
     const yard = getTrack("yard");
