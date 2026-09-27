@@ -9,6 +9,7 @@ import {
   camFovTarget,
   camFwdRate,
   camLandDrop,
+  camLandFollowBoost,
   camLookAhead,
   cpFlashHoldMs,
   cpFlashLabel,
@@ -244,7 +245,12 @@ describe("camera feel helpers", () => {
     assert.ok(camFovTarget(58, 20, 0, 1) < camFovTarget(58, 20, 0, 0));
     assert.ok(camBoostPull(1) > 0);
     assert.equal(camBoostPull(0), 0);
+    assert.ok(camBoostPull(0, 1) > camBoostPull(0, 0));
+    assert.ok(camFovTarget(58, 30, 0, 0, 1) > camFovTarget(58, 30, 0, 0, 0));
+    assert.ok(camFollowRate(false, false, 0, 1) > camFollowRate(false, false, 0, 0));
     assert.ok(camLandDrop(1) > 0.4);
+    assert.ok(camLandFollowBoost(1) > 5);
+    assert.equal(camLandFollowBoost(0), 0);
   });
 });
 

@@ -140,32 +140,48 @@ export function headingReturn(steerAbs: number, drifting: boolean, assist: Track
 
 /** Chase yaw settle. Idle (released steer) damps residual swing; steering lags. */
 export function camFwdRate(steerAbs: number, headingAbs: number, airborne: boolean): number {
-  if (airborne) return 3.4;
-  if (steerAbs < 0.08 && headingAbs < 0.16) return 11.2;
-  if (steerAbs < 0.08) return 8.6;
-  return 6.6;
+  if (airborne) return 3.6;
+  if (steerAbs < 0.08 && headingAbs < 0.14) return 13.2;
+  if (steerAbs < 0.08) return 9.4;
+  return 6.8;
 }
 
-export function camFollowRate(airborne: boolean, hood: boolean, boost: number): number {
+export function camFollowRate(airborne: boolean, hood: boolean, boost: number, padJuice = 0): number {
   if (hood) return 14;
-  return (airborne ? 8.8 : 11.2) + (boost > 0.05 ? 1.8 : 0);
+  const pad = padJuice > 0.05 ? 2.4 + padJuice * 2.8 : 0;
+  return (airborne ? 9.2 : 12.6) + (boost > 0.05 ? 2.1 : 0) + pad;
 }
 
 export function camLookAhead(speed: number, boost: number, airborne: boolean): number {
   return 12 + speed * 0.12 + (boost > 0.05 ? 2.6 : 0) - (airborne ? 1.15 : 0);
 }
 
-export function camFovTarget(baseFov: number, speed: number, boost: number, landJuice: number): number {
-  const kick = (boost > 0 ? 4.6 : 0) + landJuice * -2.1;
-  return clamp(baseFov - 4 + speed * 0.15 + kick, baseFov - 6, baseFov + 9);
+export function camFovTarget(
+  baseFov: number,
+  speed: number,
+  boost: number,
+  landJuice: number,
+  padJuice = 0,
+): number {
+  const padKick = padJuice > 0.05 ? 3.8 + padJuice * 4.2 : 0;
+  const kick = (boost > 0 ? 4.8 : 0) + landJuice * -2.35 + padKick;
+  return clamp(baseFov - 4 + speed * 0.15 + kick, baseFov - 6, baseFov + 11);
 }
 
-export function camBoostPull(boost: number): number {
-  return boost > 0.05 ? 0.48 + boost * 0.22 : 0;
+export function camBoostPull(boost: number, padJuice = 0): number {
+  const hold = boost > 0.05 ? 0.5 + boost * 0.24 : 0;
+  const punch = padJuice > 0.05 ? 0.35 + padJuice * 1.45 : 0;
+  return hold + punch;
 }
 
 export function camLandDrop(landJuice: number): number {
-  return landJuice * 0.58;
+  return landJuice * 0.62;
+}
+
+/** Brief follow snap after a plant so chase catches the nose without a rubber band. */
+export function camLandFollowBoost(landJuice: number): number {
+  if (landJuice <= 0.05) return 0;
+  return 2.6 + landJuice * 5.4;
 }
 
 /** Ghost gap in ms. Positive = ghost ahead (you are behind). */
