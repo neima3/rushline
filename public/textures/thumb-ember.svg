@@ -18,6 +18,7 @@
   <polygon points="48,200 78,48 112,200" fill="#3a1810"/>
   <polygon points="168,200 204,42 244,200" fill="#2a1410"/>
   <polygon points="216,200 248,70 278,200" fill="#401810"/>
+  <path d="M18 158 L 42 148 L 66 158 L 90 142" fill="none" stroke="#8a3018" stroke-width="5" stroke-linejoin="round"/>
   <path d="M22 176 C 58 160, 82 128, 108 108 S 146 78, 176 80 S 214 108, 228 134 S 232 164, 198 172 S 136 180, 90 182 S 40 184, 22 176 Z" fill="none" stroke="#1a0804" stroke-width="13" stroke-linejoin="round"/>
   <path d="M22 176 C 58 160, 82 128, 108 108 S 146 78, 176 80 S 214 108, 228 134 S 232 164, 198 172 S 136 180, 90 182 S 40 184, 22 176 Z" fill="none" stroke="#c04010" stroke-width="8" stroke-linejoin="round"/>
   <path d="M22 176 C 58 160, 82 128, 108 108 S 146 78, 176 80 S 214 108, 228 134 S 232 164, 198 172 S 136 180, 90 182 S 40 184, 22 176 Z" fill="none" stroke="#ffb060" stroke-width="2.2" stroke-dasharray="7 6"/>

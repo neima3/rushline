@@ -83,4 +83,26 @@ describe("look polish 3 presentation locks", () => {
     assert.ok(CAR_PAINT.roughness <= 0.14);
     assert.ok(CAR_PAINT.envDay > 3);
   });
+
+  it("keeps six-pack High lights off Circuit High lock values", () => {
+    const high = QUALITY_PRESETS.high;
+    for (const theme of ["alpine", "works", "mesa", "grove", "ember", "storm"] as const) {
+      const lv = themeLightLevels(theme, high);
+      assert.notEqual(lv.sun, CIRCUIT_HIGH_LOCK.sun);
+      assert.notEqual(lv.exposure, CIRCUIT_HIGH_LOCK.exposure);
+      assert.notEqual(lv.bloomMul, CIRCUIT_HIGH_LOCK.bloomMul);
+    }
+    assert.equal(themeLightLevels("stadium", high).sun, CIRCUIT_HIGH_LOCK.sun);
+  });
+
+  it("keeps storm rain and grove moonlit skies distinct from Helix night", () => {
+    assert.notEqual(SKY_LOOK.storm.zenith, SKY_LOOK.night.zenith);
+    assert.notEqual(SKY_LOOK.grove.horizon, SKY_LOOK.night.horizon);
+    assert.ok(SKY_LOOK.ember.sunGlow > SKY_LOOK.stadium.sunGlow);
+    assert.ok(SKY_LOOK.mesa.sunGlow > SKY_LOOK.stadium.sunGlow);
+    assert.notEqual(SKY_LOOK.ember.horizon, SKY_LOOK.mesa.horizon);
+    assert.ok(GRADE.ember.saturation > GRADE.mesa.saturation);
+    assert.ok(GRADE.storm.tint !== GRADE.alpine.tint);
+    assert.deepEqual(fogWindow("night"), NIGHT_FOG);
+  });
 });
