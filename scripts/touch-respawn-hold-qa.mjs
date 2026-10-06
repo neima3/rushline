@@ -2,13 +2,34 @@
 /**
  * CDP touch repro: hold RespawnRestartButton ≥550ms then release must not applyRespawn.
  * Requires dev server on 127.0.0.1:8080 (npm run dev).
+ * Run via: node --experimental-strip-types --import ./scripts/ts-ext-hooks.mjs scripts/touch-respawn-hold-qa.mjs
  */
 import { chromium } from "playwright";
+import {
+  DEFAULT_HOLD_MS,
+  simulateLegacyComponentHold,
+  simulateModuleRemountHold,
+} from "../src/game/touch-respawn-sim.ts";
 
 const url = process.env.TOUCH_QA_URL ?? "http://127.0.0.1:8080/";
 const holdMs = Number(process.env.TOUCH_QA_HOLD_MS ?? 3000);
 
+function assertSimModels() {
+  const remountAt = DEFAULT_HOLD_MS + 40;
+  const legacy = simulateLegacyComponentHold(DEFAULT_HOLD_MS, remountAt, holdMs);
+  const fixed = simulateModuleRemountHold(42, DEFAULT_HOLD_MS, remountAt, holdMs);
+  const legacyBad = legacy.restarts >= 2 || legacy.respawns > 0;
+  const fixedOk = fixed.restarts === 1 && fixed.respawns === 0;
+  if (!legacyBad || !fixedOk) {
+    throw new Error(
+      `sim mismatch legacy=${JSON.stringify(legacy)} fixed=${JSON.stringify(fixed)}`,
+    );
+  }
+  return { legacy, fixed, remountAt };
+}
+
 async function main() {
+  const sim = assertSimModels();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -79,8 +100,9 @@ async function main() {
         respawnBlocked: blocked,
         marks: result.marks,
         holdMs,
+        simModels: sim,
         note: ok
-          ? "hold restart only; no applyRespawn on release"
+          ? "legacy sim fails (≥2 restarts or spurious respawn); module sim + browser: 1 restart, 0 applyRespawn"
           : "expected exactly one restartRun and zero applyRespawn",
       },
       null,

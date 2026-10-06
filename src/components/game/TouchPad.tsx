@@ -3,7 +3,12 @@ import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { RESTART_HOLD_MS } from "@/game/camera";
 import { shapeTouchSteer } from "@/game/feel";
-import { touchRespawnHoldRestart, touchRespawnPointerDown, touchRespawnPointerUp } from "@/game/touch-respawn-gesture";
+import {
+  touchRespawnHoldRestart,
+  touchRespawnPointerDown,
+  touchRespawnPointerRelease,
+  touchRespawnPointerUp,
+} from "@/game/touch-respawn-gesture";
 import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
@@ -148,6 +153,19 @@ function RespawnRestartButton({
 }) {
   const holdRef = useRef<RespawnHold | null>(null);
 
+  useEffect(() => {
+    const orphanRelease = (e: PointerEvent) => touchRespawnPointerRelease(e.pointerId);
+    window.addEventListener("pointerup", orphanRelease);
+    window.addEventListener("pointercancel", orphanRelease);
+    return () => {
+      window.removeEventListener("pointerup", orphanRelease);
+      window.removeEventListener("pointercancel", orphanRelease);
+      const st = holdRef.current;
+      if (st) window.clearTimeout(st.timer);
+      holdRef.current = null;
+    };
+  }, []);
+
   const releaseHold = (el: HTMLElement, pointerId: number) => {
     const st = holdRef.current;
     if (!st || st.pointerId !== pointerId) {
@@ -177,7 +195,7 @@ function RespawnRestartButton({
         const el = e.currentTarget;
         el.setPointerCapture(e.pointerId);
         const pointerId = e.pointerId;
-        touchRespawnPointerDown(pointerId);
+        if (touchRespawnPointerDown(pointerId) === "duplicate") return;
         const timer = window.setTimeout(() => {
           const cur = holdRef.current;
           if (!cur || cur.pointerId !== pointerId) return;
