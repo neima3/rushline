@@ -62,6 +62,8 @@ describe("camera placement", () => {
     assert.ok(cabin.dist < hood.dist);
     assert.equal(cabin.hideCar, true);
     assert.ok(camLiveFollow("cockpit", false, 0) > camLiveFollow("chase", false, 0));
+    assert.ok(camLiveFollow("chase", false, 0, 1) > camLiveFollow("chase", false, 0, 0));
+    assert.ok(camLiveFollow("chase", false, 0) > camLiveFollow("far", false, 0));
   });
 
   it("keeps Helix chase and far above the road after CP1 R", () => {

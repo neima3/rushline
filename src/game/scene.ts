@@ -24,7 +24,7 @@ import {
   type QualityProfile,
   type QualityTier,
 } from "./quality";
-import { camBoostPull, camFovTarget, camFwdRate, camLandDrop } from "./feel";
+import { camBoostPull, camFovTarget, camFwdRate, camLandDrop, camLandFollowBoost } from "./feel";
 import { camLiveFollow, camLiveLook, camSnapOffsets, isChaseCam, isCloseCam } from "./camera";
 import { editorFlythroughPose } from "./editor";
 import { sampleGhost } from "./ghost";
@@ -792,7 +792,7 @@ export class World {
       this.landJuice = 1;
       this.vfx.emitLand(snap, true);
     } else if (this.wasAir && !snap.airborne) {
-      this.landJuice = Math.max(this.landJuice, 0.55);
+      this.landJuice = Math.max(this.landJuice, 0.62);
       this.vfx.emitLand(snap, false);
     }
     if (snap.justTurbo) {
@@ -974,7 +974,7 @@ export class World {
     const steep = THREE.MathUtils.clamp(1 - snap.uy, 0, 1);
     const portrait = this.camera.aspect > 0 && this.camera.aspect < 0.72;
     const landDrop = camLandDrop(this.landJuice);
-    const boostPull = camBoostPull(snap.boost);
+    const boostPull = camBoostPull(snap.boost, this.boostJuice);
     if (mode === "cockpit") {
       const back = 0.14;
       const lift = 0.66 + steep * 0.08;
@@ -1033,7 +1033,7 @@ export class World {
         snap.pz + this.camFwd.z * lookDist,
       );
     }
-    const follow = camLiveFollow(mode, snap.airborne, snap.boost);
+    const follow = camLiveFollow(mode, snap.airborne, snap.boost, this.boostJuice) + camLandFollowBoost(this.landJuice);
     const k = 1 - Math.exp(-follow * dt);
     this.camPos.lerp(_desired, k);
     this.lookPos.lerp(_look, k);
@@ -1059,7 +1059,7 @@ export class World {
     }
     this.camera.lookAt(this.lookPos);
 
-    const targetFov = camFovTarget(this.camFov, spd, snap.boost, this.landJuice);
+    const targetFov = camFovTarget(this.camFov, spd, snap.boost, this.landJuice, this.boostJuice);
     this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4.2 * dt));
     this.camera.updateProjectionMatrix();
     this.sun.target.position.set(snap.px, snap.py, snap.pz);
