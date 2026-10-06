@@ -30,6 +30,8 @@ import { resolveRaceLaps, withRaceLaps } from "./laps";
 import { getTrack, invalidateCustomTrack, medalFor, medalPace, sampleAt, validateCustomBuild } from "./track";
 import { raceValidated } from "./validate";
 import { cpPbSplitMs, livePbSplitMs } from "./run-flow";
+import { playtestMark } from "./playtest";
+import { touchRespawnSuppressed } from "./touch-respawn-gesture";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
@@ -424,6 +426,7 @@ export class Game {
 
   restartRun() {
     if (this.phase === "race" || this.phase === "paused" || this.phase === "results" || this.phase === "countdown") {
+      playtestMark("restartRun");
       this.prepareRunRestart(performance.now());
       if (useGame.getState().playMode === "hotseat") this.retryHotseat();
       else this.startRace(this.trackId);
@@ -1639,6 +1642,10 @@ export class Game {
   }
 
   respawn() {
+    if (touchRespawnSuppressed()) {
+      playtestMark("respawnBlocked");
+      return;
+    }
     if (this.phase === "race" || this.phase === "countdown") this.applyRespawn();
   }
 
@@ -1668,6 +1675,7 @@ export class Game {
   }
 
   private applyRespawn() {
+    playtestMark("applyRespawn");
     this.car.respawn(this.track);
     this.camSnapAfterSim = true;
     this.afterSimRespawn();

@@ -3,6 +3,7 @@ import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { RESTART_HOLD_MS } from "@/game/camera";
 import { shapeTouchSteer } from "@/game/feel";
+import { touchRespawnHoldRestart, touchRespawnPointerDown, touchRespawnPointerUp } from "@/game/touch-respawn-gesture";
 import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
@@ -136,7 +137,6 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
 type RespawnHold = {
   pointerId: number;
   timer: number;
-  restartFired: boolean;
 };
 
 function RespawnRestartButton({
@@ -150,10 +150,13 @@ function RespawnRestartButton({
 
   const releaseHold = (el: HTMLElement, pointerId: number) => {
     const st = holdRef.current;
-    if (!st || st.pointerId !== pointerId) return;
+    if (!st || st.pointerId !== pointerId) {
+      touchRespawnPointerUp(pointerId);
+      return;
+    }
     window.clearTimeout(st.timer);
-    if (!st.restartFired) onRespawn();
     holdRef.current = null;
+    if (touchRespawnPointerUp(pointerId) === "respawn") onRespawn();
     try {
       el.releasePointerCapture(pointerId);
     } catch {
@@ -174,13 +177,14 @@ function RespawnRestartButton({
         const el = e.currentTarget;
         el.setPointerCapture(e.pointerId);
         const pointerId = e.pointerId;
+        touchRespawnPointerDown(pointerId);
         const timer = window.setTimeout(() => {
           const cur = holdRef.current;
           if (!cur || cur.pointerId !== pointerId) return;
-          cur.restartFired = true;
+          touchRespawnHoldRestart(pointerId);
           onRestart?.();
         }, RESTART_HOLD_MS);
-        holdRef.current = { pointerId, timer, restartFired: false };
+        holdRef.current = { pointerId, timer };
       }}
       onPointerUp={(e) => {
         e.preventDefault();
