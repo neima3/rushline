@@ -152,6 +152,7 @@ export type HudState = {
   ghostS: number | null;
   ghostN: number | null;
   ghostDelta: number | null;
+  pbDelta: number | null;
   ghostLead: GhostLead;
   ghostKind: GhostSource;
   medalRemain: number | null;

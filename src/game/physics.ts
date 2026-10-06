@@ -36,6 +36,7 @@ import {
   steerSpeedScale,
   surfaceFeel,
 } from "./feel.ts";
+import { respawnEntrySpeed, RESPAWN_SPEED_MAX, RESPAWN_SPEED_MIN } from "./run-flow.ts";
 
 const ACCEL = 28;
 const BRAKE = 40;
@@ -84,6 +85,8 @@ export class CarSim {
   slideAmt = 0;
   driftCharge = 0;
   lastCp = -1;
+  /** Speed magnitude recorded when a checkpoint gate is crossed (TM respawn reference). */
+  cpCrossSpeed = 0;
   lap = 1;
   finished = false;
   wrongWay = 0;
@@ -129,6 +132,7 @@ export class CarSim {
     this.slideAmt = 0;
     this.driftCharge = 0;
     this.lastCp = -1;
+    this.cpCrossSpeed = 0;
     this.lap = 1;
     this.finished = false;
     this.wrongWay = 0;
@@ -158,10 +162,11 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
+    const keptSpeed = respawnEntrySpeed(this.lastCp, this.cpCrossSpeed);
     this.s = pickSafeRespawnS(track, this.lastCp, this.s);
     this.n = 0;
     this.heading = 0;
-    this.speed = 9;
+    this.speed = keptSpeed;
     this.airborne = false;
     this.vx = this.vy = this.vz = 0;
     this.boost = 0;
@@ -205,6 +210,15 @@ export class CarSim {
       this.place(track);
       this.flattenRespawn(track);
     }
+    this.finishRespawnPace(keptSpeed);
+  }
+
+  /** After plant/flatten (6–10 clamp), restore TM CP-crossing pace for this respawn only. */
+  private finishRespawnPace(keptSpeed: number) {
+    this.speed = Math.min(RESPAWN_SPEED_MAX, Math.max(RESPAWN_SPEED_MIN, keptSpeed));
+    this.vx = this.fx * this.speed;
+    this.vy = this.fy * this.speed;
+    this.vz = this.fz * this.speed;
   }
 
   private plantUpright(track: BuiltTrack) {
@@ -691,6 +705,7 @@ export class CarSim {
       const gate = track.checkpoints[next]!;
       if (crossedGate(prevS, this.s, gate, track.length, track.def.closed)) {
         this.lastCp = next;
+        this.cpCrossSpeed = Math.abs(this.speed);
         this.justCp = true;
       }
     }
@@ -703,6 +718,7 @@ export class CarSim {
       } else {
         this.lap += 1;
         this.lastCp = -1;
+        this.cpCrossSpeed = 0;
         this.justLap = true;
       }
     }

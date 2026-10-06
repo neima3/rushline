@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTrack, medalPace, sampleAt } from "./track.ts";
 import { CarSim, copySnap, emptySnap, helixNearGate, lerpSnap, pickSafeRespawnS } from "./physics.ts";
+import { steerFilter } from "./feel.ts";
+import { applySteerSettings } from "./settings.ts";
+import { resolveSampleDrive } from "./auto-throttle.ts";
 
 const idle = {
   throttle: 0,
@@ -452,6 +455,55 @@ describe("surface feel on track", () => {
       tech.step(yard, { ...cruise, steer: 0.55 }, 1 / 60);
     }
     assert.ok(Math.abs(ice.heading) > Math.abs(tech.heading) * 1.12, `ice ${ice.heading} vs tech ${tech.heading}`);
+  });
+});
+
+describe("CP respawn pace", () => {
+  it("Green Circuit: touch-style full-left + auto-throttle still crosses CP1 (mobile QA pattern)", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.trackAssist = "medium";
+    car.reset(circuit);
+    const idle = { ...cruise, throttle: 0, steer: 0 };
+    let filtSteer = 0;
+    const dt = 1 / 60;
+    const firstCp = circuit.checkpoints[0]!;
+    let maxKmh = 0;
+    for (let i = 0; i < 1200; i++) {
+      const steer = applySteerSettings(0, 0, 1, { sensitivity: 1, invert: false, preset: "normal" });
+      filtSteer = steerFilter(filtSteer, steer, dt, true);
+      const drive = resolveSampleDrive({
+        throttle: 0,
+        brake: 0,
+        touchThrottle: 1,
+        touchBrake: 0,
+        autoThrottle: true,
+        touchMode: true,
+        now: i * 16.67,
+        latchUntil: 0,
+      });
+      car.step(circuit, { ...idle, throttle: drive.throttle, brake: drive.brake, steer: filtSteer }, dt);
+      maxKmh = Math.max(maxKmh, car.speed * 3.6);
+    }
+    assert.equal(car.finished, false);
+    assert.ok(car.lastCp >= 0, `expected CP1, lastCp=${car.lastCp} s=${car.s}`);
+    assert.ok(car.s > firstCp - 20, `expected past first gate s=${car.s} gate=${firstCp}`);
+    assert.ok(maxKmh > 55, `expected headroom above ~72 km/h lock theory, max=${maxKmh.toFixed(1)}`);
+  });
+
+  it("Green Circuit: respawn at CP pace can still reach the next checkpoint", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    for (let i = 0; i < 520; i++) car.step(circuit, { ...cruise, throttle: 1, steer: 0 }, 1 / 60);
+    assert.equal(car.lastCp, 0, `expected CP1 before respawn, lastCp=${car.lastCp} s=${car.s}`);
+    const crossSpeed = car.cpCrossSpeed;
+    assert.ok(crossSpeed > 8, `expected recorded CP speed, got ${crossSpeed}`);
+    car.speed = 0.5;
+    car.respawn(circuit);
+    assert.ok(car.speed > crossSpeed * 0.65, `respawn pace ${car.speed} vs cross ${crossSpeed}`);
+    for (let i = 0; i < 720; i++) car.step(circuit, { ...cruise, throttle: 1, steer: 0 }, 1 / 60);
+    assert.ok(car.lastCp >= 1, `expected CP2 after respawn run, lastCp=${car.lastCp} s=${car.s}`);
   });
 });
 

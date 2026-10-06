@@ -68,6 +68,7 @@ const emptyHud = (): HudState => ({
   ghostS: null,
   ghostN: null,
   ghostDelta: null,
+  pbDelta: null,
   ghostLead: null,
   ghostKind: "none",
   medalRemain: null,

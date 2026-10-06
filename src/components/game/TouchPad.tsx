@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
+import { RESTART_HOLD_MS } from "@/game/camera";
 import { shapeTouchSteer } from "@/game/feel";
+import {
+  touchRespawnHoldRestart,
+  touchRespawnPointerDown,
+  touchRespawnPointerRelease,
+  touchRespawnPointerUp,
+} from "@/game/touch-respawn-gesture";
 import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
@@ -124,33 +131,89 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
               <Undo2 className="size-5" strokeWidth={1.75} />
             </button>
           ) : null}
-          <button
-            type="button"
-            aria-label="Respawn — tap last checkpoint, hold to restart"
-            data-play-control="1"
-            className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
-            onContextMenu={(e) => e.preventDefault()}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRespawn();
-              if (!onRestart) return;
-              const hold = window.setTimeout(() => onRestart(), 550);
-              const clear = () => {
-                window.clearTimeout(hold);
-                window.removeEventListener("pointerup", clear);
-                window.removeEventListener("pointercancel", clear);
-              };
-              window.addEventListener("pointerup", clear);
-              window.addEventListener("pointercancel", clear);
-            }}
-          >
-            <RotateCcw className="size-5" strokeWidth={1.75} />
-          </button>
+          <RespawnRestartButton onRespawn={onRespawn} onRestart={onRestart} />
         </div>
         <DriveCluster onThrottle={onThrottle} onBrake={onBrake} onSlide={onSlide} />
       </div>
     </div>
+  );
+}
+
+type RespawnHold = {
+  pointerId: number;
+  timer: number;
+};
+
+function RespawnRestartButton({
+  onRespawn,
+  onRestart,
+}: {
+  onRespawn: () => void;
+  onRestart?: () => void;
+}) {
+  const holdRef = useRef<RespawnHold | null>(null);
+
+  useEffect(() => {
+    const orphanRelease = (e: PointerEvent) => touchRespawnPointerRelease(e.pointerId);
+    window.addEventListener("pointerup", orphanRelease);
+    window.addEventListener("pointercancel", orphanRelease);
+    return () => {
+      window.removeEventListener("pointerup", orphanRelease);
+      window.removeEventListener("pointercancel", orphanRelease);
+      const st = holdRef.current;
+      if (st) window.clearTimeout(st.timer);
+      holdRef.current = null;
+    };
+  }, []);
+
+  const releaseHold = (el: HTMLElement, pointerId: number) => {
+    const st = holdRef.current;
+    if (!st || st.pointerId !== pointerId) {
+      touchRespawnPointerUp(pointerId);
+      return;
+    }
+    window.clearTimeout(st.timer);
+    holdRef.current = null;
+    if (touchRespawnPointerUp(pointerId) === "respawn") onRespawn();
+    try {
+      el.releasePointerCapture(pointerId);
+    } catch {
+      /* already released */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Respawn — tap last checkpoint, hold to restart"
+      data-play-control="1"
+      className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        const pointerId = e.pointerId;
+        if (touchRespawnPointerDown(pointerId) === "duplicate") return;
+        const timer = window.setTimeout(() => {
+          const cur = holdRef.current;
+          if (!cur || cur.pointerId !== pointerId) return;
+          touchRespawnHoldRestart(pointerId);
+          onRestart?.();
+        }, RESTART_HOLD_MS);
+        holdRef.current = { pointerId, timer };
+      }}
+      onPointerUp={(e) => {
+        e.preventDefault();
+        releaseHold(e.currentTarget, e.pointerId);
+      }}
+      onPointerCancel={(e) => {
+        releaseHold(e.currentTarget, e.pointerId);
+      }}
+    >
+      <RotateCcw className="size-5" strokeWidth={1.75} />
+    </button>
   );
 }
 
