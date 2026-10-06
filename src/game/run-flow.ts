@@ -26,12 +26,10 @@ export function respawnKeepSpeed(speed: number): number {
   return next * Math.sign(speed || 1);
 }
 
-/**
- * Stale `finished` blocks every checkpoint gate for the rest of the run.
- * Call after reset / restart so a prior finish cannot soft-lock CP progress.
- */
-export function gatesBlockedByFinish(finished: boolean): boolean {
-  return finished;
+/** Pace at respawn: last CP crossing speed, else grid default. */
+export function respawnEntrySpeed(lastCp: number, cpCrossSpeed: number): number {
+  if (lastCp < 0 || !Number.isFinite(cpCrossSpeed) || cpCrossSpeed <= 0) return 9;
+  return respawnKeepSpeed(cpCrossSpeed);
 }
 
 /** Live HUD split vs PB when the racing ghost is not the PB tape. */

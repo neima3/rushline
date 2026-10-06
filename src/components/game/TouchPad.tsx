@@ -3,8 +3,6 @@ import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
 import { RESTART_HOLD_MS } from "@/game/camera";
 import { shapeTouchSteer } from "@/game/feel";
-
-const RESPAWN_TAP_MS = 220;
 import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
@@ -127,43 +125,73 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
               <Undo2 className="size-5" strokeWidth={1.75} />
             </button>
           ) : null}
-          <button
-            type="button"
-            aria-label="Respawn — tap last checkpoint, hold to restart"
-            data-play-control="1"
-            className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
-            onContextMenu={(e) => e.preventDefault()}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.currentTarget.setPointerCapture(e.pointerId);
-              const downAt = performance.now();
-              let restartFired = false;
-              const hold = window.setTimeout(() => {
-                restartFired = true;
-                onRestart?.();
-              }, RESTART_HOLD_MS);
-              const clear = (ev: PointerEvent) => {
-                if (ev.pointerId !== e.pointerId) return;
-                window.clearTimeout(hold);
-                if (!restartFired && performance.now() - downAt < RESPAWN_TAP_MS) onRespawn();
-                restartFired = false;
-                try {
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-                } catch {
-                  /* already released */
-                }
-              };
-              e.currentTarget.addEventListener("pointerup", clear);
-              e.currentTarget.addEventListener("pointercancel", clear);
-            }}
-          >
-            <RotateCcw className="size-5" strokeWidth={1.75} />
-          </button>
+          <RespawnRestartButton onRespawn={onRespawn} onRestart={onRestart} />
         </div>
         <DriveCluster onThrottle={onThrottle} onBrake={onBrake} onSlide={onSlide} />
       </div>
     </div>
+  );
+}
+
+type RespawnHold = {
+  pointerId: number;
+  timer: number;
+  restartFired: boolean;
+};
+
+function RespawnRestartButton({
+  onRespawn,
+  onRestart,
+}: {
+  onRespawn: () => void;
+  onRestart?: () => void;
+}) {
+  const holdRef = useRef<RespawnHold | null>(null);
+
+  const releaseHold = (el: HTMLElement, pointerId: number) => {
+    const st = holdRef.current;
+    if (!st || st.pointerId !== pointerId) return;
+    window.clearTimeout(st.timer);
+    if (!st.restartFired) onRespawn();
+    holdRef.current = null;
+    try {
+      el.releasePointerCapture(pointerId);
+    } catch {
+      /* already released */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Respawn — tap last checkpoint, hold to restart"
+      data-play-control="1"
+      className="play-control flex size-12 items-center justify-center rounded-md border border-border bg-surface/90 text-fg"
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        const pointerId = e.pointerId;
+        const timer = window.setTimeout(() => {
+          const cur = holdRef.current;
+          if (!cur || cur.pointerId !== pointerId) return;
+          cur.restartFired = true;
+          onRestart?.();
+        }, RESTART_HOLD_MS);
+        holdRef.current = { pointerId, timer, restartFired: false };
+      }}
+      onPointerUp={(e) => {
+        e.preventDefault();
+        releaseHold(e.currentTarget, e.pointerId);
+      }}
+      onPointerCancel={(e) => {
+        releaseHold(e.currentTarget, e.pointerId);
+      }}
+    >
+      <RotateCcw className="size-5" strokeWidth={1.75} />
+    </button>
   );
 }
 

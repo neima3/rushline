@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   cpPbSplitMs,
-  gatesBlockedByFinish,
   livePbSplitMs,
+  respawnEntrySpeed,
   respawnKeepSpeed,
   RESPAWN_SPEED_MAX,
   RESPAWN_SPEED_MIN,
@@ -14,7 +14,7 @@ import { CarSim } from "./physics.ts";
 const cruise = {
   throttle: 1,
   brake: 0,
-  steer: 1,
+  steer: 0,
   slide: 0,
   respawn: false,
   restart: false,
@@ -51,10 +51,15 @@ describe("respawnKeepSpeed", () => {
   });
 });
 
-describe("gatesBlockedByFinish", () => {
-  it("documents the CP soft-lock when finished is stale", () => {
-    assert.equal(gatesBlockedByFinish(true), true);
-    assert.equal(gatesBlockedByFinish(false), false);
+describe("respawnEntrySpeed", () => {
+  it("defaults to 9 before any checkpoint", () => {
+    assert.equal(respawnEntrySpeed(-1, 0), 9);
+    assert.equal(respawnEntrySpeed(-1, 40), 9);
+  });
+
+  it("uses CP crossing speed, not crash speed at respawn", () => {
+    assert.equal(respawnEntrySpeed(0, 30), respawnKeepSpeed(30));
+    assert.equal(respawnEntrySpeed(0, 0), 9);
   });
 });
 
@@ -70,7 +75,7 @@ describe("livePbSplitMs", () => {
 });
 
 describe("restart run car state", () => {
-  it("clears stale finished so CP1 can register on Green Circuit", () => {
+  it("stale finished blocks CP until reset (hardening reference)", () => {
     const circuit = getTrack("circuit");
     const car = new CarSim();
     car.reset(circuit);
@@ -79,23 +84,29 @@ describe("restart run car state", () => {
     car.speed = 20;
     car.s = 6;
     for (let i = 0; i < 240; i++) car.step(circuit, cruise, 1 / 60);
-    assert.equal(car.lastCp, -1, "stale finished must block checkpoints");
+    assert.equal(car.lastCp, -1, "stale finished blocks checkpoints without reset");
 
     car.reset(circuit);
-    assert.equal(car.finished, false);
-    const straight = { ...cruise, steer: 0 };
-    for (let i = 0; i < 480; i++) car.step(circuit, straight, 1 / 60);
+    for (let i = 0; i < 480; i++) car.step(circuit, cruise, 1 / 60);
     assert.ok(car.lastCp >= 0, `expected CP1 after reset, lastCp=${car.lastCp} s=${car.s}`);
   });
 
-  it("restores respawn speed from pre-respawn pace", () => {
+  it("respawns at CP pace recorded at the gate, not post-crash speed", () => {
     const circuit = getTrack("circuit");
     const car = new CarSim();
     car.reset(circuit);
     car.lastCp = 0;
-    car.speed = 26;
+    car.cpCrossSpeed = 28;
+    car.speed = 1.2;
     car.respawn(circuit);
-    assert.ok(car.speed >= 18 && car.speed <= 28, `kept pace ${car.speed}`);
+    const withoutCp = new CarSim();
+    withoutCp.reset(circuit);
+    withoutCp.lastCp = 0;
+    withoutCp.cpCrossSpeed = 0;
+    withoutCp.speed = 1.2;
+    withoutCp.respawn(circuit);
+    assert.ok(car.speed > withoutCp.speed + 0.5, `CP pace ${car.speed} vs crash-only ${withoutCp.speed}`);
+    assert.equal(car.speed, 10, "flattenRespawn caps planted respawn to 10");
     assert.equal(car.heading, 0);
   });
 });
