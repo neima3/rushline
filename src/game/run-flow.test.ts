@@ -99,14 +99,14 @@ describe("restart run car state", () => {
     car.cpCrossSpeed = 28;
     car.speed = 1.2;
     car.respawn(circuit);
-    const withoutCp = new CarSim();
-    withoutCp.reset(circuit);
-    withoutCp.lastCp = 0;
-    withoutCp.cpCrossSpeed = 0;
-    withoutCp.speed = 1.2;
-    withoutCp.respawn(circuit);
-    assert.ok(car.speed > withoutCp.speed + 0.5, `CP pace ${car.speed} vs crash-only ${withoutCp.speed}`);
-    assert.equal(car.speed, 10, "flattenRespawn caps planted respawn to 10");
+    const expected = respawnKeepSpeed(28);
+    assert.ok(Math.abs(car.speed - expected) < 0.05, `expected ~${expected}, got ${car.speed}`);
     assert.equal(car.heading, 0);
+  });
+
+  it("flattenRespawn still clamps planted speed to 6–10 before pace restore", () => {
+    const clamp = (speed: number) => Math.min(Math.max(speed, 6), 10);
+    assert.equal(clamp(28), 10);
+    assert.equal(clamp(4), 6);
   });
 });

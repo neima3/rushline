@@ -455,6 +455,23 @@ describe("surface feel on track", () => {
   });
 });
 
+describe("CP respawn pace", () => {
+  it("Green Circuit: respawn at CP pace can still reach the next checkpoint", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    for (let i = 0; i < 520; i++) car.step(circuit, { ...cruise, throttle: 1, steer: 0 }, 1 / 60);
+    assert.equal(car.lastCp, 0, `expected CP1 before respawn, lastCp=${car.lastCp} s=${car.s}`);
+    const crossSpeed = car.cpCrossSpeed;
+    assert.ok(crossSpeed > 8, `expected recorded CP speed, got ${crossSpeed}`);
+    car.speed = 0.5;
+    car.respawn(circuit);
+    assert.ok(car.speed > crossSpeed * 0.65, `respawn pace ${car.speed} vs cross ${crossSpeed}`);
+    for (let i = 0; i < 720; i++) car.step(circuit, { ...cruise, throttle: 1, steer: 0 }, 1 / 60);
+    assert.ok(car.lastCp >= 1, `expected CP2 after respawn run, lastCp=${car.lastCp} s=${car.s}`);
+  });
+});
+
 describe("snap reuse", () => {
   it("writes into the same CarSnap object", () => {
     const circuit = getTrack("circuit");

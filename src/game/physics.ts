@@ -36,7 +36,7 @@ import {
   steerSpeedScale,
   surfaceFeel,
 } from "./feel.ts";
-import { respawnEntrySpeed } from "./run-flow.ts";
+import { respawnEntrySpeed, RESPAWN_SPEED_MAX, RESPAWN_SPEED_MIN } from "./run-flow.ts";
 
 const ACCEL = 28;
 const BRAKE = 40;
@@ -210,6 +210,15 @@ export class CarSim {
       this.place(track);
       this.flattenRespawn(track);
     }
+    this.finishRespawnPace(keptSpeed);
+  }
+
+  /** After plant/flatten (6–10 clamp), restore TM CP-crossing pace for this respawn only. */
+  private finishRespawnPace(keptSpeed: number) {
+    this.speed = Math.min(RESPAWN_SPEED_MAX, Math.max(RESPAWN_SPEED_MIN, keptSpeed));
+    this.vx = this.fx * this.speed;
+    this.vy = this.fy * this.speed;
+    this.vz = this.fz * this.speed;
   }
 
   private plantUpright(track: BuiltTrack) {
