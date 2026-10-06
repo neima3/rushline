@@ -218,6 +218,7 @@ export function Overlay({ gameRef }: Props) {
           medal={hud.medal}
           medalRemain={hud.medalRemain}
           ghostDelta={hud.ghostDelta}
+          pbDelta={hud.pbDelta}
           ghostLead={hud.ghostLead}
           ghostKind={hud.ghostKind ?? "none"}
           ghostS={hud.ghostS}
@@ -582,6 +583,7 @@ function Hud({
   medal,
   medalRemain,
   ghostDelta,
+  pbDelta,
   ghostLead,
   ghostKind,
   ghostS,
@@ -611,6 +613,7 @@ function Hud({
   medal: Medal | null;
   medalRemain: number | null;
   ghostDelta: number | null;
+  pbDelta: number | null;
   ghostLead: "ahead" | "behind" | "even" | null;
   ghostKind: GhostSource;
   ghostS: number | null;
@@ -648,6 +651,17 @@ function Hud({
             >
               <span className="hud-ghost-tag">{ghostHudTag(ghostKind)}</span>
               {formatDelta(ghostDelta)}
+            </p>
+          ) : null}
+          {pbDelta != null ? (
+            <p
+              className={cn(
+                "hud-ghost-delta mt-0.5 font-semibold tabular-nums tracking-wide",
+                pbDelta > 20 ? "text-danger" : pbDelta < -20 ? "text-ok" : "text-muted",
+              )}
+            >
+              <span className="hud-ghost-tag">PB</span>
+              {formatDelta(pbDelta)}
             </p>
           ) : null}
           {ghostLead ? (

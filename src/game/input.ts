@@ -147,6 +147,19 @@ export class Input {
     surface?.addEventListener("pointerdown", this.onPointer);
   }
 
+  /** Clear latch / filter state so a new run cannot inherit brake or steer from the last one. */
+  resetForRun() {
+    this.brakeLatchUntil = 0;
+    this.filtSteer = 0;
+    this.respawnHold = emptyRespawnHold();
+    this.queued.pause = false;
+    this.queued.camera = false;
+    this.queued.respawn = false;
+    this.queued.photo = false;
+    this.queued.restart = false;
+    this.touchRewind = 0;
+  }
+
   detach() {
     if (typeof window === "undefined") {
       this.surface = null;

@@ -36,6 +36,7 @@ import {
   steerSpeedScale,
   surfaceFeel,
 } from "./feel.ts";
+import { respawnKeepSpeed, RESPAWN_SPEED_MAX, RESPAWN_SPEED_MIN } from "./run-flow.ts";
 
 const ACCEL = 28;
 const BRAKE = 40;
@@ -158,10 +159,11 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
+    const keptSpeed = respawnKeepSpeed(this.speed);
     this.s = pickSafeRespawnS(track, this.lastCp, this.s);
     this.n = 0;
     this.heading = 0;
-    this.speed = 9;
+    this.speed = keptSpeed;
     this.airborne = false;
     this.vx = this.vy = this.vz = 0;
     this.boost = 0;
@@ -240,7 +242,7 @@ export class CarSim {
   }
 
   private flattenRespawn(track: BuiltTrack) {
-    this.speed = Math.min(Math.max(this.speed, 6), 10);
+    this.speed = Math.min(Math.max(this.speed, RESPAWN_SPEED_MIN), RESPAWN_SPEED_MAX);
     this.landLock = Math.max(this.landLock, 0.45);
     this.plantUpright(track);
   }

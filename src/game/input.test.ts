@@ -140,6 +140,26 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("resetForRun clears brake latch so auto-throttle returns after restart", () => {
+    const input = new Input();
+    input.autoThrottle = true;
+    input.touchMode = true;
+    let t = 5000;
+    input.nowMs = () => t;
+    input.touchBrake = 1;
+    const latched = input.sample();
+    assert.equal(latched.brake, 1);
+    assert.equal(latched.throttle, 0);
+    input.resetForRun();
+    input.touchBrake = 0;
+    input.touchThrottle = 0;
+    t = 5100;
+    const after = input.sample();
+    assert.equal(after.brake, 0);
+    assert.ok(after.throttle > 0.3, "auto throttle should refill after run reset");
+    input.detach();
+  });
+
   it("fires restart after holding R past the threshold", () => {
     const input = new Input();
     let t = 1000;

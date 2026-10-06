@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useGame } from "@/game/store";
 import { hitDrivePad, reduceHold, type HoldLatch } from "@/game/auto-throttle";
+import { RESTART_HOLD_MS } from "@/game/camera";
 import { shapeTouchSteer } from "@/game/feel";
+
+const RESPAWN_TAP_MS = 220;
 import { RotateCcw, Undo2 } from "lucide-react";
 
 type Props = {
@@ -133,16 +136,26 @@ export function TouchPad({ onSteer, onThrottle, onBrake, onSlide, onRespawn, onR
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onRespawn();
-              if (!onRestart) return;
-              const hold = window.setTimeout(() => onRestart(), 550);
-              const clear = () => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              const downAt = performance.now();
+              let restartFired = false;
+              const hold = window.setTimeout(() => {
+                restartFired = true;
+                onRestart?.();
+              }, RESTART_HOLD_MS);
+              const clear = (ev: PointerEvent) => {
+                if (ev.pointerId !== e.pointerId) return;
                 window.clearTimeout(hold);
-                window.removeEventListener("pointerup", clear);
-                window.removeEventListener("pointercancel", clear);
+                if (!restartFired && performance.now() - downAt < RESPAWN_TAP_MS) onRespawn();
+                restartFired = false;
+                try {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                } catch {
+                  /* already released */
+                }
               };
-              window.addEventListener("pointerup", clear);
-              window.addEventListener("pointercancel", clear);
+              e.currentTarget.addEventListener("pointerup", clear);
+              e.currentTarget.addEventListener("pointercancel", clear);
             }}
           >
             <RotateCcw className="size-5" strokeWidth={1.75} />

@@ -29,9 +29,11 @@ import {
 import { resolveRaceLaps, withRaceLaps } from "./laps";
 import { getTrack, invalidateCustomTrack, medalFor, medalPace, sampleAt, validateCustomBuild } from "./track";
 import { raceValidated } from "./validate";
+import { cpPbSplitMs, livePbSplitMs } from "./run-flow";
 import {
   cpFlashHoldMs,
   cpFlashLabel,
+  ghostDeltaSmooth,
   ghostLead,
   ghostRaceSplitMs,
   ghostSplitMs,
@@ -141,7 +143,9 @@ export class Game {
   private editorFly = false;
   private recording: GhostFrame[] = [];
   private ghost: GhostFrame[] | null = null;
+  private pbGhost: GhostFrame[] | null = null;
   private ghostSource: GhostSource = "none";
+  private pbSplitSmooth: number | null = null;
   private ghostPref: GhostPref = "auto";
   private ghostSmooth: number | null = null;
   private ghostDecisive: DecisiveLead | null = null;
@@ -295,6 +299,7 @@ export class Game {
       if (frames) {
         this.ghost = frames;
         this.ghostSource = "hotseat";
+        this.pbGhost = readSave().ghosts[id] ?? null;
         this.ghostPref = "auto";
         return;
       }
@@ -309,6 +314,7 @@ export class Game {
     );
     this.ghost = picked.frames;
     this.ghostSource = picked.source;
+    this.pbGhost = readSave().ghosts[id] ?? null;
     this.ghostPref = "auto";
   }
 
@@ -418,9 +424,20 @@ export class Game {
 
   restartRun() {
     if (this.phase === "race" || this.phase === "paused" || this.phase === "results" || this.phase === "countdown") {
+      this.prepareRunRestart(performance.now());
       if (useGame.getState().playMode === "hotseat") this.retryHotseat();
       else this.startRace(this.trackId);
     }
+  }
+
+  /** Drop rewind / input latch / stale finish before lights-out. */
+  private prepareRunRestart(now: number) {
+    if (this.rewinding) this.releaseRewind(now);
+    this.injectSteer = null;
+    this.camSnapAfterSim = false;
+    this.input.resetForRun();
+    this.car.finished = false;
+    this.pbSplitSmooth = null;
   }
 
   setMuted(m: boolean) {
@@ -656,6 +673,7 @@ export class Game {
   startRace(id?: TrackId, pref: GhostPref = "auto") {
     this.clearPhoto();
     this.clearReplay();
+    this.prepareRunRestart(performance.now());
     useGame.getState().setSettingsOpen(false);
     useGame.getState().setHelpOpen(false);
     this.ghostPref = pref;
@@ -677,11 +695,13 @@ export class Game {
     this.usedRewind = false;
     this.input.touchRewind = 0;
     this.ghostSmooth = null;
+    this.pbSplitSmooth = null;
     this.ghostDecisive = null;
     this.ghostPass = null;
     this.ghostPassUntil = 0;
     this.cpFlash = null;
     this.cpFlashUntil = 0;
+    this.car.finished = false;
     this.phase = "countdown";
     this.lastT = this.countdownAt;
     this.world.snapCamera(this.curr, this.camera);
@@ -856,6 +876,7 @@ export class Game {
         this.time = 0;
         this.timeHold = 0;
         this.raceClockAt = now;
+        this.car.finished = false;
         useGame.getState().setPhase("race");
         useGame.getState().setHud({ countdown: 0 });
       } else {
@@ -1042,6 +1063,20 @@ export class Game {
         ghostDelta = this.ghostSmooth;
       } else if (this.phase !== "race") {
         this.ghostSmooth = null;
+        this.pbSplitSmooth = null;
+      }
+      let pbDelta: number | null = null;
+      if (this.phase === "race") {
+        const rawPb = livePbSplitMs(
+          this.time,
+          this.pbGhost,
+          this.car.s,
+          this.track.length,
+          this.track.def.closed,
+          this.ghostSource === "pb",
+        );
+        this.pbSplitSmooth = ghostDeltaSmooth(this.pbSplitSmooth, rawPb, dt);
+        pbDelta = this.pbSplitSmooth;
       }
       const flash = now < this.cpFlashUntil ? this.cpFlash : null;
       if (!flash) this.cpFlash = null;
@@ -1064,6 +1099,7 @@ export class Game {
         ghostS: this.phase === "countdown" ? null : (ghost?.s ?? null),
         ghostN: this.phase === "countdown" ? null : (ghost?.n ?? null),
         ghostDelta,
+        pbDelta,
         ghostLead: ghostLead(ghostDelta),
         ghostKind: this.ghostSource,
         medalRemain: pace.remain,
@@ -1077,8 +1113,14 @@ export class Game {
   };
 
   private armCpFlash(kind: "cp" | "lap" | "finish", now: number) {
-    const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
-    const delta = this.phase === "race" ? ghostRaceSplitMs(this.time, atS) : null;
+    let delta: number | null = null;
+    if (this.phase === "race") {
+      delta = cpPbSplitMs(this.time, this.pbGhost, this.car.s, this.track.length, this.track.def.closed);
+      if (delta == null) {
+        const atS = ghostTimeAtS(this.ghost, this.car.s, this.track.length, this.track.def.closed);
+        delta = ghostRaceSplitMs(this.time, atS);
+      }
+    }
     this.cpFlash = {
       kind,
       delta,
