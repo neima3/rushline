@@ -4,7 +4,7 @@ import { getTrack, medalPace, sampleAt } from "./track.ts";
 import { CarSim, copySnap, emptySnap, helixNearGate, lerpSnap, pickSafeRespawnS } from "./physics.ts";
 import { steerFilter } from "./feel.ts";
 import { applySteerSettings } from "./settings.ts";
-import { resolveSampleDrive } from "./auto-throttle.ts";
+import { autoThrottleCap, resolveRaceDrive, resolveSampleDrive } from "./auto-throttle.ts";
 
 const idle = {
   throttle: 0,
@@ -459,6 +459,71 @@ describe("surface feel on track", () => {
 });
 
 describe("CP respawn pace", () => {
+  it("Green Circuit: touch Auto + Assist Medium beats the old 72 km/h plateau and stays on track through CP1", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.trackAssist = "medium";
+    car.reset(circuit);
+    const dt = 1 / 60;
+    const firstCp = circuit.checkpoints[0]!;
+    let filtSteer = 0;
+    let latchUntil = 0;
+    let speed5 = 0;
+    let speed10 = 0;
+    let maxEarlyKmh = 0;
+    let cp1Time: number | null = null;
+    let offTrack = false;
+    for (let i = 0; i < 900; i++) {
+      const t = i * dt;
+      const steer = applySteerSettings(0, 0, t < 4 ? 0.65 : t < 7 ? -0.2 : 0, {
+        sensitivity: 1,
+        invert: false,
+        preset: "normal",
+      });
+      filtSteer = steerFilter(filtSteer, steer, dt, true);
+      const race = resolveRaceDrive({
+        throttle: 0,
+        brake: 0,
+        touchThrottle: 0,
+        touchBrake: 0,
+        autoThrottle: true,
+        touchMode: true,
+        now: t * 1000,
+        latchUntil,
+        cap: autoThrottleCap({
+          trackId: "circuit",
+          s: car.s,
+          speed: car.speed,
+          firstCp,
+          touchMode: true,
+          countdown: false,
+        }),
+      });
+      latchUntil = race.latchUntil;
+      const prevCp = car.lastCp;
+      car.step(
+        circuit,
+        { ...idle, throttle: race.throttle, brake: race.brake, steer: filtSteer },
+        dt,
+      );
+      const sm = sampleAt(circuit, car.s);
+      if (Math.abs(car.n) >= sm.width * 0.48) offTrack = true;
+      if (car.s < firstCp) maxEarlyKmh = Math.max(maxEarlyKmh, car.speed * 3.6);
+      if (Math.abs(t - 5) < dt / 2) speed5 = car.speed * 3.6;
+      if (Math.abs(t - 10) < dt / 2 && car.s < firstCp) speed10 = car.speed * 3.6;
+      if (prevCp < 0 && car.lastCp >= 0 && cp1Time == null) cp1Time = t;
+    }
+    assert.equal(offTrack, false, "opening line left the track");
+    assert.ok(maxEarlyKmh > 95, `expected above ~72 km/h plateau before CP1, max=${maxEarlyKmh.toFixed(1)}`);
+    assert.ok(maxEarlyKmh <= 125, `opening cap too high before CP1: ${maxEarlyKmh.toFixed(1)}`);
+    assert.ok(speed5 > 55, `opening corner should still roll, 5s=${speed5.toFixed(1)}`);
+    if (speed10 > 0) {
+      assert.ok(speed10 > 85, `still before CP1 at 10s should beat plateau, got ${speed10.toFixed(1)}`);
+    }
+    assert.ok(cp1Time != null && cp1Time < 14, `expected CP1 crossing, t=${cp1Time}`);
+    assert.ok(car.lastCp >= 0, `lastCp=${car.lastCp}`);
+  });
+
   it("Green Circuit: touch-style full-left + auto-throttle still crosses CP1 (mobile QA pattern)", () => {
     const circuit = getTrack("circuit");
     const car = new CarSim();
