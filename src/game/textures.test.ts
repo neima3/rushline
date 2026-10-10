@@ -163,9 +163,10 @@ describe("track look tokens", () => {
 
   it("lifts backlit canyon terrain and dirt so off-track fill is not unlit black", () => {
     const ground = terrainGroundFill("canyon");
-    assert.ok(ground.emissiveIntensity > 0.15);
+    assert.ok(ground.emissiveIntensity >= 0.28);
     const dirt = surfaceSpec("canyon", "dirt");
-    assert.ok(dirt.emissiveIntensity > 0);
+    assert.ok(dirt.emissiveIntensity >= 0.09);
+    assert.equal(terrainGroundFill("stadium").emissiveIntensity, 0.08);
   });
 
   it("keeps storm asphalt cooler and wetter than Circuit without rewriting Helix", () => {

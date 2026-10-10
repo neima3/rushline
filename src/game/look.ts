@@ -107,7 +107,7 @@ export type SurfaceSpec = {
 
 /** Self-lit lift on the terrain plane — canyon dusk sun is low and backlights the fill. */
 export function terrainGroundFill(theme: ThemeId): { emissive: number; emissiveIntensity: number } {
-  if (theme === "canyon") return { emissive: 0x502818, emissiveIntensity: 0.24 };
+  if (theme === "canyon") return { emissive: 0x583018, emissiveIntensity: 0.3 };
   if (theme === "stadium") return { emissive: 0x284018, emissiveIntensity: 0.08 };
   if (theme === "mesa") return { emissive: 0x402808, emissiveIntensity: 0.1 };
   if (theme === "ember") return { emissive: 0x301008, emissiveIntensity: 0.12 };
@@ -122,7 +122,7 @@ export function surfaceSpec(theme: ThemeId, surface: SurfaceKind): SurfaceSpec {
       emissive:
         theme === "ember" ? 0x281008 : theme === "mesa" ? 0x201808 : theme === "canyon" ? 0x281408 : 0x000000,
       emissiveIntensity:
-        theme === "ember" ? 0.08 : theme === "mesa" ? 0.04 : theme === "canyon" ? 0.07 : 0,
+        theme === "ember" ? 0.08 : theme === "mesa" ? 0.04 : theme === "canyon" ? 0.1 : 0,
     };
   }
   if (surface === "ice") {
