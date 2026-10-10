@@ -26,9 +26,10 @@ export function respawnKeepSpeed(speed: number): number {
   return next * Math.sign(speed || 1);
 }
 
-/** Pace at respawn: last CP crossing speed, else grid default. */
+/** Pace at respawn: last CP crossing speed; before CP1 the grid respawn is a full stop. */
 export function respawnEntrySpeed(lastCp: number, cpCrossSpeed: number): number {
-  if (lastCp < 0 || !Number.isFinite(cpCrossSpeed) || cpCrossSpeed <= 0) return 9;
+  if (lastCp < 0) return 0;
+  if (!Number.isFinite(cpCrossSpeed) || cpCrossSpeed <= 0) return 9;
   return respawnKeepSpeed(cpCrossSpeed);
 }
 
