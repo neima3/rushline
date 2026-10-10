@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { AUTHOR_START_S } from "./author-ghost.ts";
 import { getTrack, nearestSample, sampleAt } from "./track.ts";
 import { CarSim, helixNearGate, helixRibbonOverhead, pickSafeRespawnS } from "./physics.ts";
 import { chaseSnapPlacement, clearChaseCamera } from "./scene.ts";
+import { TRACK_ORDER } from "./types.ts";
 
 const idle = {
   throttle: 0,
@@ -58,15 +60,13 @@ describe("leave-track respawn", () => {
     assert.equal(invertedFlats, 0);
   });
 
-  it("parks Circuit on the #9 island and Helix past the finish seam", () => {
-    const circuit = getTrack("circuit");
-    const helix = getTrack("helix");
-    const cs = pickSafeRespawnS(circuit, -1, 8);
-    const hs = pickSafeRespawnS(helix, -1, 8);
-    assert.ok(cs >= 12 && cs < 50, `circuit pre-CP s ${cs}`);
-    assert.ok(hs >= 16, `helix pre-CP s ${hs}`);
-    assert.ok(sampleAt(circuit, cs).uy > 0.9);
-    assert.ok(sampleAt(helix, hs).uy > 0.9);
+  it("pre-CP1 pickSafeRespawnS is always the grid start line", () => {
+    for (const id of TRACK_ORDER) {
+      const track = getTrack(id);
+      const s = pickSafeRespawnS(track, -1, track.length * 0.4);
+      assert.equal(s, AUTHOR_START_S, `${id} pre-CP s`);
+      assert.ok(sampleAt(track, s).uy > 0.9, `${id} uy`);
+    }
   });
 
   it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
@@ -111,7 +111,7 @@ describe("leave-track respawn", () => {
     const circuit = getTrack("circuit");
     const pre = pickSafeRespawnS(circuit, -1, 8);
     const post = pickSafeRespawnS(circuit, 0, circuit.checkpoints[0]! + 8);
-    assert.ok(pre >= 12 && pre < 50, `circuit #9 pre-CP s ${pre}`);
+    assert.equal(pre, AUTHOR_START_S, `circuit pre-CP s ${pre}`);
     assert.ok(post > 160 && post < 180, `circuit post-CP1 s ${post}`);
     assert.ok(sampleAt(circuit, pre).uy > 0.9);
     assert.ok(sampleAt(circuit, post).uy > 0.9);
@@ -129,6 +129,10 @@ describe("leave-track respawn", () => {
         assert.ok(car.uy > 0.9, `circuit cp${lastCp} R${r} uy ${car.uy}`);
         assert.equal(car.airborne, false);
         assert.ok(car.py > -0.2, `circuit cp${lastCp} R${r} py ${car.py}`);
+        if (lastCp < 0) {
+          assert.equal(car.s, AUTHOR_START_S, `circuit pre-CP R${r} s`);
+          assert.equal(car.speed, 0, `circuit pre-CP R${r} speed`);
+        }
         const sm = sampleAt(circuit, car.s);
         assert.ok(sm.uy > 0.88, `circuit cp${lastCp} R${r} sample uy ${sm.uy} at s=${car.s}`);
         const { cam, road, snap } = portraitChaseAboveRoad(car, circuit);
@@ -142,28 +146,27 @@ describe("leave-track respawn", () => {
     }
   });
 
-  it("centers Circuit pre-CP1 R on the outbound ribbon, not the wrap", () => {
+  it("pre-CP1 R returns to the start grid from mid-sector, not a nearby island", () => {
     const circuit = getTrack("circuit");
     const start = pickSafeRespawnS(circuit, -1, 8);
     const startSm = sampleAt(circuit, start);
-    assert.ok(start >= 12 && start < 50, `start s ${start}`);
+    assert.equal(start, AUTHOR_START_S, `start s ${start}`);
     assert.ok(Math.abs(startSm.x) < 0.45, `start x ${startSm.x}`);
     assert.ok(startSm.tz < -0.9, `start tz ${startSm.tz}`);
 
-    const mid = pickSafeRespawnS(circuit, -1, 140);
-    const midSm = sampleAt(circuit, mid);
-    assert.ok(mid > 120 && mid < 160, `mid-sector s ${mid}`);
-    assert.ok(midSm.uy > 0.9, `mid uy ${midSm.uy}`);
-    assert.ok(Math.abs(midSm.x) > 40, `expected first-curve x, got ${midSm.x}`);
+    assert.equal(pickSafeRespawnS(circuit, -1, 140), AUTHOR_START_S);
 
     const car = new CarSim();
     car.reset(circuit);
     car.s = 22;
     car.n = -9;
     car.lastCp = -1;
+    car.speed = 20;
     car.respawn(circuit);
     assert.equal(car.n, 0);
     assert.equal(car.heading, 0);
+    assert.equal(car.s, AUTHOR_START_S);
+    assert.equal(car.speed, 0);
     assert.ok(Math.abs(car.px) < 0.45, `px ${car.px}`);
     assert.ok(car.fz < -0.9, `fz ${car.fz}`);
     assert.ok(car.uy > 0.9, `uy ${car.uy}`);
@@ -202,8 +205,8 @@ describe("leave-track respawn", () => {
       car.py = -6;
       car.airborne = true;
       car.respawn(track);
-      if (id === "helix") assert.ok(car.s >= 16, `${id} respawn s ${car.s}`);
-      else assert.ok(car.s >= 6, `${id} respawn s ${car.s}`);
+      assert.equal(car.s, AUTHOR_START_S, `${id} respawn s ${car.s}`);
+      assert.equal(car.speed, 0, `${id} respawn speed`);
       assert.ok(car.uy > 0.9, `${id} flatten uy ${car.uy}`);
       assert.equal(car.airborne, false);
       for (let i = 0; i < 50; i++) car.step(track, idle, 1 / 60);
@@ -211,5 +214,31 @@ describe("leave-track respawn", () => {
       assert.equal(car.airborne, false);
       assert.ok(car.py > -1, `${id} py ${car.py}`);
     }
+  });
+
+  it("auto-recover before CP1 also returns to the grid with recoverLock", () => {
+    const circuit = getTrack("circuit");
+    const car = new CarSim();
+    car.reset(circuit);
+    car.s = 30;
+    let recovered = false;
+    for (let i = 0; i < 200; i++) {
+      car.n = 24;
+      car.py = -10;
+      car.airborne = true;
+      car.step(circuit, idle, 1 / 60);
+      if (car.justRespawn) {
+        recovered = true;
+        break;
+      }
+    }
+    assert.ok(recovered, "expected auto-respawn off track");
+    assert.equal(car.s, AUTHOR_START_S);
+    assert.equal(car.speed, 0);
+    car.n = 24;
+    car.py = -10;
+    car.airborne = true;
+    car.step(circuit, idle, 1 / 60);
+    assert.equal(car.justRespawn, false, "recoverLock should block an immediate re-respawn");
   });
 });

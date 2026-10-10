@@ -8,8 +8,11 @@ import {
   RESPAWN_SPEED_MAX,
   RESPAWN_SPEED_MIN,
 } from "./run-flow.ts";
+import { AUTHOR_START_S } from "./author-ghost.ts";
+import { wallClockMs } from "./clock.ts";
 import { getTrack } from "./track.ts";
 import { CarSim } from "./physics.ts";
+import { TRACK_ORDER } from "./types.ts";
 
 const cruise = {
   throttle: 1,
@@ -52,9 +55,9 @@ describe("respawnKeepSpeed", () => {
 });
 
 describe("respawnEntrySpeed", () => {
-  it("defaults to 9 before any checkpoint", () => {
-    assert.equal(respawnEntrySpeed(-1, 0), 9);
-    assert.equal(respawnEntrySpeed(-1, 40), 9);
+  it("is a full stop before CP1 (Trackmania grid respawn)", () => {
+    assert.equal(respawnEntrySpeed(-1, 0), 0);
+    assert.equal(respawnEntrySpeed(-1, 40), 0);
   });
 
   it("uses CP crossing speed, not crash speed at respawn", () => {
@@ -108,5 +111,49 @@ describe("restart run car state", () => {
     const clamp = (speed: number) => Math.min(Math.max(speed, 6), 10);
     assert.equal(clamp(28), 10);
     assert.equal(clamp(4), 6);
+  });
+
+  it("CP0 respawn returns to the grid pose at zero speed without resetting the race clock", () => {
+    const circuit = getTrack("circuit");
+    const hold = 12_500;
+    const startedAt = 1_000;
+    const now = 11_000;
+    const clockBefore = wallClockMs(hold, startedAt, now);
+
+    const car = new CarSim();
+    car.reset(circuit);
+    car.speed = 20;
+    car.s = 42;
+    car.respawn(circuit);
+
+    assert.equal(wallClockMs(hold, startedAt, now), clockBefore);
+    assert.equal(car.s, AUTHOR_START_S);
+    assert.equal(car.speed, 0);
+    assert.equal(car.lastCp, -1);
+    assert.equal(car.heading, 0);
+    assert.equal(car.n, 0);
+  });
+
+  it("CP0 respawn matches reset placement on every stock track", () => {
+    for (const id of TRACK_ORDER) {
+      const track = getTrack(id);
+      const grid = new CarSim();
+      grid.reset(track);
+      const snapGrid = grid.snap();
+
+      const car = new CarSim();
+      car.reset(track);
+      car.lastCp = -1;
+      car.speed = 18;
+      car.s = track.checkpoints[0]! * 0.35;
+      car.respawn(track);
+      const snapRespawn = car.snap();
+
+      assert.equal(snapRespawn.s, AUTHOR_START_S, `${id} s`);
+      assert.equal(snapRespawn.s, snapGrid.s, `${id} grid s`);
+      assert.equal(car.speed, 0, `${id} speed`);
+      assert.ok(Math.abs(snapRespawn.px - snapGrid.px) < 0.02, `${id} px`);
+      assert.ok(Math.abs(snapRespawn.pz - snapGrid.pz) < 0.02, `${id} pz`);
+    }
   });
 });
