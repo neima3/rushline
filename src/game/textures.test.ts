@@ -16,6 +16,7 @@ import {
   surfaceAlbedoBase,
   surfaceRoughnessMid,
   surfaceSpec,
+  terrainGroundFill,
   themeDefaultSurface,
 } from "./look.ts";
 
@@ -158,6 +159,13 @@ describe("track look tokens", () => {
     assert.ok(left.b > left.r);
     assert.ok(right.r > right.b);
     assert.ok(ASPHALT_BASE.night[2] > ASPHALT_BASE.night[0]);
+  });
+
+  it("lifts backlit canyon terrain and dirt so off-track fill is not unlit black", () => {
+    const ground = terrainGroundFill("canyon");
+    assert.ok(ground.emissiveIntensity > 0.15);
+    const dirt = surfaceSpec("canyon", "dirt");
+    assert.ok(dirt.emissiveIntensity > 0);
   });
 
   it("keeps storm asphalt cooler and wetter than Circuit without rewriting Helix", () => {

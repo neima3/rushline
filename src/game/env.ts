@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { BuiltTrack, ThemeId } from "./types";
 import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
+import { terrainGroundFill } from "./look";
 import type { TextureBudget } from "./quality";
 import { gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
 
@@ -37,6 +38,10 @@ export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: 
   mat.map = tex;
   mat.color.set(0xffffff);
   mat.roughness = theme === "night" ? 0.92 : theme === "works" ? 0.88 : theme === "grove" ? 0.9 : theme === "mesa" ? 0.97 : theme === "ember" ? 0.96 : theme === "storm" ? 0.86 : 0.95;
+  const fill = terrainGroundFill(theme);
+  mat.emissive.setHex(fill.emissive);
+  mat.emissiveIntensity = fill.emissiveIntensity;
+  mat.side = theme === "canyon" || theme === "alpine" || theme === "works" ? THREE.DoubleSide : THREE.FrontSide;
   mat.needsUpdate = true;
 }
 
@@ -91,6 +96,9 @@ function buildStadium(
     color: 0xb8b2a4,
     roughness: 0.78,
     metalness: 0.08,
+    side: THREE.DoubleSide,
+    emissive: 0xb8b2a4,
+    emissiveIntensity: 0.26,
   });
   const n = 20;
   const stands = new THREE.InstancedMesh(standGeo, standMat, n);
@@ -109,7 +117,14 @@ function buildStadium(
   mats.push(standMat);
 
   const seatGeo = new THREE.BoxGeometry(1, 1, 1);
-  const seatMat = new THREE.MeshStandardMaterial({ color: 0x2a4a72, roughness: 0.62, metalness: 0.08 });
+  const seatMat = new THREE.MeshStandardMaterial({
+    color: 0x2a4a72,
+    roughness: 0.62,
+    metalness: 0.08,
+    side: THREE.DoubleSide,
+    emissive: 0x1e4068,
+    emissiveIntensity: 0.22,
+  });
   const seats = new THREE.InstancedMesh(seatGeo, seatMat, n);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
@@ -1530,6 +1545,9 @@ function addContrastBarriers(
     color: 0x14161c,
     roughness: 0.55,
     metalness: 0.2,
+    side: THREE.DoubleSide,
+    emissive: 0x14161c,
+    emissiveIntensity: 0.14,
   });
   const n = theme === "night" ? 28 : 22;
   const step = Math.max(1, Math.floor(track.samples.length / n));
@@ -1569,13 +1587,21 @@ function addNearStands(
   mats: THREE.Material[],
 ) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const conc = new THREE.MeshStandardMaterial({ color: 0xa8a294, roughness: 0.78, metalness: 0.08 });
+  const conc = new THREE.MeshStandardMaterial({
+    color: 0xa8a294,
+    roughness: 0.78,
+    metalness: 0.08,
+    side: THREE.DoubleSide,
+    emissive: 0xa8a294,
+    emissiveIntensity: 0.28,
+  });
   const seats = new THREE.MeshStandardMaterial({
     color: 0x1e4c88,
     roughness: 0.5,
     metalness: 0.1,
+    side: THREE.DoubleSide,
     emissive: 0x102038,
-    emissiveIntensity: 0.12,
+    emissiveIntensity: 0.26,
   });
   const n = 12;
   const bowl = new THREE.InstancedMesh(geo, conc, n);
