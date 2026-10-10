@@ -8,6 +8,7 @@ import { applyGroundMaterial, buildEnvironment } from "./env";
 import { bakeSkyEnvironment, SkyDome } from "./sky";
 import { buildGate } from "./gates";
 import { Vfx } from "./vfx";
+import { RaceVfx } from "./race-vfx";
 import { PostFx } from "./postfx";
 import type { Settings } from "./settings";
 import {
@@ -311,6 +312,7 @@ export class World {
   private sky: SkyDome | null = null;
   private ground: THREE.Mesh;
   private vfx = new Vfx();
+  private raceVfx = new RaceVfx();
   private post: PostFx;
   private quality: QualityProfile = resolveQuality();
   private pmrem: THREE.PMREMGenerator | null = null;
@@ -429,10 +431,11 @@ export class World {
     this.car = makeCar(false);
     this.ghost = makeCar(true);
     this.ghost.group.visible = false;
-    this.scene.add(this.car.group, this.ghost.group, this.vfx.root);
+    this.scene.add(this.car.group, this.ghost.group, this.vfx.root, this.raceVfx.root);
     this.post = new PostFx(this.renderer, this.scene, this.camera);
     this.disposables.push(groundGeo, this.ground.material as THREE.Material);
     this.vfx.setQuality(this.quality);
+    this.raceVfx.setQuality(this.quality);
     this.applyEnvironmentMap();
   }
 
@@ -484,6 +487,7 @@ export class World {
     }
     this.vfx.setQuality(this.quality);
     this.vfx.density = this.knobs.particleDensity ?? this.quality.sparkScale;
+    this.raceVfx.setQuality(this.quality, this.knobs.particleDensity);
     this.renderer.shadowMap.enabled = s.shadows;
     this.renderer.shadowMap.autoUpdate = s.shadows;
     this.renderer.shadowMap.type = this.quality.tier === "high" ? THREE.PCFShadowMap : THREE.BasicShadowMap;
@@ -632,6 +636,8 @@ export class World {
     for (const o of this.nightLights) this.scene.remove(o);
     this.nightLights = [];
     this.vfx.resetSkids();
+    this.raceVfx.bindTrack(track, theme);
+    this.raceVfx.setQuality(this.quality, this.knobs?.particleDensity);
 
     const pack = THEMES[theme];
     this.scene.background = new THREE.Color(pack.fog);
@@ -666,6 +672,11 @@ export class World {
 
     const built = buildTrackMeshes(track, theme, budget);
     this.trackRoot.add(built.group);
+    if ("boostPads" in built && Array.isArray(built.boostPads)) {
+      for (const bp of built.boostPads as { s: number; pad: THREE.Mesh; chevrons: THREE.Mesh[] }[]) {
+        this.raceVfx.registerBoostPad(bp.s, bp.pad, bp.chevrons);
+      }
+    }
     this.disposables.push(...built.geos, ...built.materials);
     if ("textures" in built && Array.isArray(built.textures)) {
       this.textures.push(...(built.textures as THREE.Texture[]));
@@ -683,6 +694,7 @@ export class World {
     this.car.setLivery(this.livery);
     this.car.setHeadlights(theme === "night" || theme === "grove" || theme === "storm");
     this.vfx.setTheme(theme);
+    this.raceVfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog, pack.skyTint);
 
     const start = sampleAt(track, 6);
@@ -778,6 +790,7 @@ export class World {
       this.trackRoot.add(built.group);
       this.disposables.push(...built.mats);
       this.textures.push(...built.textures);
+      this.raceVfx.registerGate(s, finish, built.group, built.mats);
     };
     // Spawn is s=6. The gantry sits ahead of the grid so chase cam reads
     // the checker at lights-out (Trackmania start). Ground checker stays at 2.2.
@@ -786,6 +799,7 @@ export class World {
   }
 
   applyCar(snap: CarSnap, dt: number, steer: number, brake: number) {
+    this.raceVfx.maybeClearOnRespawn(snap.s);
     this.car.group.position.set(snap.px, snap.py, snap.pz);
     this.car.group.quaternion.set(snap.qx, snap.qy, snap.qz, snap.qw);
     if (snap.justLand) {
@@ -824,7 +838,7 @@ export class World {
       this.vfx.emitSmoke(snap, 4);
       this.vfx.emitSlideSparks(snap);
     }
-    this.vfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
+    this.raceVfx.skid(snap, snap.slide > 0.35 && Math.abs(snap.speed) > 8);
   }
 
   applyGhost(
@@ -865,6 +879,7 @@ export class World {
 
   flashTiming(snap: CarSnap, kind: "cp" | "lap" | "finish") {
     this.vfx.emitCheckpoint(snap, kind === "finish");
+    this.raceVfx.onTimingGate(snap.s, kind);
   }
 
   updateCamera(
@@ -1120,6 +1135,7 @@ export class World {
 
   stepParticles(dt: number) {
     this.vfx.step(dt);
+    this.raceVfx.step(dt);
   }
 
   render() {
@@ -1285,6 +1301,7 @@ export class World {
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
     this.vfx.dispose();
+    this.raceVfx.dispose();
     this.post.dispose();
     this.skyEnvRT?.dispose();
     this.roomEnvRT?.dispose();
