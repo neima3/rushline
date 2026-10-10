@@ -5,6 +5,7 @@ import {
   gateLookForTheme,
   raceVfxDensity,
   skidFadeAlpha,
+  skidFadeTintColor,
   skidRingIndex,
   skidSurfaceTint,
   SKID_MAX_AGE,
@@ -24,6 +25,15 @@ describe("race vfx helpers", () => {
     assert.ok(skidFadeAlpha(SKID_MAX_AGE * 0.5, SKID_MAX_AGE) > 0.2);
     assert.equal(skidFadeAlpha(SKID_MAX_AGE, SKID_MAX_AGE), 0);
     assert.equal(skidFadeAlpha(SKID_MAX_AGE + 2, SKID_MAX_AGE), 0);
+  });
+
+  it("lerps multiply-blend skid colour toward white as fade drops", () => {
+    const ice = skidSurfaceTint("ice", false);
+    assert.equal(skidFadeTintColor(ice, 0.7, 0), 0xffffff);
+    const fresh = skidFadeTintColor(ice, 0.7, 1);
+    assert.ok(fresh < 0xffffff, "fresh mark darkens under multiply");
+    const mid = skidFadeTintColor(ice, 0.7, 0.5);
+    assert.ok(mid > fresh && mid < 0xffffff);
   });
 
   it("tints skid marks per surface", () => {

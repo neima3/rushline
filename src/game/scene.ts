@@ -635,7 +635,7 @@ export class World {
     this.clearGroup(this.envRoot);
     for (const o of this.nightLights) this.scene.remove(o);
     this.nightLights = [];
-    this.vfx.resetSkids();
+    this.resetRunSkidMarks();
     this.raceVfx.bindTrack(track, theme);
     this.raceVfx.setQuality(this.quality, this.knobs?.particleDensity);
 
@@ -708,7 +708,14 @@ export class World {
     this.camera.lookAt(this.lookPos);
   }
 
-  snapCamera(snap: CarSnap, mode: CameraMode) {
+  /** Clears tire-skid decals and skid particle lines (restart / respawn / track bind). */
+  resetRunSkidMarks() {
+    this.vfx.resetSkids();
+    this.raceVfx.clearMarks();
+  }
+
+  snapCamera(snap: CarSnap, mode: CameraMode, resetSkidMarks = false) {
+    if (resetSkidMarks) this.resetRunSkidMarks();
     this.trauma = 0;
     this.landJuice = 0;
     this.boostJuice = 0;
@@ -799,7 +806,6 @@ export class World {
   }
 
   applyCar(snap: CarSnap, dt: number, steer: number, brake: number) {
-    this.raceVfx.maybeClearOnRespawn(snap.s);
     this.car.group.position.set(snap.px, snap.py, snap.pz);
     this.car.group.quaternion.set(snap.qx, snap.qy, snap.qz, snap.qw);
     if (snap.justLand) {

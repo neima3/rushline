@@ -53,6 +53,21 @@ export function skidFadeAlpha(age: number, maxAge: number): number {
   return 1 - eased;
 }
 
+/** Multiply-blend instance colour: dark tint at fade=1, white (no mark) at fade=0. */
+export function skidFadeTintColor(tintHex: number, strength: number, fade: number): number {
+  const f = Math.max(0, Math.min(1, fade));
+  const inv = 1 - f;
+  const r0 = ((tintHex >> 16) & 255) / 255;
+  const g0 = ((tintHex >> 8) & 255) / 255;
+  const b0 = (tintHex & 255) / 255;
+  const rOut = r0 * strength + (1 - r0 * strength) * inv;
+  const gOut = g0 * strength + (1 - g0 * strength) * inv;
+  const bOut = b0 * strength + (1 - b0 * strength) * inv;
+  return (
+    (Math.round(rOut * 255) << 16) | (Math.round(gOut * 255) << 8) | Math.round(bOut * 255)
+  );
+}
+
 export function skidSurfaceTint(surface: SurfaceKind, night: boolean): number {
   switch (surface) {
     case "dirt":
@@ -158,6 +173,8 @@ type GateRef = {
   group: THREE.Group;
   stdMats: THREE.MeshStandardMaterial[];
   rimMat: THREE.MeshBasicMaterial | null;
+  rimColorOrig: number;
+  rimOpacityOrig: number;
   look: GateLookColors;
   flashT: number;
 };
@@ -188,7 +205,6 @@ export class RaceVfx {
   private skidStrength = new Float32Array(0);
   private skidTint = new Uint32Array(0);
   private skidLive = 0;
-  private lastMarkS = -1;
   private lastSkidX = 0;
   private lastSkidY = 0;
   private lastSkidZ = 0;
@@ -254,6 +270,8 @@ export class RaceVfx {
       group,
       stdMats,
       rimMat,
+      rimColorOrig: rimMat ? rimMat.color.getHex() : 0xffffff,
+      rimOpacityOrig: rimMat ? rimMat.opacity : 1,
       look: gateLookForTheme(this.theme, finish),
       flashT: -1,
     };
@@ -265,17 +283,10 @@ export class RaceVfx {
     this.boosts.push({ s, pad, chevrons, scroll: 0 });
   }
 
-  /** Backward s jump — respawn without reloading the track. */
-  maybeClearOnRespawn(s: number) {
-    if (this.lastMarkS >= 0 && s < this.lastMarkS - 8) this.clearMarks();
-    this.lastMarkS = s;
-  }
-
   clearMarks() {
     this.skidHead = 0;
     this.skidLive = 0;
     this.hasLastSkid = false;
-    this.lastMarkS = -1;
     if (this.skidMesh) {
       this.skidMesh.count = 0;
       for (let i = 0; i < this.skidCap; i++) this.skidAge[i] = -1;
@@ -359,8 +370,13 @@ export class RaceVfx {
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
       transparent: true,
+      opacity: 1,
       depthWrite: false,
       side: THREE.DoubleSide,
+      blending: THREE.MultiplyBlending,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -4,
     });
     this.skidMesh = new THREE.InstancedMesh(geo, mat, cap);
     this.skidMesh.frustumCulled = false;
@@ -428,9 +444,10 @@ export class RaceVfx {
     _scale.set(width, 1, 0.11 + snap.slide * 0.06);
     _mat4.compose(_pos.set(x, y, z), _quat, _scale);
     this.skidMesh!.setMatrixAt(idx, _mat4);
-    _color.setHex(this.skidTint[idx]!);
-    _color.multiplyScalar(this.skidStrength[idx]!);
-    this.skidMesh!.setColorAt(idx, _color);
+    this.skidMesh!.setColorAt(
+      idx,
+      _color.setHex(skidFadeTintColor(this.skidTint[idx]!, this.skidStrength[idx]!, 1)),
+    );
     this.skidMesh!.count = Math.max(this.skidMesh!.count, idx + 1);
     this.skidMesh!.instanceMatrix.needsUpdate = true;
     if (this.skidMesh!.instanceColor) this.skidMesh!.instanceColor.needsUpdate = true;
@@ -455,9 +472,7 @@ export class RaceVfx {
         any = true;
         continue;
       }
-      _color.setHex(this.skidTint[i]!);
-      _color.multiplyScalar(this.skidStrength[i]! * fade);
-      mesh.setColorAt(i, _color);
+      mesh.setColorAt(i, _color.setHex(skidFadeTintColor(this.skidTint[i]!, this.skidStrength[i]!, fade)));
       any = true;
     }
     if (any && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -476,7 +491,10 @@ export class RaceVfx {
           m.emissiveIntensity = g.look.emissiveBase;
           m.emissive.setHex(g.look.emissive);
         }
-        if (g.rimMat) g.rimMat.opacity = this.theme === "night" ? 0.85 : 0.72;
+        if (g.rimMat) {
+          g.rimMat.color.setHex(g.rimColorOrig);
+          g.rimMat.opacity = g.rimOpacityOrig;
+        }
         continue;
       }
       const boost = 1 + pulse * (g.finish ? 1.8 : 1.35);
@@ -486,7 +504,7 @@ export class RaceVfx {
       }
       if (g.rimMat) {
         g.rimMat.color.setHex(g.look.rim);
-        g.rimMat.opacity = Math.min(1, (this.theme === "night" ? 0.85 : 0.72) + pulse * 0.28);
+        g.rimMat.opacity = Math.min(1, g.rimOpacityOrig + pulse * 0.28);
       }
     }
   }
