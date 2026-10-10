@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cablePointAt, gondolaPosition, horizontalCableLayout } from "./alpine-gantry.ts";
+import {
+  cablePointAt,
+  gondolaCableTs,
+  gondolaPosition,
+  horizontalCableLayout,
+} from "./alpine-gantry.ts";
 
 describe("alpine gantry cable layout", () => {
   it("spans horizontally between mast tops with unit direction along the chord", () => {
@@ -11,6 +16,12 @@ describe("alpine gantry cable layout", () => {
     assert.ok(Math.abs(layout.dirX - 1) < 1e-9);
     assert.equal(layout.mx, 7);
     assert.equal(layout.mz, 0);
+  });
+
+  it("keeps gondola sample params off mast endpoints", () => {
+    assert.deepEqual(gondolaCableTs(1), [0.5]);
+    const two = gondolaCableTs(2);
+    assert.ok(two.every((t) => t >= 0.28 && t <= 0.72));
   });
 
   it("sags cable points at the center and hangs gondolas below the chord", () => {

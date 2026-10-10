@@ -57,6 +57,18 @@ export function cablePointAt(
   };
 }
 
+/** Parametric positions along a span — kept away from mast endpoints so cabins read on the cable. */
+export function gondolaCableTs(count: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [0.5];
+  const out: number[] = [];
+  for (let g = 0; g < count; g++) {
+    const t0 = 0.5 - (count - 1) * 0.12;
+    out.push(Math.max(0.28, Math.min(0.72, t0 + g * 0.24)));
+  }
+  return out;
+}
+
 /** Gondola body center: on the cable at `t`, then dropped by `drop` on Y. */
 export function gondolaPosition(
   ax: number,
