@@ -4,7 +4,7 @@ import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
 import { terrainGroundFill } from "./look";
 import type { TextureBudget } from "./quality";
-import { gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
+import { gondolaCableTs, gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
 
 const _dummy = new THREE.Object3D();
 const _fwd = new THREE.Vector3();
@@ -498,22 +498,30 @@ function buildAlpine(
   const roofs = new THREE.InstancedMesh(roofGeo, roofMat, lodgeN);
   lodges.castShadow = true;
   roofs.castShadow = true;
+  let lodgePlaced = 0;
   for (let i = 0; i < lodgeN; i++) {
     const sm = sampleAt(track, ((i + 0.35) / lodgeN) * track.length);
     const side = i % 2 === 0 ? 1 : -1;
-    const d = sm.width * 0.5 + 14 + hash(i) * 6;
+    const d = sm.width * 0.5 + 11 + hash(i) * 5;
     const x = sm.x + sm.rx * side * d;
     const z = sm.z + sm.rz * side * d;
+    const gantryD = sm.width * 0.5 + 20 + hash(i) * 8;
+    const gx = sm.x + sm.rx * side * gantryD;
+    const gz = sm.z + sm.rz * side * gantryD;
+    if (Math.hypot(x - gx, z - gz) < 9) continue;
     _dummy.position.set(x, sm.y + 1.35, z);
     _dummy.scale.set(5.2, 2.7, 3.6);
     _dummy.rotation.set(0, Math.atan2(sm.rx * side, sm.rz * side), 0);
     _dummy.updateMatrix();
-    lodges.setMatrixAt(i, _dummy.matrix);
+    lodges.setMatrixAt(lodgePlaced, _dummy.matrix);
     _dummy.position.set(x, sm.y + 3.1, z);
     _dummy.scale.set(4.2, 2.2, 3.2);
     _dummy.updateMatrix();
-    roofs.setMatrixAt(i, _dummy.matrix);
+    roofs.setMatrixAt(lodgePlaced, _dummy.matrix);
+    lodgePlaced++;
   }
+  lodges.count = lodgePlaced;
+  roofs.count = lodgePlaced;
   group.add(lodges, roofs);
   geos.push(lodgeGeo, roofGeo);
   mats.push(lodgeMat, roofMat);
@@ -1767,7 +1775,7 @@ function addAlpineGantries(
     emissiveIntensity: 0.05,
   });
   const n = 6;
-  const gondolasPerSpan = 2;
+  const gondolasPerSpan = 1;
   const masts = new THREE.InstancedMesh(mastGeo, mastMat, n * 2);
   const cables = new THREE.InstancedMesh(cableGeo, cableMat, n);
   const cabins = new THREE.InstancedMesh(cabinGeo, cabinMat, n * gondolasPerSpan);
@@ -1806,8 +1814,7 @@ function addAlpineGantries(
       const yaw = Math.atan2(layout.dirX, layout.dirZ);
       const sag = 0.35;
       const drop = 1.35;
-      for (let g = 0; g < gondolasPerSpan; g++) {
-        const t = (g + 1) / (gondolasPerSpan + 1);
+      for (const t of gondolaCableTs(gondolasPerSpan)) {
         const hang = gondolaPosition(x0, yTop, z0, x1, yTop, z1, t, sag, drop);
         _dummy.position.set(hang.x, hang.y, hang.z);
         _dummy.quaternion.setFromAxisAngle(_yAxis, yaw);
