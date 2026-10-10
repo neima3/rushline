@@ -3,11 +3,15 @@ import type { BuiltTrack, ThemeId } from "./types";
 import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
 import type { TextureBudget } from "./quality";
+import { gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
 
 const _dummy = new THREE.Object3D();
 const _fwd = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _look = new THREE.Matrix4();
+const _yAxis = new THREE.Vector3(0, 1, 0);
+const _cableDir = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
 
 function lookMat(fwd: THREE.Vector3, up: THREE.Vector3) {
   const x = new THREE.Vector3().crossVectors(up, fwd);
@@ -1714,18 +1718,36 @@ function addAlpineGantries(
 ) {
   const mastGeo = new THREE.CylinderGeometry(0.14, 0.18, 1, 6);
   const cableGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 5);
-  const mastMat = new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.52, metalness: 0.35 });
+  const cabinGeo = new THREE.BoxGeometry(1, 1, 1);
+  const mastMat = new THREE.MeshStandardMaterial({
+    color: 0x8a7868,
+    roughness: 0.78,
+    metalness: 0.08,
+    emissive: 0x302820,
+    emissiveIntensity: 0.06,
+  });
   const cableMat = new THREE.MeshStandardMaterial({
-    color: 0x8898a8,
-    roughness: 0.38,
-    metalness: 0.55,
-    emissive: 0x304050,
-    emissiveIntensity: 0.12,
+    color: 0xa0acb8,
+    roughness: 0.74,
+    metalness: 0.12,
+    emissive: 0x485868,
+    emissiveIntensity: 0.08,
+  });
+  const cabinMat = new THREE.MeshStandardMaterial({
+    color: 0xd83828,
+    roughness: 0.82,
+    metalness: 0.06,
+    emissive: 0x401008,
+    emissiveIntensity: 0.05,
   });
   const n = 6;
+  const gondolasPerSpan = 2;
   const masts = new THREE.InstancedMesh(mastGeo, mastMat, n * 2);
   const cables = new THREE.InstancedMesh(cableGeo, cableMat, n);
+  const cabins = new THREE.InstancedMesh(cabinGeo, cabinMat, n * gondolasPerSpan);
   masts.castShadow = true;
+  cabins.castShadow = true;
+  let gi = 0;
   for (let i = 0; i < n; i++) {
     const sm = sampleAt(track, ((i + 0.35) / n) * track.length);
     const side = i % 2 === 0 ? 1 : -1;
@@ -1734,26 +1756,50 @@ function addAlpineGantries(
     const z0 = sm.z + sm.rz * side * d;
     const x1 = sm.x + sm.rx * side * (d + 14);
     const z1 = sm.z + sm.rz * side * (d + 14);
-    const y0 = sm.y + 10;
-    _dummy.position.set(x0, y0, z0);
-    _dummy.scale.set(1, 20, 1);
+    const yMast = sm.y + 10;
+    const yTop = sm.y + 19.5;
+    _dummy.position.set(x0, yMast, z0);
+    _dummy.scale.set(1, 19, 1);
     _dummy.rotation.set(0, 0, 0);
+    _dummy.quaternion.identity();
     _dummy.updateMatrix();
     masts.setMatrixAt(i * 2, _dummy.matrix);
-    _dummy.position.set(x1, y0, z1);
+    _dummy.position.set(x1, yMast, z1);
     _dummy.updateMatrix();
     masts.setMatrixAt(i * 2 + 1, _dummy.matrix);
-    _dummy.position.set((x0 + x1) * 0.5, y0 + 9.2, (z0 + z1) * 0.5);
-    _fwd.set(x1 - x0, 0, z1 - z0);
-    _up.set(0, 1, 0);
-    _dummy.quaternion.setFromRotationMatrix(lookMat(_fwd, _up));
-    _dummy.scale.set(1, 14, 1);
-    _dummy.updateMatrix();
-    cables.setMatrixAt(i, _dummy.matrix);
+
+    const layout = horizontalCableLayout(x0, yTop, z0, x1, yTop, z1);
+    if (layout.span > 0.5) {
+      _dummy.position.set(layout.mx, layout.my, layout.mz);
+      _cableDir.set(layout.dirX, layout.dirY, layout.dirZ);
+      _dummy.quaternion.setFromUnitVectors(_yAxis, _cableDir);
+      _dummy.scale.set(1, layout.span, 1);
+      _dummy.updateMatrix();
+      cables.setMatrixAt(i, _dummy.matrix);
+
+      const yaw = Math.atan2(layout.dirX, layout.dirZ);
+      const sag = 0.35;
+      const drop = 1.35;
+      for (let g = 0; g < gondolasPerSpan; g++) {
+        const t = (g + 1) / (gondolasPerSpan + 1);
+        const hang = gondolaPosition(x0, yTop, z0, x1, yTop, z1, t, sag, drop);
+        _dummy.position.set(hang.x, hang.y, hang.z);
+        _dummy.quaternion.setFromAxisAngle(_yAxis, yaw);
+        _dummy.scale.set(1.35, 1.05, 1.65);
+        _dummy.updateMatrix();
+        cabins.setMatrixAt(gi++, _dummy.matrix);
+      }
+    }
   }
-  group.add(masts, cables);
-  geos.push(mastGeo, cableGeo);
-  mats.push(mastMat, cableMat);
+  masts.count = n * 2;
+  cables.count = n;
+  cabins.count = gi;
+  masts.instanceMatrix.needsUpdate = true;
+  cables.instanceMatrix.needsUpdate = true;
+  cabins.instanceMatrix.needsUpdate = true;
+  group.add(masts, cables, cabins);
+  geos.push(mastGeo, cableGeo, cabinGeo);
+  mats.push(mastMat, cableMat, cabinMat);
 }
 
 function addAshRim(
