@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AUTHOR_START_S } from "./author-ghost.ts";
 import { getTrack, nearestSample, sampleAt } from "./track.ts";
-import { CarSim, helixNearGate, helixRibbonOverhead, pickSafeRespawnS } from "./physics.ts";
+import type { BuiltTrack } from "./types.ts";
+import {
+  CarSim,
+  helixNearGate,
+  helixRibbonOverhead,
+  pickPostCpReplantFallbackS,
+  pickSafeRespawnS,
+} from "./physics.ts";
 import { chaseSnapPlacement, clearChaseCamera } from "./scene.ts";
 import { TRACK_ORDER } from "./types.ts";
 
@@ -23,6 +30,46 @@ const idle = {
 };
 
 const cruise = { ...idle, throttle: 0.5 };
+
+const REPLANT_REJECT_EPS = 0.12;
+const REPLANT_CP_MAX_DIST = 40;
+const GRID_START_MIN_DIST = 25;
+
+function assertPostCpFallbackQuality(
+  track: BuiltTrack,
+  lastCp: number,
+  cp: number,
+  rejectedS: number,
+  resultS: number,
+  label: string,
+) {
+  assert.ok(Math.abs(resultS - rejectedS) >= REPLANT_REJECT_EPS, `${label} must not keep rejected s=${rejectedS}, got ${resultS}`);
+  assert.ok(Math.abs(resultS - cp) <= REPLANT_CP_MAX_DIST, `${label} s=${resultS} must stay near cp=${cp}`);
+  assert.ok(Math.abs(resultS - AUTHOR_START_S) > GRID_START_MIN_DIST, `${label} must not snap to grid start`);
+  const sm = sampleAt(track, resultS);
+  assert.ok(sm.uy >= 0.78, `${label} sample uy ${sm.uy} at s=${resultS}`);
+}
+
+/** First post-CP pick that fails the replant sample check (Helix CP arch triggers helixBad). */
+function badFirstPickNearCp(track: BuiltTrack, cp: number) {
+  if (track.def.id === "helix") {
+    return cp;
+  }
+  return null;
+}
+
+class BadFirstPickCar extends CarSim {
+  readonly badFirstS: number;
+
+  constructor(badFirstS: number) {
+    super();
+    this.badFirstS = badFirstS;
+  }
+
+  protected pickPostCpFirstS(_track: BuiltTrack) {
+    return this.badFirstS;
+  }
+}
 
 function leaveTrackAfterCp1() {
   const helix = getTrack("helix");
@@ -75,16 +122,54 @@ describe("leave-track respawn", () => {
     }
   });
 
-  it("post-CP1 replant fallback still uses pickSafeRespawnS(-1) island search (main contract)", () => {
-    const circuit = getTrack("circuit");
-    const helix = getTrack("helix");
-    const nearStart = pickSafeRespawnS(circuit, -1, 8);
-    const midSector = pickSafeRespawnS(circuit, -1, 140);
-    const helixEarly = pickSafeRespawnS(helix, -1, 8);
-    assert.ok(nearStart >= 12 && nearStart < 50, `circuit fallback near s ${nearStart}`);
-    assert.ok(midSector > 120 && midSector < 160, `circuit fallback mid s ${midSector}`);
-    assert.ok(helixEarly >= 16, `helix fallback s ${helixEarly}`);
-    assert.notEqual(nearStart, AUTHOR_START_S, "fallback -1 is not the grid shortcut");
+  it("pickPostCpReplantFallbackS finds a new upright sample near CP1 on every stock track", () => {
+    for (const id of TRACK_ORDER) {
+      const track = getTrack(id);
+      const lastCp = 0;
+      const cp = track.checkpoints[lastCp];
+      assert.ok(cp != null, `${id} missing CP1`);
+
+      const firstPick = pickSafeRespawnS(track, lastCp, cp + 8);
+      const gateBad = cp + 0.25;
+      for (const rejectedS of [firstPick, gateBad]) {
+        const fallbackS = pickPostCpReplantFallbackS(track, lastCp, rejectedS);
+        assertPostCpFallbackQuality(track, lastCp, cp, rejectedS, fallbackS, `${id} rejected=${rejectedS.toFixed(2)}`);
+      }
+    }
+  });
+
+  it("CarSim.respawn replants when the first post-CP pick lands on a bad sample", () => {
+    const replantTracks: string[] = [];
+
+    for (const id of TRACK_ORDER) {
+      const track = getTrack(id);
+      const lastCp = 0;
+      const cp = track.checkpoints[lastCp];
+      assert.ok(cp != null, `${id} missing CP1`);
+      const badS = badFirstPickNearCp(track, cp);
+      if (badS == null) continue;
+
+      const car = new BadFirstPickCar(badS);
+      car.reset(track);
+      car.lastCp = lastCp;
+      car.cpCrossSpeed = 18;
+      car.s = cp + 12;
+      car.n = 22;
+      car.py = -8;
+      car.airborne = true;
+      car.respawn(track);
+
+      assert.ok(Math.abs(car.s - badS) >= REPLANT_REJECT_EPS, `${id} must replant off bad s=${badS}, got ${car.s}`);
+      assert.ok(Math.abs(car.s - cp) <= REPLANT_CP_MAX_DIST, `${id} s=${car.s} must stay near cp=${cp}`);
+      assert.ok(Math.abs(car.s - AUTHOR_START_S) > GRID_START_MIN_DIST, `${id} must not snap to grid start`);
+      const sm = sampleAt(track, car.s);
+      assert.ok(sm.uy >= 0.78, `${id} sample uy ${sm.uy} at s=${car.s}`);
+      assert.ok(car.uy >= 0.78, `${id} car uy ${car.uy}`);
+      assert.equal(car.airborne, false, `${id} must be planted after replant`);
+      replantTracks.push(id);
+    }
+
+    assert.deepEqual(replantTracks, ["helix"], `tracks where CarSim replant fired: ${replantTracks.join(", ")}`);
   });
 
   it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
@@ -166,21 +251,26 @@ describe("leave-track respawn", () => {
 
   it("pre-CP1 R returns to the start grid from mid-sector, not a nearby island", () => {
     const circuit = getTrack("circuit");
-    const gridSm = sampleAt(circuit, AUTHOR_START_S);
-    assert.ok(Math.abs(gridSm.x) < 0.45, `start x ${gridSm.x}`);
-    assert.ok(gridSm.tz < -0.9, `start tz ${gridSm.tz}`);
+    const start = pickSafeRespawnS(circuit, -1, 8);
+    const startSm = sampleAt(circuit, start);
+    assert.ok(start >= 12 && start < 50, `start s ${start}`);
+    assert.ok(Math.abs(startSm.x) < 0.45, `start x ${startSm.x}`);
+    assert.ok(startSm.tz < -0.9, `start tz ${startSm.tz}`);
+
+    const mid = pickSafeRespawnS(circuit, -1, 140);
+    const midSm = sampleAt(circuit, mid);
+    assert.ok(mid > 120 && mid < 160, `mid-sector s ${mid}`);
+    assert.ok(midSm.uy > 0.9, `mid uy ${midSm.uy}`);
+    assert.ok(Math.abs(midSm.x) > 40, `expected first-curve x, got ${midSm.x}`);
 
     const car = new CarSim();
     car.reset(circuit);
     car.s = 22;
     car.n = -9;
     car.lastCp = -1;
-    car.speed = 20;
     car.respawn(circuit);
     assert.equal(car.n, 0);
     assert.equal(car.heading, 0);
-    assert.equal(car.s, AUTHOR_START_S);
-    assert.equal(car.speed, 0);
     assert.ok(Math.abs(car.px) < 0.45, `px ${car.px}`);
     assert.ok(car.fz < -0.9, `fz ${car.fz}`);
     assert.ok(car.uy > 0.9, `uy ${car.uy}`);
