@@ -173,7 +173,6 @@ function injectBakedOgHead(host) {
 test("deployed bake: allowlisted vercel hosts emit absolute og and twitter images", () => {
   for (const host of [
     "rushline-racer.vercel.app",
-    "rushline.vercel.app",
     "rushline-racer-git-main-neima-nakhaees-projects.vercel.app",
   ]) {
     const out = injectBakedOgHead(host);
@@ -192,6 +191,7 @@ test("deployed bake: non-allowlisted request hosts emit no image metas", () => {
     'evil.com"><script>',
     "a b",
     "203.0.113.10",
+    "rushline.vercel.app",
     "rushline-racer.vercel.app.evil.com",
     "evilrushline-racer.vercel.app",
     "rushline-racer-x-other-team.vercel.app",

@@ -129,10 +129,7 @@ function requestHostName(hostHeader) {
 }
 
 /** Production Vercel aliases that serve this app (request-host fallback when `site.image` is baked). */
-export const OG_IMAGE_BAKED_REQUEST_HOST_ALLOWLIST = [
-  "rushline-racer.vercel.app",
-  "rushline.vercel.app",
-];
+export const OG_IMAGE_BAKED_REQUEST_HOST_ALLOWLIST = ["rushline-racer.vercel.app"];
 
 /**
  * Non-Vercel custom domains for the same fallback (none declared in vercel.json / README / env).
