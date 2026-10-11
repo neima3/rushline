@@ -87,7 +87,7 @@ describe("autoThrottleCap", () => {
     );
   });
 
-  it("keeps mobile Circuit opening cap", () => {
+  it("keeps mobile Circuit opening cap below post-CP cruise", () => {
     const early = autoThrottleCap({
       trackId: "circuit",
       s: 20,
@@ -96,17 +96,51 @@ describe("autoThrottleCap", () => {
       touchMode: true,
       countdown: false,
     });
-    const faster = autoThrottleCap({
+    const held = autoThrottleCap({
       trackId: "circuit",
+      s: 20,
+      speed: 34,
+      firstCp: 80,
+      touchMode: true,
+      countdown: false,
+    });
+    assert.ok(early >= 0.46 && early <= 0.5, `early cruise ${early}`);
+    assert.ok(held >= 0.18 && held <= 0.22, `high-speed bleed ${held}`);
+    assert.ok(held < early);
+  });
+
+  it("keeps the legacy opening cap on non-Circuit touch tracks", () => {
+    const legacyEarly = autoThrottleCap({
+      trackId: "helix",
+      s: 20,
+      speed: 20,
+      firstCp: 80,
+      touchMode: true,
+      countdown: false,
+    });
+    const legacyHeld = autoThrottleCap({
+      trackId: "helix",
       s: 20,
       speed: 26,
       firstCp: 80,
       touchMode: true,
       countdown: false,
     });
-    assert.ok(early < 0.28, `early ${early}`);
-    assert.ok(faster <= 0.16, `faster ${faster}`);
-    assert.ok(faster < early);
+    assert.ok(legacyEarly < 0.28, `helix early ${legacyEarly}`);
+    assert.ok(legacyHeld <= 0.16, `helix held ${legacyHeld}`);
+    assert.ok(legacyHeld < legacyEarly);
+
+    for (const trackId of ["storm", "mesa"] as const) {
+      const cap = autoThrottleCap({
+        trackId,
+        s: 20,
+        speed: 20,
+        firstCp: 80,
+        touchMode: true,
+        countdown: false,
+      });
+      assert.equal(cap, legacyEarly, `${trackId} should match legacy opening cap`);
+    }
   });
 });
 
