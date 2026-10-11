@@ -4,12 +4,7 @@ import { FAST_PATH_RACE_CAMERA, FAST_PATH_WORLD_RESETS } from "./scene.ts";
 import { resolveRaceLaps, withRaceLaps } from "./laps.ts";
 import { getTrack } from "./track.ts";
 import { QUALITY_PRESETS } from "./quality.ts";
-import {
-  advanceTrackSceneCache,
-  shouldRebuildTrackScene,
-  trackSceneContentKey,
-  trackSceneVisualKey,
-} from "./track-scene-cache.ts";
+import { advanceTrackSceneCache, shouldRebuildTrackScene, trackSceneVisualKey } from "./track-scene-cache.ts";
 
 describe("same-track restart fast path", () => {
   it("skips scene rebuild when track content key, theme, and quality key match", () => {
@@ -17,7 +12,7 @@ describe("same-track restart fast path", () => {
     const key = trackSceneVisualKey(QUALITY_PRESETS.high);
     const raced = withRaceLaps(track, 1);
     assert.notEqual(raced, track);
-    const cache = { trackKey: trackSceneContentKey(track), theme: track.def.env, visualKey: key };
+    const cache = { trackId: track.def.id, geometry: track.samples, theme: track.def.env, visualKey: key };
     assert.equal(shouldRebuildTrackScene(cache, raced, raced.def.env, key, { sceneBuilt: true }), false);
   });
 

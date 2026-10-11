@@ -32,8 +32,7 @@ import { sampleGhost } from "./ghost";
 import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
 import {
-  shouldRebuildTrackScene,
-  trackSceneContentKey,
+  advanceTrackSceneCache,
   trackSceneVisualKey,
   TrackTextureRegistry,
   type TrackSceneCache,
@@ -658,17 +657,16 @@ export class World {
 
   loadTrack(track: BuiltTrack, theme: ThemeId, opts?: { forceRebuild?: boolean }): LoadTrackMode {
     const visualKey = trackSceneVisualKey(this.quality);
-    const rebuild = shouldRebuildTrackScene(this.trackSceneCache, track, theme, visualKey, {
+    const step = advanceTrackSceneCache(this.trackSceneCache, track, theme, visualKey, this.trackRoot.children.length > 0, {
       forceRebuild: opts?.forceRebuild,
-      sceneBuilt: this.trackRoot.children.length > 0,
     });
-    if (rebuild) {
+    if (step.mode === "rebuilt") {
       this.disposeTrackSceneAssets();
       this.buildTrackScene(track, theme);
-      this.trackSceneCache = { trackKey: trackSceneContentKey(track), theme, visualKey };
     }
+    this.trackSceneCache = step.cache;
     this.resetRunBoundState(track, theme);
-    return rebuild ? "rebuilt" : "reused";
+    return step.mode;
   }
 
   private pushTrackTextures(list: THREE.Texture[]) {

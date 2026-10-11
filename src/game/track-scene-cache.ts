@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import type { BuiltTrack, ThemeId } from "./types.ts";
+import type { BuiltTrack, ThemeId, TrackId } from "./types.ts";
 import { textureBudget, type QualityProfile } from "./quality.ts";
 
 /** Canvas texture budget key — rebuild track meshes when this changes. */
@@ -8,13 +8,14 @@ export function trackSceneVisualKey(quality: QualityProfile): string {
   return `${quality.tier}:${budget.size}:${budget.roughnessMap ? 1 : 0}:${budget.anisotropy}`;
 }
 
-/** Geometry / layout identity — ignores lap overrides and object identity. */
-export function trackSceneContentKey(track: BuiltTrack): string {
-  return `${track.def.id}:${track.samples.length}:${track.length.toFixed(3)}`;
+/** Compiled ribbon identity — shared by lap clones (`withRaceLaps` shallow-spreads samples). */
+export function trackSceneGeometryRef(track: BuiltTrack): BuiltTrack["samples"] {
+  return track.samples;
 }
 
 export type TrackSceneCache = {
-  trackKey: string;
+  trackId: TrackId;
+  geometry: BuiltTrack["samples"];
   theme: ThemeId;
   visualKey: string;
 };
@@ -28,13 +29,14 @@ export function shouldRebuildTrackScene(
 ): boolean {
   if (opts?.forceRebuild) return true;
   if (!cache || !opts?.sceneBuilt) return true;
-  if (cache.trackKey !== trackSceneContentKey(track)) return true;
+  if (cache.trackId !== track.def.id) return true;
+  if (cache.geometry !== trackSceneGeometryRef(track)) return true;
   if (cache.theme !== theme) return true;
   if (cache.visualKey !== visualKey) return true;
   return false;
 }
 
-/** Pure loadTrack cache step for tests (counts rebuild vs reuse). */
+/** loadTrack cache decision — used by World.loadTrack and restart tests. */
 export function advanceTrackSceneCache(
   cache: TrackSceneCache | null,
   track: BuiltTrack,
@@ -49,7 +51,12 @@ export function advanceTrackSceneCache(
   });
   if (rebuild) {
     return {
-      cache: { trackKey: trackSceneContentKey(track), theme, visualKey },
+      cache: {
+        trackId: track.def.id,
+        geometry: trackSceneGeometryRef(track),
+        theme,
+        visualKey,
+      },
       mode: "rebuilt",
     };
   }

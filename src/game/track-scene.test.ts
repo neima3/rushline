@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getTrack } from "./track.ts";
-import { QUALITY_PRESETS } from "./quality.ts";
+import { cloneSave, defaultCustomSave, setCustomDraft } from "./editor.ts";
 import { withRaceLaps } from "./laps.ts";
+import { getTrack, invalidateCustomTrack } from "./track.ts";
+import { QUALITY_PRESETS } from "./quality.ts";
 import {
   shouldRebuildTrackScene,
-  trackSceneContentKey,
+  trackSceneGeometryRef,
   trackSceneVisualKey,
   TrackTextureRegistry,
   type TrackSceneCache,
@@ -17,8 +18,13 @@ describe("track scene cache", () => {
   const highKey = trackSceneVisualKey(QUALITY_PRESETS.high);
   const lowKey = trackSceneVisualKey(QUALITY_PRESETS.low);
 
-  it("reuses when track content key, theme, and visual key match", () => {
-    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
+  it("reuses when compiled geometry ref, theme, and visual key match", () => {
+    const cache: TrackSceneCache = {
+      trackId: circuit.def.id,
+      geometry: trackSceneGeometryRef(circuit),
+      theme: "stadium",
+      visualKey: highKey,
+    };
     assert.equal(
       shouldRebuildTrackScene(cache, circuit, "stadium", highKey, { sceneBuilt: true }),
       false,
@@ -26,17 +32,82 @@ describe("track scene cache", () => {
   });
 
   it("reuses when lap override clones the track object without changing geometry", () => {
-    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: circuit.def.env, visualKey: highKey };
+    const cache: TrackSceneCache = {
+      trackId: circuit.def.id,
+      geometry: trackSceneGeometryRef(circuit),
+      theme: circuit.def.env,
+      visualKey: highKey,
+    };
     const raced = withRaceLaps(circuit, 1);
     assert.notEqual(raced, circuit);
+    assert.equal(raced.samples, circuit.samples);
     assert.equal(
       shouldRebuildTrackScene(cache, raced, raced.def.env, highKey, { sceneBuilt: true }),
       false,
     );
   });
 
+  it("rebuilds when custom geometry recompiles even if sample count and length match", () => {
+    const stock = getTrack("circuit");
+    const length = stock.length;
+    const count = stock.samples.length;
+    const first: typeof stock = {
+      ...stock,
+      def: { ...stock.def, id: "custom" },
+      samples: stock.samples,
+    };
+    const recompiled: typeof stock = {
+      ...stock,
+      def: { ...stock.def, id: "custom" },
+      samples: stock.samples.slice(),
+      length,
+    };
+    assert.equal(recompiled.samples.length, count);
+    assert.equal(recompiled.length, length);
+    assert.notEqual(recompiled.samples, first.samples);
+    const cache: TrackSceneCache = {
+      trackId: "custom",
+      geometry: trackSceneGeometryRef(first),
+      theme: "stadium",
+      visualKey: highKey,
+    };
+    assert.equal(
+      shouldRebuildTrackScene(cache, recompiled, "stadium", highKey, { sceneBuilt: true }),
+      true,
+    );
+  });
+
+  it("rebuilds after invalidateCustomTrack() and a custom recompile", () => {
+    setCustomDraft(defaultCustomSave());
+    invalidateCustomTrack();
+    const first = getTrack("custom");
+    const save = cloneSave(defaultCustomSave());
+    save.points[0] = { ...save.points[0]!, x: save.points[0]!.x + 12 };
+    setCustomDraft(save);
+    invalidateCustomTrack();
+    const second = getTrack("custom");
+    assert.notEqual(first.samples, second.samples);
+    const cache: TrackSceneCache = {
+      trackId: "custom",
+      geometry: trackSceneGeometryRef(first),
+      theme: first.def.env,
+      visualKey: highKey,
+    };
+    assert.equal(
+      shouldRebuildTrackScene(cache, second, second.def.env, highKey, { sceneBuilt: true }),
+      true,
+    );
+    setCustomDraft(null);
+    invalidateCustomTrack();
+  });
+
   it("rebuilds on track change, theme change, or quality key change", () => {
-    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
+    const cache: TrackSceneCache = {
+      trackId: circuit.def.id,
+      geometry: trackSceneGeometryRef(circuit),
+      theme: "stadium",
+      visualKey: highKey,
+    };
     assert.equal(shouldRebuildTrackScene(cache, canyon, "stadium", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "canyon", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "stadium", lowKey, { sceneBuilt: true }), true);
@@ -44,7 +115,12 @@ describe("track scene cache", () => {
   });
 
   it("rebuilds when nothing is cached or the scene was never built", () => {
-    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
+    const cache: TrackSceneCache = {
+      trackId: circuit.def.id,
+      geometry: trackSceneGeometryRef(circuit),
+      theme: "stadium",
+      visualKey: highKey,
+    };
     assert.equal(shouldRebuildTrackScene(null, circuit, "stadium", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "stadium", highKey, { sceneBuilt: false }), true);
   });
