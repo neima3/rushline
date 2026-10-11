@@ -331,7 +331,14 @@ export class RaceVfx {
     this.theme = theme;
     this.clearGates();
     this.clearBoosts();
+    this.resetRun();
+  }
+
+  /** Per-run VFX reset without tearing down gate / boost registrations. */
+  resetRun() {
     this.clearMarks();
+    this.resetGateFlash();
+    this.resetBoostScroll();
   }
 
   registerGate(s: number, finish: boolean, group: THREE.Group, mats: THREE.Material[]) {
@@ -721,5 +728,23 @@ export class RaceVfx {
 
   private clearBoosts() {
     this.boosts = [];
+  }
+
+  private resetGateFlash() {
+    for (const g of this.gates) {
+      g.flashT = -1;
+      for (const m of g.stdMats) {
+        m.emissive.setHex(g.look.emissive);
+        m.emissiveIntensity = g.look.emissiveBase;
+      }
+      if (g.rimMat) {
+        g.rimMat.color.setHex(g.rimColorOrig);
+        g.rimMat.opacity = g.rimOpacityOrig;
+      }
+    }
+  }
+
+  private resetBoostScroll() {
+    for (const b of this.boosts) b.scroll = 0;
   }
 }

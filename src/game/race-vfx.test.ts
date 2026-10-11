@@ -13,6 +13,7 @@ import {
   createSkidDecalMaterial,
   gateFlashPulse,
   gateLookForTheme,
+  RaceVfx,
   raceVfxDensity,
   skidFadeAlpha,
   skidFadeTintColor,
@@ -20,6 +21,8 @@ import {
   skidSurfaceTint,
   SKID_MAX_AGE,
 } from "./race-vfx.ts";
+import { getTrack } from "./track.ts";
+import { QUALITY_PRESETS } from "./quality.ts";
 import { GATE_LOOK } from "./presentation.ts";
 
 describe("race vfx helpers", () => {
@@ -190,5 +193,55 @@ describe("skid segment length", () => {
       assert.ok(Math.abs(maxW - minW - 0.52 * widthScale) < 1e-6, `width ${maxW - minW}`);
     }
     geo.dispose();
+  });
+});
+
+describe("RaceVfx resetRun", () => {
+  it("clears gate flash, finish burst, and boost scroll without unregistering gates", () => {
+    const rv = new RaceVfx();
+    rv.setQuality(QUALITY_PRESETS.high, 1);
+    const track = getTrack("circuit");
+    rv.bindTrack(track, "stadium");
+    const cpLook = gateLookForTheme("stadium", false);
+    const cpMat = new THREE.MeshStandardMaterial({ emissive: new THREE.Color(cpLook.emissive) });
+    cpMat.emissiveIntensity = cpLook.emissiveBase;
+    const cpRim = new THREE.MeshBasicMaterial({ transparent: true, color: 0xffffff, opacity: 0.8 });
+    const finMat = new THREE.MeshStandardMaterial({
+      emissive: new THREE.Color(gateLookForTheme("stadium", true).emissive),
+    });
+    finMat.emissiveIntensity = gateLookForTheme("stadium", true).emissiveBase;
+    rv.registerGate(48, false, new THREE.Group(), [cpMat, cpRim]);
+    rv.registerGate(11.2, true, new THREE.Group(), [finMat]);
+
+    rv.onTimingGate(48, "cp");
+    rv.step(0.05);
+    assert.ok(cpMat.emissiveIntensity > cpLook.emissiveBase + 0.01, "gate mid-flash");
+
+    rv.onTimingGate(11.2, "finish");
+    const burstLife = (rv as unknown as { burstLife: Float32Array }).burstLife;
+    assert.ok([...burstLife].some((l) => l > 0), "finish burst spawned");
+
+    rv.resetRun();
+    assert.ok([...burstLife].every((l) => l <= 0), "finish burst cleared");
+    assert.equal(cpMat.emissiveIntensity, cpLook.emissiveBase);
+    assert.equal(cpRim.color.getHex(), 0xffffff);
+    assert.equal(cpRim.opacity, 0.8);
+
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    const chevron = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    rv.registerBoostPad(20, pad, [chevron]);
+    const boosts = (rv as unknown as { boosts: { scroll: number }[] }).boosts;
+    boosts[0]!.scroll = 2.75;
+    rv.resetRun();
+    assert.equal(boosts[0]!.scroll, 0);
+    rv.step(0.01);
+    rv.dispose();
+    cpMat.dispose();
+    cpRim.dispose();
+    finMat.dispose();
+    pad.geometry.dispose();
+    (pad.material as THREE.Material).dispose();
+    chevron.geometry.dispose();
+    (chevron.material as THREE.Material).dispose();
   });
 });
