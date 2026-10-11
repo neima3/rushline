@@ -314,6 +314,14 @@ export function Overlay({ gameRef }: Props) {
           title="Paused"
           subtitle={getTrackDef(trackId).name}
           chrome
+          pauseMenu
+          onPauseMenuMount={(root) => {
+            g()?.setPauseMenuOpen(Boolean(root), root);
+          }}
+          onPauseMenuResume={() => {
+            g()?.uiClick();
+            g()?.resume();
+          }}
           extra={
             <p className="mt-3 text-xs leading-relaxed text-muted">
               {cupEvent

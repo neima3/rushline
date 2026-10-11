@@ -762,7 +762,13 @@ export class Game {
     if (next === "race") this.raceClockAt = this.lastT;
     if (next === "countdown") this.countdownAt = countdownPausedAt(this.lastT, this.countdown);
     useGame.getState().setPhase(next);
+    this.input.setPauseMenuOpen(false);
+    this.input.flushAfterResume();
     this.capturePlayFocus();
+  }
+
+  setPauseMenuOpen(open: boolean, root?: HTMLElement | null) {
+    this.input.setPauseMenuOpen(open, root ?? null);
   }
 
   menu() {
@@ -1544,7 +1550,7 @@ export class Game {
     );
   }
 
-  private handleMenuPad(actions: { confirm: boolean; back: boolean; menuY: number }) {
+  private handleMenuPad(actions: { confirm: boolean; back: boolean; menuY: number; pauseMenuConfirm: boolean }) {
     const y = Math.abs(actions.menuY) > 0.5 ? Math.sign(actions.menuY) : 0;
     const yEdge = y !== 0 && y !== this.menuYPrev;
     this.menuYPrev = y;
@@ -1616,7 +1622,7 @@ export class Game {
       return;
     }
     if (this.phase === "paused") {
-      if (actions.confirm) {
+      if (actions.pauseMenuConfirm) {
         this.audio.click();
         this.resume();
       } else if (actions.back) {

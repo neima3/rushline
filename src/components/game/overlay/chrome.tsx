@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { isPauseMenuButton, pauseMenuKeyAction } from "@/game/pause-menu";
 import type { Medal } from "@/game/types";
 
 export function keepPlayFocus(e: { preventDefault: () => void }) {
@@ -46,16 +47,61 @@ export function Modal({
   extra,
   actions,
   chrome,
+  pauseMenu,
+  onPauseMenuMount,
+  onPauseMenuResume,
 }: {
   title: string;
   subtitle?: string;
   extra?: ReactNode;
   chrome?: boolean;
+  pauseMenu?: boolean;
+  onPauseMenuMount?: (root: HTMLElement | null) => void;
+  onPauseMenuResume?: () => void;
   actions: { label: string; onClick: () => void; primary?: boolean }[];
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const mountCb = useRef(onPauseMenuMount);
+  mountCb.current = onPauseMenuMount;
+
+  useEffect(() => {
+    if (!pauseMenu) return;
+    const root = panelRef.current;
+    mountCb.current?.(root);
+    const primary = root?.querySelector<HTMLButtonElement>("button[data-pause-menu-btn='Resume']");
+    primary?.focus({ preventScroll: true });
+    return () => mountCb.current?.(null);
+  }, [pauseMenu]);
+
+  const onPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!pauseMenu || !onPauseMenuResume) return;
+    if (e.code === "Escape" || e.key === "Escape") {
+      e.preventDefault();
+      onPauseMenuResume();
+      return;
+    }
+    const root = panelRef.current;
+    const action = pauseMenuKeyAction(e.code, e.key, document.activeElement, root);
+    if (action === "ignore") return;
+    if (action === "resume") {
+      e.preventDefault();
+      onPauseMenuResume();
+      return;
+    }
+    const focused = document.activeElement;
+    if (isPauseMenuButton(focused)) {
+      e.preventDefault();
+      focused.click();
+    }
+  };
+
   return (
     <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/70 px-4">
       <div
+        ref={panelRef}
+        data-pause-menu={pauseMenu ? "" : undefined}
+        tabIndex={pauseMenu ? -1 : undefined}
+        onKeyDown={pauseMenu ? onPanelKeyDown : undefined}
         className={cn(
           "overlay-enter w-full max-w-sm p-6",
           chrome
@@ -73,7 +119,8 @@ export function Modal({
             <button
               key={a.label}
               type="button"
-              onMouseDown={keepPlayFocus}
+              data-pause-menu-btn={pauseMenu ? a.label : undefined}
+              onMouseDown={pauseMenu ? undefined : keepPlayFocus}
               onClick={a.onClick}
               className={cn(
                 "h-11 rounded-md text-sm font-medium transition-[transform,filter] duration-150 ease-out enabled:active:scale-[0.98]",

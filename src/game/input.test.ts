@@ -131,6 +131,35 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("flushAfterResume clears confirm edge without dropping held drive keys", () => {
+    const input = new Input();
+    input.setPauseMenuOpen(true);
+    input.setKeys(["KeyW", "Enter", "Space"]);
+    const before = input.sample();
+    assert.equal(before.throttle, 1);
+    assert.equal(before.confirm, true);
+    input.flushAfterResume();
+    input.setPauseMenuOpen(false);
+    input.setKeys(["KeyW"]);
+    const after = input.sample();
+    assert.equal(after.throttle, 1);
+    assert.equal(after.confirm, false);
+    assert.equal(after.slide, 0);
+    input.detach();
+  });
+
+  it("edges Space as pause menu confirm while the overlay is open", () => {
+    const input = new Input();
+    input.setPauseMenuOpen(true);
+    input.setKeys(["Space"]);
+    const a = input.sample();
+    assert.equal(a.pauseMenuConfirm, true);
+    assert.equal(a.slide, 1);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.detach();
+  });
+
   it("does not treat Enter as a mid-race restart", () => {
     const input = new Input();
     input.setKeys(["Enter"]);

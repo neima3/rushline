@@ -27,6 +27,7 @@ const idle = {
   photo: false,
   rewind: false,
   menuY: 0,
+  pauseMenuConfirm: false,
 };
 
 const cruise = { ...idle, throttle: 0.5 };
