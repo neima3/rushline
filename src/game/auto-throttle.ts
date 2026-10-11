@@ -8,10 +8,10 @@ const CANYON_BLEND_S = 40;
 const OPENING_THROTTLE = 0.38;
 const OPENING_HOLD = 0.14;
 const OPENING_SPEED = 17;
-/** Circuit / Helix touch opening — faster stadium/tech start, still capped before CP1. */
-const TOUCH_OPENING_THROTTLE = 0.48;
-const TOUCH_OPENING_HOLD = 0.2;
-const TOUCH_OPENING_SPEED = 28;
+/** Green Circuit touch opening only — faster stadium start, still capped before CP1. */
+const CIRCUIT_OPENING_THROTTLE = 0.48;
+const CIRCUIT_OPENING_HOLD = 0.2;
+const CIRCUIT_OPENING_SPEED = 28;
 const TOUCH_CRUISE = 0.5;
 const TOUCH_LATE_SPEED = 24;
 
@@ -294,9 +294,12 @@ export function autoThrottleCap(opts: {
   if (!opts.touchMode) return 1;
 
   const early = opts.s < opts.firstCp;
-  const cruise = early ? TOUCH_OPENING_THROTTLE : TOUCH_CRUISE;
-  const trip = early ? TOUCH_OPENING_SPEED : TOUCH_LATE_SPEED;
-  const hold = early ? TOUCH_OPENING_HOLD : 0.22;
+  if (early && opts.trackId === "circuit") {
+    return blendHold(opts.speed, CIRCUIT_OPENING_SPEED, CIRCUIT_OPENING_THROTTLE, CIRCUIT_OPENING_HOLD, 4);
+  }
+  const cruise = early ? OPENING_THROTTLE : TOUCH_CRUISE;
+  const trip = early ? OPENING_SPEED : TOUCH_LATE_SPEED;
+  const hold = early ? OPENING_HOLD : 0.22;
   return blendHold(opts.speed, trip, cruise, hold, early ? 4 : 6);
 }
 
