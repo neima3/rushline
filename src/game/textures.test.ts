@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ASPHALT_BASE,
+  contrastBarrierDarkLook,
+  presentMaps,
   curbBlockHigh,
   curbColor,
   curbDims,
@@ -177,5 +179,67 @@ describe("track look tokens", () => {
     assert.ok(ROAD_TINT.night.b > ROAD_TINT.night.r);
     const crown = roadCrown("storm");
     assert.ok(crown.edge > crown.mid);
+  });
+});
+
+describe("low-quality texture maps", () => {
+  it("omits absent maps so three never sees roughnessMap: undefined", () => {
+    const tex = { id: 1 };
+    assert.deepEqual(presentMaps({ roughnessMap: null }), {});
+    assert.deepEqual(presentMaps({ roughnessMap: undefined }), {});
+    assert.equal("roughnessMap" in presentMaps({ roughnessMap: null }), false);
+    assert.deepEqual(presentMaps({ roughnessMap: tex, normalMap: null }), { roughnessMap: tex });
+  });
+
+  it("road material built with Low's null roughness map logs no three warning", async () => {
+    const THREE = await import("three");
+    const warn = console.warn;
+    const seen: unknown[][] = [];
+    console.warn = (...args: unknown[]) => void seen.push(args);
+    try {
+      const rough: InstanceType<typeof THREE.Texture> | null = null;
+      const mat = new THREE.MeshStandardMaterial({
+        roughness: 0.5,
+        ...presentMaps({ roughnessMap: rough }),
+      });
+      assert.equal(mat.roughnessMap, null);
+      mat.dispose();
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(seen.filter((a) => String(a[0]).includes("roughnessMap")).length, 0);
+  });
+});
+
+describe("contrast barrier dark panel", () => {
+  const lum = (hex: number) =>
+    (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
+
+  it("White Pass panel is matte, double-sided and lifted off black", () => {
+    const look = contrastBarrierDarkLook("alpine");
+    assert.equal(look.doubleSided, true);
+    assert.ok(look.metalness <= 0.1, `metalness ${look.metalness}`);
+    assert.ok(look.roughness >= 0.7, `roughness ${look.roughness}`);
+    assert.equal(look.emissive, look.color);
+    assert.ok(look.emissiveIntensity >= 0.25);
+    assert.ok(lum(look.color) > 0.25, `albedo luminance ${lum(look.color)}`);
+  });
+
+  it("other themes keep the original charcoal panel", () => {
+    for (const theme of [
+      "stadium",
+      "canyon",
+      "night",
+      "works",
+      "mesa",
+      "grove",
+      "ember",
+      "storm",
+    ] as const) {
+      const look = contrastBarrierDarkLook(theme);
+      assert.equal(look.color, 0x14161c);
+      assert.equal(look.metalness, 0.2);
+      assert.equal(look.emissiveIntensity, 0.14);
+    }
   });
 });
