@@ -59,26 +59,6 @@ const REPLANT_REJECT_S_EPS = 0.12;
 const REPLANT_CP_WALK_STEP = 0.5;
 const REPLANT_CP_WALK_MAX = 40;
 
-/** Test-only: force the post-CP replant fallback path in CarSim.respawn (never set in production). */
-let forcePostCpReplantForTests = false;
-/** Test-only: one-shot s for the first post-CP pickSafeRespawnS result. */
-let postCpFirstPickOverrideForTests: number | undefined;
-
-export function setForcePostCpReplantForTests(on: boolean) {
-  forcePostCpReplantForTests = on;
-}
-
-export function isForcePostCpReplantForTests() {
-  return forcePostCpReplantForTests;
-}
-
-export function setPostCpFirstPickOverrideForTests(s: number | undefined) {
-  postCpFirstPickOverrideForTests = s;
-}
-
-export function peekPostCpFirstPickOverrideForTests() {
-  return postCpFirstPickOverrideForTests;
-}
 const TURBO_MINI = 0.32;
 const TURBO_MID = 0.58;
 const TURBO_FULL = 0.92;
@@ -191,14 +171,7 @@ export class CarSim {
   respawn(track: BuiltTrack) {
     const preCp = this.lastCp < 0;
     const keptSpeed = respawnEntrySpeed(this.lastCp, this.cpCrossSpeed);
-    if (preCp) {
-      this.s = AUTHOR_START_S;
-    } else if (postCpFirstPickOverrideForTests !== undefined) {
-      this.s = postCpFirstPickOverrideForTests;
-      postCpFirstPickOverrideForTests = undefined;
-    } else {
-      this.s = pickSafeRespawnS(track, this.lastCp, this.s);
-    }
+    this.s = preCp ? AUTHOR_START_S : this.pickPostCpFirstS(track);
     this.n = 0;
     this.heading = 0;
     this.speed = keptSpeed;
@@ -247,20 +220,24 @@ export class CarSim {
     const planted = sampleAt(track, this.s);
     const helixBad =
       track.def.id === "helix" && (planted.uy < 0.9 || helixRibbonOverhead(track, planted) || helixNearGate(track, planted.s));
-    if (this.uy < REPLANT_SAMPLE_UY_MIN || this.airborne || helixBad || forcePostCpReplantForTests) {
+    if (this.uy < 0.78 || this.airborne || helixBad) {
       const rejectedS = this.s;
-      if (helixBad && this.lastCp >= 0 && !forcePostCpReplantForTests) {
+      if (helixBad && this.lastCp >= 0) {
         const cp = track.checkpoints[this.lastCp] ?? 24;
         this.s = pickHelixRespawnS(track, Math.max(24, cp - 18));
       } else {
         this.s = pickPostCpReplantFallbackS(track, this.lastCp, rejectedS);
       }
-      forcePostCpReplantForTests = false;
       this.airborne = false;
       this.place(track);
       this.flattenRespawn(track);
     }
     this.finishRespawnPace(keptSpeed);
+  }
+
+  /** First post-CP respawn pick; override in tests to force a bad placement. */
+  protected pickPostCpFirstS(track: BuiltTrack) {
+    return pickSafeRespawnS(track, this.lastCp, this.s);
   }
 
   /** After plant/flatten (6–10 clamp), restore TM CP-crossing pace for this respawn only. */
@@ -1164,7 +1141,6 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
   return sampleAt(track, 20).uy >= 0.85 ? 20 : origin;
 }
 
-/** Pre-CP1 Circuit: stay on the outbound lane, past the start/finish seam. */
 function sampleIndexAt(track: BuiltTrack, s: number) {
   const { samples, length, def } = track;
   if (samples.length === 0) return 0;
@@ -1230,6 +1206,7 @@ export function pickPostCpReplantFallbackS(track: BuiltTrack, lastCp: number, re
   return pickSafeRespawnS(track, -1, rejectedS);
 }
 
+/** Pre-CP1 Circuit: stay on the outbound lane, past the start/finish seam. */
 function earlyCircuitOrigin(track: BuiltTrack, alongS: number) {
   const L = track.length || 1;
   const firstCp = track.checkpoints[0] ?? 80;
