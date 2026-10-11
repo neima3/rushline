@@ -8,10 +8,20 @@ import type { QualityProfile, QualityTier } from "./quality.ts";
 export const SKID_MAX_AGE = 38;
 
 const SKID_CAP_MAX = 320;
+
+/** Longest gap (m) a skid decal will bridge; beyond this (respawn/teleport) a stub is placed. */
+export const SKID_MAX_SEGMENT = 1.5;
+/** Stub length (m) for the first point of a skid or after an unbridged gap. */
+export const SKID_MIN_SEGMENT = 0.15;
+/** Extra length (m) so consecutive segments overlap without seams. */
+export const SKID_SEGMENT_OVERLAP = 0.05;
+/** Skid plane is 1 m long (local Z) so instance scale.z is the world length in metres. */
+export const SKID_PLANE_LENGTH = 1;
+/** Skid plane base width (m, local X); instance scale.x multiplies it (unchanged look). */
+export const SKID_PLANE_WIDTH = 0.52;
 const FINISH_BURST_MAX = 96;
 
 const _pos = new THREE.Vector3();
-const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _mat4 = new THREE.Matrix4();
@@ -42,6 +52,48 @@ export function skidRingIndex(head: number, cap: number): number {
   if (cap <= 0) return 0;
   const h = head % cap;
   return h < 0 ? h + cap : h;
+}
+
+/**
+ * World length (m) of a skid segment decal covering `dist` metres of travel.
+ * Gaps beyond `cap` (respawn, teleport) or invalid distances give the `minLen` stub.
+ */
+export function skidSegmentLength(dist: number, cap: number, minLen: number, overlap: number): number {
+  if (!Number.isFinite(dist) || dist < 0 || dist > cap) return minLen;
+  return Math.max(minLen, dist + overlap);
+}
+
+/** True when a gap of `dist` metres should be bridged by one stretched decal. */
+export function skidShouldBridge(dist: number, cap: number): boolean {
+  return Number.isFinite(dist) && dist >= 0 && dist <= cap;
+}
+
+/**
+ * Writes a skid decal instance matrix into `out`: centred at (cx, cy, cz), yawed so local +Z
+ * points along (dirX, dirZ), `length` metres long and `widthScale` × SKID_PLANE_WIDTH wide.
+ * Allocation-free (module scratch only).
+ */
+export function composeSkidDecalMatrix(
+  out: THREE.Matrix4,
+  cx: number,
+  cy: number,
+  cz: number,
+  dirX: number,
+  dirZ: number,
+  length: number,
+  widthScale: number,
+): THREE.Matrix4 {
+  _up.set(0, 1, 0);
+  _quat.setFromAxisAngle(_up, Math.atan2(dirX, dirZ));
+  _scale.set(widthScale, 1, length / SKID_PLANE_LENGTH);
+  return out.compose(_pos.set(cx, cy, cz), _quat, _scale);
+}
+
+/** Shared skid decal geometry: flat plane, SKID_PLANE_WIDTH × SKID_PLANE_LENGTH, length on Z. */
+export function createSkidDecalGeometry(): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(SKID_PLANE_WIDTH, SKID_PLANE_LENGTH);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
 }
 
 /** Ease-out fade for skid decal alpha (0 = fresh, maxAge = gone). */
@@ -231,9 +283,8 @@ export class RaceVfx {
   private skidStrength = new Float32Array(0);
   private skidTint = new Uint32Array(0);
   private skidLive = 0;
-  private lastSkidX = 0;
-  private lastSkidY = 0;
-  private lastSkidZ = 0;
+  /** Previous skid point (preallocated; valid only while hasLastSkid). */
+  private readonly lastSkid = new THREE.Vector3();
   private hasLastSkid = false;
   private density = 1;
   private theme: ThemeId = "stadium";
@@ -336,14 +387,29 @@ export class RaceVfx {
     const y = snap.py + snap.uy * 0.02 - 0.34;
     const z = snap.pz - snap.fz * 0.62;
     if (this.hasLastSkid) {
-      const dx = x - this.lastSkidX;
-      const dz = z - this.lastSkidZ;
-      if (dx * dx + dz * dz < 0.035) return;
-      this.placeSkidDecal(x, y, z, snap);
+      const dx = x - this.lastSkid.x;
+      const dz = z - this.lastSkid.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < 0.035) return;
+      const dist = Math.sqrt(d2);
+      if (skidShouldBridge(dist, SKID_MAX_SEGMENT)) {
+        // Stretch from the previous point to this one, centred on the midpoint.
+        this.placeSkidDecal(
+          (x + this.lastSkid.x) * 0.5,
+          (y + this.lastSkid.y) * 0.5,
+          (z + this.lastSkid.z) * 0.5,
+          dx,
+          dz,
+          skidSegmentLength(dist, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+          snap,
+        );
+      } else {
+        this.placeSkidStub(x, y, z, snap);
+      }
+    } else {
+      this.placeSkidStub(x, y, z, snap);
     }
-    this.lastSkidX = x;
-    this.lastSkidY = y;
-    this.lastSkidZ = z;
+    this.lastSkid.set(x, y, z);
     this.hasLastSkid = true;
   }
 
@@ -392,8 +458,7 @@ export class RaceVfx {
     this.skidStrength = new Float32Array(cap);
     this.skidTint = new Uint32Array(cap);
     for (let i = 0; i < cap; i++) this.skidAge[i] = -1;
-    const geo = new THREE.PlaneGeometry(0.52, 0.11);
-    geo.rotateX(-Math.PI / 2);
+    const geo = createSkidDecalGeometry();
     const mat = createSkidDecalMaterial();
     this.skidMesh = new THREE.InstancedMesh(geo, mat, cap);
     this.skidMesh.frustumCulled = false;
@@ -441,7 +506,22 @@ export class RaceVfx {
     this.disposables.push(this.burstMat);
   }
 
-  private placeSkidDecal(x: number, y: number, z: number, snap: CarSnap) {
+  /** Minimum-length stub at a point (first point of a skid, or an unbridged gap). */
+  private placeSkidStub(x: number, y: number, z: number, snap: CarSnap) {
+    _fwd.set(snap.fx, 0, snap.fz);
+    if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, 1);
+    this.placeSkidDecal(x, y, z, _fwd.x, _fwd.z, SKID_MIN_SEGMENT, snap);
+  }
+
+  private placeSkidDecal(
+    x: number,
+    y: number,
+    z: number,
+    dirX: number,
+    dirZ: number,
+    length: number,
+    snap: CarSnap,
+  ) {
     const idx = skidRingIndex(this.skidHead, this.skidCap);
     this.skidHead++;
     this.skidLive = Math.min(this.skidCap, this.skidLive + 1);
@@ -451,15 +531,8 @@ export class RaceVfx {
       snap.surface,
       this.theme === "night" || this.theme === "grove" || this.theme === "storm",
     );
-    _fwd.set(snap.fx, 0, snap.fz);
-    if (_fwd.lengthSq() < 1e-6) _fwd.set(snap.fx, snap.fy, snap.fz);
-    _fwd.normalize();
-    _right.set(-_fwd.z, 0, _fwd.x);
-    _up.set(0, 1, 0);
-    _quat.setFromAxisAngle(_up, Math.atan2(_fwd.x, _fwd.z));
     const width = 0.42 + snap.driftCharge * 0.18;
-    _scale.set(width, 1, 0.11 + snap.slide * 0.06);
-    _mat4.compose(_pos.set(x, y, z), _quat, _scale);
+    composeSkidDecalMatrix(_mat4, x, y, z, dirX, dirZ, length, width);
     this.skidMesh!.setMatrixAt(idx, _mat4);
     this.skidMesh!.setColorAt(
       idx,

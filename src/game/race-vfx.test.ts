@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import * as THREE from "three";
 import {
+  SKID_MAX_SEGMENT,
+  SKID_MIN_SEGMENT,
+  SKID_SEGMENT_OVERLAP,
   blendingNeedsPremultipliedAlpha,
+  composeSkidDecalMatrix,
+  createSkidDecalGeometry,
+  skidSegmentLength,
+  skidShouldBridge,
   createSkidDecalMaterial,
   gateFlashPulse,
   gateLookForTheme,
@@ -102,5 +109,86 @@ describe("race vfx materials", () => {
   it("faded skid colour is white so premultiplied multiply leaves the road untouched", () => {
     assert.equal(skidFadeTintColor(0x202020, 0.7, 0), 0xffffff);
     assert.notEqual(skidFadeTintColor(0x202020, 0.7, 1), 0xffffff);
+  });
+});
+
+describe("skid segment length", () => {
+  it("30 m/s at 60 fps gives a ~0.55 m segment", () => {
+    const len = skidSegmentLength(
+      30 / 60,
+      SKID_MAX_SEGMENT,
+      SKID_MIN_SEGMENT,
+      SKID_SEGMENT_OVERLAP,
+    );
+    assert.ok(Math.abs(len - 0.55) < 1e-9, `len=${len}`);
+    assert.equal(skidShouldBridge(30 / 60, SKID_MAX_SEGMENT), true);
+  });
+
+  it("a gap over the cap gives the minimum stub and is not bridged", () => {
+    const gap = SKID_MAX_SEGMENT + 0.01;
+    assert.equal(
+      skidSegmentLength(gap, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.equal(
+      skidSegmentLength(40, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.equal(skidShouldBridge(gap, SKID_MAX_SEGMENT), false);
+    assert.equal(
+      skidSegmentLength(Number.NaN, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+  });
+
+  it("never shorter than the stub and caps at max + overlap", () => {
+    assert.equal(
+      skidSegmentLength(0.01, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.ok(
+      Math.abs(
+        skidSegmentLength(
+          SKID_MAX_SEGMENT,
+          SKID_MAX_SEGMENT,
+          SKID_MIN_SEGMENT,
+          SKID_SEGMENT_OVERLAP,
+        ) -
+          (SKID_MAX_SEGMENT + SKID_SEGMENT_OVERLAP),
+      ) < 1e-9,
+    );
+  });
+
+  it("decal world length equals the helper length (no double scale) and width is unchanged", () => {
+    const geo = createSkidDecalGeometry();
+    const m = new THREE.Matrix4();
+    const pos = geo.getAttribute("position");
+    const v = new THREE.Vector3();
+    const dir = new THREE.Vector3(3, 0, 4).normalize();
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    for (const widthScale of [0.42, 0.6]) {
+      const len = skidSegmentLength(0.5, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP);
+      composeSkidDecalMatrix(m, 10, 2, -5, dir.x, dir.z, len, widthScale);
+      let minA = Infinity,
+        maxA = -Infinity,
+        minW = Infinity,
+        maxW = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i)
+          .applyMatrix4(m)
+          .sub(new THREE.Vector3(10, 2, -5));
+        const a = v.dot(dir);
+        const w = v.dot(side);
+        minA = Math.min(minA, a);
+        maxA = Math.max(maxA, a);
+        minW = Math.min(minW, w);
+        maxW = Math.max(maxW, w);
+        assert.ok(Math.abs(v.y) < 1e-9);
+      }
+      assert.ok(Math.abs(maxA - minA - len) < 1e-6, `world length ${maxA - minA} vs ${len}`);
+      assert.ok(Math.abs(maxA + minA) < 1e-6, "centred on the midpoint");
+      assert.ok(Math.abs(maxW - minW - 0.52 * widthScale) < 1e-6, `width ${maxW - minW}`);
+    }
+    geo.dispose();
   });
 });
