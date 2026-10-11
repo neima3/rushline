@@ -173,6 +173,24 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("does not re-edge pauseMenuConfirm while Enter or Space stay held (repeat poll path)", () => {
+    const input = new Input();
+    input.setKeys(["Enter"]);
+    input.setPauseMenuOpen(true, null);
+    const enterHeld = input.sample();
+    assert.equal(enterHeld.pauseMenuConfirm, false);
+    const enterAgain = input.sample();
+    assert.equal(enterAgain.pauseMenuConfirm, false);
+    input.setPauseMenuOpen(false);
+    input.setKeys(["Space"]);
+    input.setPauseMenuOpen(true, null);
+    const spaceHeld = input.sample();
+    assert.equal(spaceHeld.pauseMenuConfirm, false);
+    const spaceAgain = input.sample();
+    assert.equal(spaceAgain.pauseMenuConfirm, false);
+    input.detach();
+  });
+
   it("edges Space as pause menu confirm while the overlay is open", () => {
     const input = new Input();
     input.setPauseMenuOpen(true);

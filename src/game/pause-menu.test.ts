@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  emptyPauseMenuFreshKeys,
   isResumeKey,
   pauseMenuKeyAction,
+  pauseMenuPanelKeyDown,
+  pauseMenuPanelKeyUp,
   resumeCallsFromEscWhilePaused,
+  shouldBlockStalePauseMenuKeyUp,
   shouldBypassGameKeyCapture,
   shouldCapturePlayFocusAfterPauseMenuAction,
 } from "./pause-menu.ts";
@@ -75,6 +79,62 @@ describe("shouldCapturePlayFocusAfterPauseMenuAction", () => {
     assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Options"), false);
     assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Help"), false);
   });
+});
+
+function panelResumeScenario(code: "Enter" | "Space", key: string) {
+  const resume = menuButton("Resume");
+  const root = menuRoot(resume);
+  return { resume, root, code, key };
+}
+
+describe("pauseMenuPanelKeyDown (Enter and Space)", () => {
+  for (const { code, key } of [
+    { code: "Enter" as const, key: "Enter" },
+    { code: "Space" as const, key: " " },
+  ]) {
+    it(`${code}: repeat keydown on focused Resume prevents default and does not resume`, () => {
+      const { resume, root } = panelResumeScenario(code, key);
+      const out = pauseMenuPanelKeyDown({
+        code,
+        key,
+        repeat: true,
+        activeElement: resume,
+        menuRoot: root,
+        freshBefore: emptyPauseMenuFreshKeys(),
+      });
+      assert.equal(out.preventDefault, true);
+      assert.equal(out.resume, false);
+      assert.equal(out.activateFocused, false);
+    });
+
+    it(`${code}: fresh press on focused Resume resumes`, () => {
+      const { resume, root } = panelResumeScenario(code, key);
+      const out = pauseMenuPanelKeyDown({
+        code,
+        key,
+        repeat: false,
+        activeElement: resume,
+        menuRoot: root,
+        freshBefore: emptyPauseMenuFreshKeys(),
+      });
+      assert.equal(out.preventDefault, true);
+      assert.equal(out.resume, true);
+    });
+
+    it(`${code}: keyup without a fresh menu keydown blocks stale activation`, () => {
+      assert.equal(shouldBlockStalePauseMenuKeyUp(code, key, emptyPauseMenuFreshKeys()), true);
+      const up = pauseMenuPanelKeyUp(code, key, emptyPauseMenuFreshKeys());
+      assert.equal(up.preventDefault, true);
+    });
+
+    it(`${code}: key held through pause then released does not resume via panel keyup`, () => {
+      const fresh = emptyPauseMenuFreshKeys();
+      const up = pauseMenuPanelKeyUp(code, key, fresh);
+      assert.equal(up.preventDefault, true);
+      assert.equal(up.freshKeys.enter, false);
+      assert.equal(up.freshKeys.space, false);
+    });
+  }
 });
 
 describe("shouldBypassGameKeyCapture", () => {
