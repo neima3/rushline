@@ -196,6 +196,32 @@ type BurstSlot = {
   vz: number;
 };
 
+/**
+ * Skid decal material. three's MultiplyBlending is premultiplied-only
+ * (blendFuncSeparate(ZERO, SRC_COLOR, ZERO, SRC_ALPHA)); without
+ * premultipliedAlpha it logs an error every draw and skips the blend.
+ * With opacity 1 the instance colour from skidFadeTintColor() is the
+ * multiplier directly: dark tint = mark, white = no darkening (faded out).
+ */
+export function createSkidDecalMaterial(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    transparent: true,
+    premultipliedAlpha: true,
+    opacity: 1,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.MultiplyBlending,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -4,
+  });
+}
+
+/** three requires premultipliedAlpha for Multiply/Subtractive blending. */
+export function blendingNeedsPremultipliedAlpha(blending: THREE.Blending): boolean {
+  return blending === THREE.MultiplyBlending || blending === THREE.SubtractiveBlending;
+}
+
 export class RaceVfx {
   root = new THREE.Group();
   private skidMesh: THREE.InstancedMesh | null = null;
@@ -368,16 +394,7 @@ export class RaceVfx {
     for (let i = 0; i < cap; i++) this.skidAge[i] = -1;
     const geo = new THREE.PlaneGeometry(0.52, 0.11);
     geo.rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 1,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      blending: THREE.MultiplyBlending,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -4,
-    });
+    const mat = createSkidDecalMaterial();
     this.skidMesh = new THREE.InstancedMesh(geo, mat, cap);
     this.skidMesh.frustumCulled = false;
     this.skidMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

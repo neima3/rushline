@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import * as THREE from "three";
 import {
+  blendingNeedsPremultipliedAlpha,
+  createSkidDecalMaterial,
   gateFlashPulse,
   gateLookForTheme,
   raceVfxDensity,
@@ -67,5 +70,37 @@ describe("race vfx helpers", () => {
     const start = gateLookForTheme("stadium", true);
     assert.equal(start.post, GATE_LOOK.startPost);
     assert.equal(start.emissive, GATE_LOOK.startEmissive);
+  });
+});
+
+describe("race vfx materials", () => {
+  it("skid decal uses premultiplied multiply blending with fade-safe state", () => {
+    const mat = createSkidDecalMaterial();
+    assert.equal(mat.blending, THREE.MultiplyBlending);
+    assert.equal(mat.premultipliedAlpha, true);
+    assert.equal(mat.transparent, true);
+    assert.equal(mat.opacity, 1);
+    assert.equal(mat.depthWrite, false);
+    assert.equal(mat.polygonOffset, true);
+    assert.equal(mat.polygonOffsetFactor, -1);
+    assert.equal(mat.polygonOffsetUnits, -4);
+    mat.dispose();
+  });
+
+  it("every Multiply/Subtractive VFX material sets premultipliedAlpha", () => {
+    const mats: THREE.Material[] = [createSkidDecalMaterial()];
+    for (const m of mats) {
+      if (blendingNeedsPremultipliedAlpha(m.blending)) assert.equal(m.premultipliedAlpha, true);
+      m.dispose();
+    }
+    assert.equal(blendingNeedsPremultipliedAlpha(THREE.MultiplyBlending), true);
+    assert.equal(blendingNeedsPremultipliedAlpha(THREE.SubtractiveBlending), true);
+    assert.equal(blendingNeedsPremultipliedAlpha(THREE.AdditiveBlending), false);
+    assert.equal(blendingNeedsPremultipliedAlpha(THREE.NormalBlending), false);
+  });
+
+  it("faded skid colour is white so premultiplied multiply leaves the road untouched", () => {
+    assert.equal(skidFadeTintColor(0x202020, 0.7, 0), 0xffffff);
+    assert.notEqual(skidFadeTintColor(0x202020, 0.7, 1), 0xffffff);
   });
 });
