@@ -95,6 +95,7 @@ export type Actions = {
   photo: boolean;
   rewind: boolean;
   menuY: number;
+  pauseMenuConfirm: boolean;
 };
 
 export type PadInfo = {

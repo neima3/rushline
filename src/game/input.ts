@@ -4,6 +4,7 @@ import { resolveSampleDrive } from "./auto-throttle";
 import { emptyRespawnHold, RESTART_HOLD_MS, stepRespawnHold } from "./camera";
 import { steerFilter } from "./feel";
 import { applySteerSettings, type SteerPreset } from "./settings";
+import { shouldBypassGameKeyCapture } from "./pause-menu";
 
 const GAME_CODES = new Set([
   "KeyW",
@@ -67,7 +68,10 @@ export class Input {
     confirm: false,
     back: false,
     photo: false,
+    spaceMenu: false,
   };
+  private pauseMenuOpen = false;
+  private pauseMenuRoot: HTMLElement | null = null;
   private surface: HTMLElement | null = null;
   private lastKeyStamp = -1;
   private filtSteer = 0;
@@ -82,6 +86,7 @@ export class Input {
     this.onKeyDown = (e) => {
       if (e.timeStamp && e.timeStamp === this.lastKeyStamp) return;
       this.lastKeyStamp = e.timeStamp || this.lastKeyStamp;
+      if (shouldBypassGameKeyCapture(e.code, e.target, this.pauseMenuRoot)) return;
       const esc = e.code === "Escape" || e.key === "Escape";
       if (GAME_CODES.has(e.code) || esc) {
         e.preventDefault();
@@ -158,6 +163,51 @@ export class Input {
     this.queued.photo = false;
     this.queued.restart = false;
     this.touchRewind = 0;
+  }
+
+  setPauseMenuOpen(open: boolean, root?: HTMLElement | null) {
+    this.pauseMenuOpen = open;
+    this.pauseMenuRoot = open ? (root ?? this.pauseMenuRoot) : null;
+    if (open) {
+      const gp = pollPads();
+      this.edgePrev.confirm = this.down("Enter") || Boolean(gp?.a);
+      this.edgePrev.spaceMenu = this.down("Space");
+    } else {
+      this.edgePrev.spaceMenu = false;
+    }
+  }
+
+  /** Drop resume-key latch so Space / Enter cannot leak into the next race frame. */
+  flushAfterResume() {
+    this.queued.pause = false;
+    this.queued.camera = false;
+    this.queued.respawn = false;
+    this.queued.photo = false;
+    this.queued.restart = false;
+    this.respawnHold = emptyRespawnHold();
+    this.keys.delete("Enter");
+    this.keys.delete("Space");
+    const gp = pollPads();
+    const rewindPad = Boolean(gp?.lb && gp?.y);
+    const rewind = this.down("Backspace") || rewindPad || this.touchRewind > 0.5;
+    const respawnNow = (this.down("KeyR") || Boolean(gp?.y && !gp?.lb)) && !rewind;
+    const restartNow = this.down("Delete") || this.down("Home");
+    const pauseNow = this.down("Escape") || this.down("KeyP") || Boolean(gp?.start);
+    const cameraNow = this.down("KeyC") || Boolean(gp?.rb) || Boolean(gp?.view && !gp?.lb);
+    const photoNow = this.down("KeyF") || Boolean(gp?.lb && gp?.view);
+    const confirmNow = this.down("Enter") || Boolean(gp?.a);
+    const backNow = this.down("Backspace") || Boolean(gp?.b);
+    const spaceNow = this.down("Space");
+    this.edgePrev = {
+      respawn: respawnNow,
+      restart: restartNow,
+      pause: pauseNow,
+      camera: cameraNow,
+      confirm: confirmNow,
+      back: backNow,
+      photo: photoNow,
+      spaceMenu: spaceNow,
+    };
   }
 
   detach() {
@@ -303,6 +353,8 @@ export class Input {
     this.queued.restart = false;
     const confirm = confirmNow && !this.edgePrev.confirm;
     const back = backNow && !this.edgePrev.back;
+    const spaceNow = this.down("Space");
+    const spaceMenuEdge = this.pauseMenuOpen && spaceNow && !this.edgePrev.spaceMenu;
     this.edgePrev = {
       respawn: respawnNow,
       restart: restartNow,
@@ -311,6 +363,7 @@ export class Input {
       confirm: confirmNow,
       back: backNow,
       photo: photoNow,
+      spaceMenu: this.pauseMenuOpen ? spaceNow : false,
     };
 
     return {
@@ -327,6 +380,7 @@ export class Input {
       photo,
       rewind,
       menuY,
+      pauseMenuConfirm: confirm || spaceMenuEdge,
     };
   }
 

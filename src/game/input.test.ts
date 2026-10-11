@@ -131,6 +131,78 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("flushAfterResume clears confirm edge without dropping held drive keys", () => {
+    const input = new Input();
+    input.setPauseMenuOpen(true);
+    input.setKeys(["KeyW", "Enter", "Space"]);
+    const before = input.sample();
+    assert.equal(before.throttle, 1);
+    assert.equal(before.confirm, true);
+    input.flushAfterResume();
+    input.setPauseMenuOpen(false);
+    input.setKeys(["KeyW"]);
+    const after = input.sample();
+    assert.equal(after.throttle, 1);
+    assert.equal(after.confirm, false);
+    assert.equal(after.slide, 0);
+    input.detach();
+  });
+
+  it("held Space through pause menu open does not edge-resume until released and pressed again", () => {
+    const input = new Input();
+    input.setKeys(["Space"]);
+    input.sample();
+    input.setPauseMenuOpen(true, null);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.setKeys([]);
+    input.sample();
+    input.setKeys(["Space"]);
+    const fresh = input.sample();
+    assert.equal(fresh.pauseMenuConfirm, true);
+    input.detach();
+  });
+
+  it("seeds Enter confirm edge when the pause menu opens", () => {
+    const input = new Input();
+    input.setKeys(["Enter"]);
+    input.sample();
+    input.setPauseMenuOpen(true, null);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.detach();
+  });
+
+  it("does not re-edge pauseMenuConfirm while Enter or Space stay held (repeat poll path)", () => {
+    const input = new Input();
+    input.setKeys(["Enter"]);
+    input.setPauseMenuOpen(true, null);
+    const enterHeld = input.sample();
+    assert.equal(enterHeld.pauseMenuConfirm, false);
+    const enterAgain = input.sample();
+    assert.equal(enterAgain.pauseMenuConfirm, false);
+    input.setPauseMenuOpen(false);
+    input.setKeys(["Space"]);
+    input.setPauseMenuOpen(true, null);
+    const spaceHeld = input.sample();
+    assert.equal(spaceHeld.pauseMenuConfirm, false);
+    const spaceAgain = input.sample();
+    assert.equal(spaceAgain.pauseMenuConfirm, false);
+    input.detach();
+  });
+
+  it("edges Space as pause menu confirm while the overlay is open", () => {
+    const input = new Input();
+    input.setPauseMenuOpen(true);
+    input.setKeys(["Space"]);
+    const a = input.sample();
+    assert.equal(a.pauseMenuConfirm, true);
+    assert.equal(a.slide, 1);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.detach();
+  });
+
   it("does not treat Enter as a mid-race restart", () => {
     const input = new Input();
     input.setKeys(["Enter"]);

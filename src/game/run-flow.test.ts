@@ -28,6 +28,7 @@ const cruise = {
   photo: false,
   rewind: false,
   menuY: 0,
+  pauseMenuConfirm: false,
 };
 
 describe("cpPbSplitMs", () => {
