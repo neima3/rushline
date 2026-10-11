@@ -245,3 +245,101 @@ describe("RaceVfx resetRun", () => {
     (chevron.material as THREE.Material).dispose();
   });
 });
+
+describe("RaceVfx finish burst visibility", () => {
+  type BurstView = { burstPoints: THREE.Points | null; burstLife: Float32Array };
+  function setup() {
+    const rv = new RaceVfx();
+    rv.setQuality(QUALITY_PRESETS.high, 1);
+    rv.bindTrack(getTrack("circuit"), "stadium");
+    const finMat = new THREE.MeshStandardMaterial({
+      emissive: new THREE.Color(gateLookForTheme("stadium", true).emissive),
+    });
+    rv.registerGate(11.2, true, new THREE.Group(), [finMat]);
+    const view = rv as unknown as BurstView;
+    return { rv, finMat, view };
+  }
+  function drawnPoints(view: BurstView) {
+    const pts = view.burstPoints;
+    if (!pts || !pts.visible) return 0;
+    const pos = pts.geometry.getAttribute("position");
+    const range = pts.geometry.drawRange;
+    return Math.max(0, Math.min(range.count, pos.count - range.start));
+  }
+
+  it("draws nothing before any finish", () => {
+    const { rv, finMat, view } = setup();
+    assert.ok(view.burstPoints, "high quality has a burst pool");
+    assert.equal(drawnPoints(view), 0);
+    rv.step(0.016);
+    assert.equal(drawnPoints(view), 0);
+    rv.dispose();
+    finMat.dispose();
+  });
+
+  it("restart after a finish leaves no visible burst points", () => {
+    const { rv, finMat, view } = setup();
+    rv.onTimingGate(11.2, "finish");
+    rv.step(0.05);
+    const live = [...view.burstLife].filter((l) => l > 0).length;
+    assert.ok(live > 0, "finish burst spawned");
+    assert.equal(drawnPoints(view), live, "only live particles are drawn");
+
+    rv.resetRun();
+    assert.equal(view.burstPoints!.visible, false, "burst hidden after resetRun");
+    assert.equal(view.burstPoints!.geometry.drawRange.count, 0, "draw range empty after resetRun");
+    assert.equal(drawnPoints(view), 0);
+    // Countdown frames after the restart keep it hidden.
+    for (let i = 0; i < 30; i++) rv.step(1 / 60);
+    assert.equal(drawnPoints(view), 0);
+    rv.dispose();
+    finMat.dispose();
+  });
+
+  it("draws nothing once the burst life expires via step()", () => {
+    const { rv, finMat, view } = setup();
+    rv.onTimingGate(11.2, "finish");
+    assert.ok(drawnPoints(view) > 0, "burst visible while live");
+    // Max particle life is 0.9 s; step well past it in frame-sized steps.
+    for (let i = 0; i < 90; i++) rv.step(1 / 60);
+    assert.ok([...view.burstLife].every((l) => l <= 0), "all particles dead");
+    assert.equal(view.burstPoints!.visible, false, "burst hidden after expiry");
+    assert.equal(view.burstPoints!.geometry.drawRange.count, 0);
+    assert.equal(drawnPoints(view), 0);
+    rv.dispose();
+    finMat.dispose();
+  });
+
+  it("dead particles are not drawn while others are still live", () => {
+    const { rv, finMat, view } = setup();
+    rv.onTimingGate(11.2, "finish");
+    // Kill half the live slots by hand, then step a tiny dt.
+    let killed = 0;
+    view.burstLife.forEach((l, i) => {
+      if (l > 0 && i % 2 === 0) {
+        view.burstLife[i] = 0;
+        killed++;
+      }
+    });
+    assert.ok(killed > 0);
+    rv.step(0.001);
+    const live = [...view.burstLife].filter((l) => l > 0).length;
+    assert.ok(live > 0);
+    assert.equal(drawnPoints(view), live);
+    rv.dispose();
+    finMat.dispose();
+  });
+
+  it("low quality spawns no burst", () => {
+    const rv = new RaceVfx();
+    rv.setQuality(QUALITY_PRESETS.low);
+    rv.bindTrack(getTrack("circuit"), "stadium");
+    const finMat = new THREE.MeshStandardMaterial();
+    rv.registerGate(11.2, true, new THREE.Group(), [finMat]);
+    rv.onTimingGate(11.2, "finish");
+    rv.step(0.05);
+    assert.equal(drawnPoints(rv as unknown as BurstView), 0);
+    rv.dispose();
+    finMat.dispose();
+  });
+});
