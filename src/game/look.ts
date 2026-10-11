@@ -114,6 +114,56 @@ export function terrainGroundFill(theme: ThemeId): { emissive: number; emissiveI
   return { emissive: 0x000000, emissiveIntensity: 0 };
 }
 
+/**
+ * Copies only the texture-map entries that exist. three warns
+ * `parameter 'roughnessMap' has value of undefined` when a constructor gets an
+ * explicit undefined (Low skips the roughness map), so absent maps are omitted.
+ */
+export function presentMaps<T>(maps: Record<string, T | null | undefined>): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const key in maps) {
+    const v = maps[key];
+    if (v !== undefined && v !== null) out[key] = v;
+  }
+  return out;
+}
+
+export type ContrastPanelLook = {
+  color: number;
+  roughness: number;
+  metalness: number;
+  emissive: number;
+  emissiveIntensity: number;
+  doubleSided: true;
+};
+
+/**
+ * Dark half of the trackside contrast barrier panels (the panel at every
+ * left-hand lamp-post base). White Pass reads it as a void-black slab against
+ * snow with no env map, so alpine gets a matte slate with an albedo-matched
+ * emissive lift; other themes keep the original charcoal.
+ */
+export function contrastBarrierDarkLook(theme: ThemeId): ContrastPanelLook {
+  if (theme === "alpine") {
+    return {
+      color: 0x4a5868,
+      roughness: 0.82,
+      metalness: 0.06,
+      emissive: 0x4a5868,
+      emissiveIntensity: 0.32,
+      doubleSided: true,
+    };
+  }
+  return {
+    color: 0x14161c,
+    roughness: 0.55,
+    metalness: 0.2,
+    emissive: 0x14161c,
+    emissiveIntensity: 0.14,
+    doubleSided: true,
+  };
+}
+
 export function surfaceSpec(theme: ThemeId, surface: SurfaceKind): SurfaceSpec {
   if (surface === "dirt") {
     return {

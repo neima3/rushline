@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { BuiltTrack, ThemeId } from "./types";
 import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
-import { terrainGroundFill } from "./look";
+import { contrastBarrierDarkLook, terrainGroundFill } from "./look";
 import type { TextureBudget } from "./quality";
 import { gondolaCableTs, gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
 
@@ -1549,13 +1549,14 @@ function addContrastBarriers(
                     ? 0.54
                     : 0.28,
   });
+  const darkLook = contrastBarrierDarkLook(theme);
   const dark = new THREE.MeshStandardMaterial({
-    color: 0x14161c,
-    roughness: 0.55,
-    metalness: 0.2,
+    color: darkLook.color,
+    roughness: darkLook.roughness,
+    metalness: darkLook.metalness,
     side: THREE.DoubleSide,
-    emissive: 0x14161c,
-    emissiveIntensity: 0.14,
+    emissive: darkLook.emissive,
+    emissiveIntensity: darkLook.emissiveIntensity,
   });
   const n = theme === "night" ? 28 : 22;
   const step = Math.max(1, Math.floor(track.samples.length / n));

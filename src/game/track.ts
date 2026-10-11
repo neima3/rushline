@@ -10,6 +10,7 @@ import {
   edgeMark,
   lipColor,
   lipWidth,
+  presentMaps,
   roadCrown,
   roadSurfaceTint,
   surfaceBand,
@@ -987,7 +988,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     // winding, which faces down and paints the driving surface black at night.
     const mat = new THREE.MeshStandardMaterial({
       map: albedo,
-      roughnessMap: rough ?? undefined,
+      ...presentMaps({ roughnessMap: rough }),
       vertexColors: true,
       roughness: spec.roughness,
       metalness: spec.metalness,
