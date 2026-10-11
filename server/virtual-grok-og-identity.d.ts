@@ -9,5 +9,6 @@ declare module "virtual:grok-og-identity" {
       banner?: string;
       color?: string;
     };
+    publicHostname: string;
   };
 }

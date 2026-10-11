@@ -116,6 +116,39 @@ export function resolvePublicHost(hostHeader) {
   );
 }
 
+/** Hostname from the incoming request, including *.vercel.app (not used for og.grok.me placeholders). */
+function requestHostName(hostHeader) {
+  const host = String(hostHeader ?? "")
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+  if (!host || !/^[a-z0-9.-]+$/.test(host) || !host.includes(".")) return "";
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return "";
+  return host;
+}
+
+/**
+ * Host for absolute og:image / twitter:image URLs. Prefers the published grok.me
+ * host (runtime env, then build-time bake). Falls back to the request host for
+ * normal domains. When the build stamped `site.image` from public/og.jpg, uses
+ * the request host even on *.vercel.app so production previews get a card URL
+ * without relying on serverless `process.env.VITE_PUBLIC_HOSTNAME`.
+ */
+export function resolveOgImagePublicHost(
+  hostHeader,
+  { bakedPublicHostname = "", site = {} } = {},
+) {
+  const fromEnv = publicAppHost(process.env?.VITE_PUBLIC_HOSTNAME);
+  if (fromEnv) return fromEnv;
+  const fromBake = publicAppHost(bakedPublicHostname);
+  if (fromBake) return fromBake;
+  const fromRequest = publicAppHost(hostHeader);
+  if (fromRequest) return fromRequest;
+  if (String(site.image ?? "").trim()) return requestHostName(hostHeader);
+  return "";
+}
+
 export function isInstallQuery(url) {
   const query = String(url ?? "").split("?", 2)[1] ?? "";
   const params = new URLSearchParams(query);
@@ -280,7 +313,8 @@ export function snapshotOgIdentity(cwd = process.cwd()) {
   if (existsSync(join(cwd, "public/x-banner.jpg"))) {
     site.banner = site.banner || "/x-banner.jpg";
   }
-  return { site };
+  const publicHostname = publicAppHost(process.env?.VITE_PUBLIC_HOSTNAME ?? "");
+  return { site, publicHostname };
 }
 
 export function customOgAssetPath(cwd = process.cwd()) {
@@ -345,9 +379,10 @@ export function grokOgHeadTags({
   documentTitle = "",
   cwd = process.cwd(),
   allowDisk = true,
+  bakedPublicHostname = "",
 } = {}) {
   const title = resolveOgTitle(site, appName, host, documentTitle);
-  const publicHost = resolvePublicHost(host);
+  const imagePublicHost = resolveOgImagePublicHost(host, { bakedPublicHostname, site });
   const tags = [
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta property="og:title" content="${escapeHtml(title)}">`,
@@ -355,24 +390,26 @@ export function grokOgHeadTags({
   const description = String(site.description ?? "").trim();
   if (description) {
     tags.push(`<meta property="og:description" content="${escapeHtml(description)}">`);
+    tags.push(`<meta name="twitter:description" content="${escapeHtml(description)}">`);
   }
   if (String(site.type ?? "").toLowerCase() === "x:game") {
     tags.push(`<meta property="og:type" content="x:game">`);
   }
-  if (publicHost) {
+  if (imagePublicHost) {
     const asset = resolveOgCardAsset(site, cwd, allowDisk);
     const custom = Boolean(asset);
     let image = custom
-      ? `https://${publicHost}${asset.startsWith("/") ? asset : `/${asset}`}`
-      : `${ogServiceUrl()}/v1/card.png?host=${encodeURIComponent(publicHost)}&title=${encodeURIComponent(title)}`;
+      ? `https://${imagePublicHost}${asset.startsWith("/") ? asset : `/${asset}`}`
+      : `${ogServiceUrl()}/v1/card.png?host=${encodeURIComponent(imagePublicHost)}&title=${encodeURIComponent(title)}`;
     const color = !custom ? placeholderCardColor(site) : "";
     if (color) image += `&color=${encodeURIComponent(color)}`;
     tags.push(`<meta property="og:image" content="${escapeHtml(image)}">`);
+    tags.push(`<meta name="twitter:image" content="${escapeHtml(image)}">`);
     tags.push(`<meta property="og:image:width" content="1200">`);
     tags.push(`<meta property="og:image:height" content="630">`);
     const banner = String(site.banner ?? "").trim();
     if (banner) {
-      const bannerUrl = `https://${publicHost}${banner.startsWith("/") ? banner : `/${banner}`}`;
+      const bannerUrl = `https://${imagePublicHost}${banner.startsWith("/") ? banner : `/${banner}`}`;
       tags.push(`<meta property="x:game:image" content="${escapeHtml(bannerUrl)}">`);
       tags.push(`<meta property="x:game:image:width" content="1200">`);
       tags.push(`<meta property="x:game:image:height" content="264">`);
@@ -430,13 +467,14 @@ export function normalizeHeadContext(ctx = {}) {
     host: ctx.host ?? "",
     cwd,
     site,
-    allowDisk: explicitCwd,
+    allowDisk: ctx.allowDisk !== undefined ? Boolean(ctx.allowDisk) : explicitCwd,
+    bakedPublicHostname: String(ctx.bakedPublicHostname ?? "").trim(),
   };
 }
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
-  const { site, projectId, creator, creatorId, host, cwd, allowDisk } =
+  const { site, projectId, creator, creatorId, host, cwd, allowDisk, bakedPublicHostname } =
     normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
@@ -457,7 +495,15 @@ export function injectGrokPwaHead(html, ctx = {}) {
 
   next = insertAfterHeadOpen(
     next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd, allowDisk }).join(""),
+    grokOgHeadTags({
+      host,
+      appName,
+      site,
+      documentTitle,
+      cwd,
+      allowDisk,
+      bakedPublicHostname,
+    }).join(""),
   );
 
   if (!next.includes("/grok-app-builder/extensions.js")) {
@@ -509,8 +555,9 @@ export function createHeadInjector(ctx = {}) {
       creator: normalized.creator,
       creatorId: normalized.creatorId,
       host: normalized.host,
-      cwd: normalized.cwd,
       site: normalized.site,
+      allowDisk: normalized.allowDisk,
+      bakedPublicHostname: normalized.bakedPublicHostname,
     });
 
   return {
