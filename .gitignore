@@ -30,7 +30,9 @@ artifacts/
 .node_modules.lock
 .grok/status
 .grok/preview.log
-.grok/skills/
+.grok/skills/*
+!.grok/skills/og/
+!.grok/skills/og/**
 .grok/references/
 
 # app-builder QA dumps
