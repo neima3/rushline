@@ -7,6 +7,7 @@ import type { SurfaceKind, ThemeId } from "./types.ts";
 import {
   SKID_MAX_AGE as SKID_FADE_SECONDS,
   SKID_BLACK_POINT,
+  SKID_TONE,
   SKID_DARKEN_ALPHA,
   skidMarkColorLinear,
   skidMarkMode,
@@ -203,6 +204,8 @@ const ROADS = {
   ] as V3[],
   // Ridge Drop dusk asphalt (screen ≈ (28,14,8)).
   ridge: [0.0563, 0.0453, 0.0414] as V3,
+  // Helix open stretch past s≈149 (QA Desktop, 150d3e2e): screen ≈ (10,6,1).
+  helix: [0.0455, 0.042, 0.0185] as V3,
 };
 const FRESH_MIN = 0.55; // weakest fresh mark (driftCharge 0)
 const FRESH_MAX = 0.8; // strongest (driftCharge 1)
@@ -286,6 +289,48 @@ describe("skid mark visibility on screen (High)", () => {
     const dl = lstar(ms) - lstar(rs);
     assert.ok(dl >= 0.07 && dl <= 0.2, `ridge dL ${dl.toFixed(3)} mark ${ms.map(Math.round)}`);
     assert.ok(Math.max(...ms) < 90, "no bright stripe");
+  });
+
+  it("Helix: a lighter near-neutral grey scuff that out-reads main's grey wedges, no glow", () => {
+    const rs = screenHigh("night", ROADS.helix);
+    assert.ok(Math.max(...rs.map((x, i) => Math.abs(x - [10, 6, 1][i]!))) < 1.5, `road ${rs.map(Math.round)}`);
+    // Main (7cc700a2) measured +0.033 / +0.055; 150d3e2e's 0x3d3d41 measured −0.008.
+    const MAIN_BEST = 0.055;
+    for (const surface of ["tech", "plastic"] as const) {
+      // k < 1: distance fog / not-quite-fresh marks dim the tone (QA's capture ≈ 0.93 of the model).
+      for (const k of [1, 0.92]) {
+        const c = skidMarkColorLinear([0, 0, 0, 0], "tone", "night", surface, FRESH_MAX, 1, true);
+        const tone: V3 = [c[0] * k, c[1] * k, c[2] * k];
+        const ms = screenHigh("night", tone);
+        const dl = lstar(ms) - lstar(rs);
+        const tag = `${surface} k${k} mark ${ms.map(Math.round)} dL ${dl.toFixed(3)}`;
+        assert.ok(dl >= MAIN_BEST + 0.015, `reads lighter than main: ${tag}`);
+        assert.ok(dl <= 0.14, `no bright stripe: ${tag}`);
+        assert.ok(Math.max(...ms) < 60, `dim scuff, not a light: ${tag}`);
+        // Near-neutral: at most a faint cool tint (the old tone rendered (4,5,18)).
+        assert.ok(ms[2] - Math.min(ms[0], ms[1]) <= 10, `not blue-violet: ${tag}`);
+        assert.ok(Math.max(ms[0], ms[1]) - ms[2] <= 6, `not brown: ${tag}`);
+        // Linear HDR value far below the High bloom threshold (≥ 0.8 on every theme).
+        assert.ok(Math.max(c[0], c[1], c[2]) < 0.1, `linear ${c.slice(0, 3)}`);
+      }
+    }
+  });
+
+  it("Helix fix leaves every other theme's skid target untouched", () => {
+    assert.deepEqual(
+      { ...SKID_TONE, night: 0 },
+      {
+        stadium: 0x3c3d40,
+        alpine: 0x3c3d40,
+        mesa: 0x3c3d40,
+        storm: 0x3c3d40,
+        night: 0,
+        grove: 0x393a39,
+        canyon: 0x4d4a47,
+        works: 0x4a4744,
+        ember: 0x48443f,
+      },
+    );
   });
 
   it("rubber tone stays far below bloom threshold on every dark theme", () => {

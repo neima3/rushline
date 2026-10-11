@@ -365,10 +365,14 @@ export const SKID_DARKEN_ALPHA = { weak: 0.62, strong: 0.68 } as const;
 
 /**
  * Rubber tone (sRGB hex; linear ≈ 0.045–0.075) per dark theme, drawn at alpha 1
- * when fresh. Cool night roads sit just above the High grade's black point, so a
- * mark is a dim scuff on unlit asphalt yet a near-black stroke over sheen,
- * headlight or sun patches; warm dusk roads (Ridge, Works, Ember) keep the
- * lighter grey scuff QA passed on Ridge.
+ * when fresh. Cool roads (Storm, Grove) sit just above the High grade's black
+ * point, so a mark is a dim scuff on unlit asphalt yet a near-black stroke over
+ * sheen, headlight or sun patches; warm dusk roads (Ridge, Works, Ember) keep the
+ * lighter grey scuff QA passed on Ridge. Helix (night) uses the same warm-grey
+ * scuff: its old cool 0x3d3d41 landed on the grade's black point and rendered
+ * blue-violet (4,5,18) on the (10,6,1) road (dL −0.008, QA on 150d3e2e); the
+ * warmer, lighter tone cancels the grade's violet tint and reads as a grey
+ * scuff above the road, still far below bloom.
  */
 export const SKID_TONE: Record<ThemeId, number> = {
   // Light themes use SKID_BLACK_POINT; these are only a fallback.
@@ -376,7 +380,7 @@ export const SKID_TONE: Record<ThemeId, number> = {
   alpine: 0x3c3d40,
   mesa: 0x3c3d40,
   storm: 0x3c3d40,
-  night: 0x3d3d41,
+  night: 0x4a4846,
   grove: 0x393a39,
   canyon: 0x4d4a47,
   works: 0x4a4744,
