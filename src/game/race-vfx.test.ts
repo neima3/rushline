@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import * as THREE from "three";
 import {
+  SKID_MAX_AGE as SKID_FADE_SECONDS,
+  createSkidSheenMaterial,
+  skidMarkBaseColor,
+  skidMarkColor,
+  skidMarkContrast,
+  skidMarkMode,
   SKID_MAX_SEGMENT,
   SKID_MIN_SEGMENT,
   SKID_SEGMENT_OVERLAP,
@@ -190,5 +196,75 @@ describe("skid segment length", () => {
       assert.ok(Math.abs(maxW - minW - 0.52 * widthScale) < 1e-6, `width ${maxW - minW}`);
     }
     geo.dispose();
+  });
+});
+
+describe("skid mark visibility per theme", () => {
+  const THEMES = ["stadium", "canyon", "night", "alpine", "works", "mesa", "grove", "ember", "storm"] as const;
+  const FRESH_MIN = 0.55; // weakest fresh mark (driftCharge 0)
+  const FRESH_MAX = 0.8; // strongest (driftCharge 1)
+
+  it("dark roads use the additive sheen, light roads keep multiply", () => {
+    for (const theme of ["canyon", "night", "grove", "storm"] as const) assert.equal(skidMarkMode(theme), "sheen", theme);
+    for (const theme of ["stadium", "alpine", "mesa"] as const) assert.equal(skidMarkMode(theme), "multiply", theme);
+  });
+
+  it("fresh marks reach dL >= 0.08 on every theme", () => {
+    for (const theme of THEMES) {
+      for (const strength of [FRESH_MIN, FRESH_MAX]) {
+        const c = skidMarkContrast(theme, strength, 1);
+        assert.ok(c.dL >= 0.08, `${theme} @${strength}: dL ${c.dL.toFixed(3)} (road ${c.roadL.toFixed(3)})`);
+      }
+    }
+  });
+
+  it("sheen stays a scuff, not a glowing stripe", () => {
+    for (const theme of THEMES) {
+      const c = skidMarkContrast(theme, FRESH_MAX, 1);
+      if (c.mode === "sheen") assert.ok(c.dL <= 0.2, `${theme}: dL ${c.dL.toFixed(3)}`);
+    }
+  });
+
+  it("fully faded marks are invisible (dL ~ 0) on every theme", () => {
+    for (const theme of THEMES) {
+      for (const strength of [FRESH_MIN, FRESH_MAX]) {
+        assert.ok(skidMarkContrast(theme, strength, 0).dL < 1e-9, theme);
+      }
+    }
+  });
+
+  it("light themes never go pure black", () => {
+    for (const theme of THEMES) {
+      const c = skidMarkContrast(theme, FRESH_MAX, 1);
+      if (c.mode !== "multiply") continue;
+      assert.ok(c.markL >= 0.02, `${theme}: markL ${c.markL.toFixed(3)}`);
+      assert.ok(c.markL >= c.roadL * 0.15, `${theme}: ${c.markL.toFixed(3)} vs road ${c.roadL.toFixed(3)}`);
+      for (const surface of ["plastic", "dirt", "ice", "tech"] as const) {
+        assert.notEqual(skidMarkColor("multiply", skidMarkBaseColor("multiply", surface), FRESH_MAX, 1), 0x000000);
+      }
+    }
+  });
+
+  it("fade end points: multiply -> white, sheen -> black", () => {
+    for (const surface of ["plastic", "dirt", "ice", "tech"] as const) {
+      assert.equal(skidMarkColor("multiply", skidMarkBaseColor("multiply", surface), 0.7, 0), 0xffffff);
+      assert.equal(skidMarkColor("sheen", skidMarkBaseColor("sheen", surface), 0.7, 0), 0x000000);
+    }
+    assert.equal(skidFadeAlpha(SKID_FADE_SECONDS, SKID_FADE_SECONDS), 0);
+    assert.ok(SKID_FADE_SECONDS <= 39);
+  });
+
+  it("sheen material is additive, unfogged and keeps decal state", () => {
+    const mat = createSkidSheenMaterial();
+    assert.equal(mat.blending, THREE.AdditiveBlending);
+    assert.equal(blendingNeedsPremultipliedAlpha(mat.blending), false);
+    assert.equal(mat.fog, false);
+    assert.equal(mat.transparent, true);
+    assert.equal(mat.opacity, 1);
+    assert.equal(mat.depthWrite, false);
+    assert.equal(mat.polygonOffset, true);
+    assert.equal(mat.polygonOffsetFactor, -1);
+    assert.equal(mat.polygonOffsetUnits, -4);
+    mat.dispose();
   });
 });

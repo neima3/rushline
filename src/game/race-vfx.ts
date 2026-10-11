@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { BuiltTrack, CarSnap, SurfaceKind, ThemeId } from "./types.ts";
 import { sampleAt } from "./track.ts";
 import { GATE_LOOK } from "./presentation.ts";
+import { roadSurfaceTint, surfaceAlbedoBase, themeDefaultSurface } from "./look.ts";
 import type { QualityProfile, QualityTier } from "./quality.ts";
 
 /** Seconds before a skid decal fully fades out. */
@@ -269,6 +270,153 @@ export function createSkidDecalMaterial(): THREE.MeshBasicMaterial {
   });
 }
 
+/**
+ * Rubber-sheen skid material for dark roads. Multiplying an already near-black
+ * road cannot darken it visibly, so dark themes add a dim scuff instead.
+ * Additive (blendFunc SRC_ALPHA, ONE) needs no premultipliedAlpha; with opacity 1
+ * the instance colour is added directly and black = no change (faded out).
+ * fog off so distant marks never add fog colour (no glowing streaks in haze).
+ */
+export function createSkidSheenMaterial(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    fog: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -4,
+  });
+}
+
+export type SkidMarkMode = "multiply" | "sheen";
+
+/** Road lightness (CIE L* / 100) below which skids switch to the rubber sheen. */
+export const SKID_SHEEN_ROAD_L = 0.12;
+
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** CIE L* / 100 for a linear-light luminance Y. */
+export function lightnessFromLinearY(y: number): number {
+  const l = y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
+  return l / 100;
+}
+
+function linearY(r: number, g: number, b: number): number {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Linear-light base colour of a theme's default road ribbon: canvas albedo
+ * (surfaceAlbedoBase, sRGB) times the ribbon vertex tint (roadSurfaceTint, linear).
+ * Writes [r, g, b] into `out`.
+ */
+export function skidRoadBaseLinear(theme: ThemeId, out: [number, number, number]): [number, number, number] {
+  const surface = themeDefaultSurface(theme);
+  const base = surfaceAlbedoBase(surface, theme);
+  const tint = roadSurfaceTint(theme, surface);
+  out[0] = srgbToLinear(base[0] / 255) * tint.r;
+  out[1] = srgbToLinear(base[1] / 255) * tint.g;
+  out[2] = srgbToLinear(base[2] / 255) * tint.b;
+  return out;
+}
+
+/** Lightness (L* / 100) of a theme's default road. */
+export function skidRoadLightness(theme: ThemeId): number {
+  const c = skidRoadBaseLinear(theme, [0, 0, 0]);
+  return lightnessFromLinearY(linearY(c[0], c[1], c[2]));
+}
+
+/** Dark roads (Ridge, Helix, Black Hollow, Storm Dock, Works, Ember) use the sheen. */
+export function skidMarkMode(theme: ThemeId): SkidMarkMode {
+  return skidRoadLightness(theme) < SKID_SHEEN_ROAD_L ? "sheen" : "multiply";
+}
+
+/** Per-surface base colour for a fresh mark: multiply tint, or additive scuff colour. */
+export function skidMarkBaseColor(mode: SkidMarkMode, surface: SurfaceKind): number {
+  if (mode === "sheen") {
+    switch (surface) {
+      case "dirt":
+        return 0x302c26;
+      case "ice":
+        return 0x8898a8;
+      case "tech":
+        return 0x2c3036;
+      default:
+        return 0x2c2e32;
+    }
+  }
+  switch (surface) {
+    case "dirt":
+      return 0x3a3028;
+    case "ice":
+      return 0x6a7a90;
+    case "tech":
+      return 0x30363e;
+    default:
+      return 0x2a2c30;
+  }
+}
+
+/**
+ * Instance colour (sRGB hex) for a skid decal.
+ * multiply: 1 - depth·fade·(1 - tint), depth 0.5–0.7 from strength, so a fresh
+ *   mark keeps at least ~30% of the road (never pure black); fade 0 = white.
+ * sheen: scuff · k · fade, k 0.75–1 from strength; fade 0 = black (adds nothing).
+ * `strength` is 0.55 + driftCharge·0.25.
+ */
+export function skidMarkColor(mode: SkidMarkMode, baseHex: number, strength: number, fade: number): number {
+  const f = Math.max(0, Math.min(1, fade));
+  const sNorm = Math.max(0, Math.min(1, (strength - 0.55) / 0.25));
+  const r0 = ((baseHex >> 16) & 255) / 255;
+  const g0 = ((baseHex >> 8) & 255) / 255;
+  const b0 = (baseHex & 255) / 255;
+  let r: number;
+  let g: number;
+  let b: number;
+  if (mode === "sheen") {
+    const k = (0.75 + 0.25 * sNorm) * f;
+    r = r0 * k;
+    g = g0 * k;
+    b = b0 * k;
+  } else {
+    const d = (0.5 + 0.2 * sNorm) * f;
+    r = 1 - d * (1 - r0);
+    g = 1 - d * (1 - g0);
+    b = 1 - d * (1 - b0);
+  }
+  return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
+}
+
+/**
+ * Modelled lightness of a theme's road with and without a skid mark on top,
+ * using the theme's mode and default surface (instance colour sRGB → linear,
+ * blended in linear light). dL = |markL − roadL|.
+ */
+export function skidMarkContrast(
+  theme: ThemeId,
+  strength: number,
+  fade: number,
+): { mode: SkidMarkMode; roadL: number; markL: number; dL: number } {
+  const mode = skidMarkMode(theme);
+  const road = skidRoadBaseLinear(theme, [0, 0, 0]);
+  const hex = skidMarkColor(mode, skidMarkBaseColor(mode, themeDefaultSurface(theme)), strength, fade);
+  const m0 = srgbToLinear(((hex >> 16) & 255) / 255);
+  const m1 = srgbToLinear(((hex >> 8) & 255) / 255);
+  const m2 = srgbToLinear((hex & 255) / 255);
+  const mark =
+    mode === "sheen"
+      ? linearY(road[0] + m0, road[1] + m1, road[2] + m2)
+      : linearY(road[0] * m0, road[1] * m1, road[2] * m2);
+  const roadL = lightnessFromLinearY(linearY(road[0], road[1], road[2]));
+  const markL = lightnessFromLinearY(mark);
+  return { mode, roadL, markL, dL: Math.abs(markL - roadL) };
+}
+
 /** three requires premultipliedAlpha for Multiply/Subtractive blending. */
 export function blendingNeedsPremultipliedAlpha(blending: THREE.Blending): boolean {
   return blending === THREE.MultiplyBlending || blending === THREE.SubtractiveBlending;
@@ -283,6 +431,9 @@ export class RaceVfx {
   private skidStrength = new Float32Array(0);
   private skidTint = new Uint32Array(0);
   private skidLive = 0;
+  private skidMode: SkidMarkMode = "multiply";
+  private skidMulMat: THREE.MeshBasicMaterial | null = null;
+  private skidSheenMat: THREE.MeshBasicMaterial | null = null;
   /** Previous skid point (preallocated; valid only while hasLastSkid). */
   private readonly lastSkid = new THREE.Vector3();
   private hasLastSkid = false;
@@ -319,6 +470,7 @@ export class RaceVfx {
 
   setTheme(theme: ThemeId) {
     this.theme = theme;
+    this.syncSkidMode();
     for (const g of this.gates) {
       g.look = gateLookForTheme(theme, g.finish);
     }
@@ -329,6 +481,7 @@ export class RaceVfx {
   bindTrack(track: BuiltTrack, theme: ThemeId) {
     this.track = track;
     this.theme = theme;
+    this.syncSkidMode();
     this.clearGates();
     this.clearBoosts();
     this.clearMarks();
@@ -441,7 +594,10 @@ export class RaceVfx {
     if (this.skidMesh) {
       this.root.remove(this.skidMesh);
       this.skidMesh.geometry.dispose();
-      (this.skidMesh.material as THREE.Material).dispose();
+      this.skidMulMat?.dispose();
+      this.skidSheenMat?.dispose();
+      this.skidMulMat = null;
+      this.skidSheenMat = null;
     }
     this.skidCap = cap;
     this.skidHead = 0;
@@ -459,14 +615,30 @@ export class RaceVfx {
     this.skidTint = new Uint32Array(cap);
     for (let i = 0; i < cap; i++) this.skidAge[i] = -1;
     const geo = createSkidDecalGeometry();
+    // Both skid materials are built once per pool; setTheme only swaps the reference.
     const mat = createSkidDecalMaterial();
-    this.skidMesh = new THREE.InstancedMesh(geo, mat, cap);
+    const sheen = createSkidSheenMaterial();
+    this.skidMulMat = mat;
+    this.skidSheenMat = sheen;
+    this.skidMode = skidMarkMode(this.theme);
+    this.skidMesh = new THREE.InstancedMesh(geo, this.skidMode === "sheen" ? sheen : mat, cap);
     this.skidMesh.frustumCulled = false;
     this.skidMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.skidMesh.count = 0;
     this.root.add(this.skidMesh);
     this.geos.push(geo);
-    this.disposables.push(mat);
+    this.disposables.push(mat, sheen);
+  }
+
+  /** Pick multiply vs sheen for the current theme; clears marks if the mode flips. */
+  private syncSkidMode() {
+    const mode = skidMarkMode(this.theme);
+    if (mode === this.skidMode) return;
+    this.skidMode = mode;
+    if (this.skidMesh && this.skidMulMat && this.skidSheenMat) {
+      this.skidMesh.material = mode === "sheen" ? this.skidSheenMat : this.skidMulMat;
+      this.clearMarks();
+    }
   }
 
   private ensureBurstPool(cap: number) {
@@ -527,16 +699,13 @@ export class RaceVfx {
     this.skidLive = Math.min(this.skidCap, this.skidLive + 1);
     this.skidAge[idx] = 0;
     this.skidStrength[idx] = 0.55 + snap.driftCharge * 0.25;
-    this.skidTint[idx] = skidSurfaceTint(
-      snap.surface,
-      this.theme === "night" || this.theme === "grove" || this.theme === "storm",
-    );
+    this.skidTint[idx] = skidMarkBaseColor(this.skidMode, snap.surface);
     const width = 0.42 + snap.driftCharge * 0.18;
     composeSkidDecalMatrix(_mat4, x, y, z, dirX, dirZ, length, width);
     this.skidMesh!.setMatrixAt(idx, _mat4);
     this.skidMesh!.setColorAt(
       idx,
-      _color.setHex(skidFadeTintColor(this.skidTint[idx]!, this.skidStrength[idx]!, 1)),
+      _color.setHex(skidMarkColor(this.skidMode, this.skidTint[idx]!, this.skidStrength[idx]!, 1)),
     );
     this.skidMesh!.count = Math.max(this.skidMesh!.count, idx + 1);
     this.skidMesh!.instanceMatrix.needsUpdate = true;
@@ -562,7 +731,10 @@ export class RaceVfx {
         any = true;
         continue;
       }
-      mesh.setColorAt(i, _color.setHex(skidFadeTintColor(this.skidTint[i]!, this.skidStrength[i]!, fade)));
+      mesh.setColorAt(
+        i,
+        _color.setHex(skidMarkColor(this.skidMode, this.skidTint[i]!, this.skidStrength[i]!, fade)),
+      );
       any = true;
     }
     if (any && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
