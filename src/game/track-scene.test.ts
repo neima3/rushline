@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getTrack } from "./track.ts";
 import { QUALITY_PRESETS } from "./quality.ts";
+import { withRaceLaps } from "./laps.ts";
 import {
   shouldRebuildTrackScene,
+  trackSceneContentKey,
   trackSceneVisualKey,
   TrackTextureRegistry,
   type TrackSceneCache,
@@ -15,16 +17,26 @@ describe("track scene cache", () => {
   const highKey = trackSceneVisualKey(QUALITY_PRESETS.high);
   const lowKey = trackSceneVisualKey(QUALITY_PRESETS.low);
 
-  it("reuses when track ref, theme, and visual key match", () => {
-    const cache: TrackSceneCache = { track: circuit, theme: "stadium", visualKey: highKey };
+  it("reuses when track content key, theme, and visual key match", () => {
+    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
     assert.equal(
       shouldRebuildTrackScene(cache, circuit, "stadium", highKey, { sceneBuilt: true }),
       false,
     );
   });
 
+  it("reuses when lap override clones the track object without changing geometry", () => {
+    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: circuit.def.env, visualKey: highKey };
+    const raced = withRaceLaps(circuit, 1);
+    assert.notEqual(raced, circuit);
+    assert.equal(
+      shouldRebuildTrackScene(cache, raced, raced.def.env, highKey, { sceneBuilt: true }),
+      false,
+    );
+  });
+
   it("rebuilds on track change, theme change, or quality key change", () => {
-    const cache: TrackSceneCache = { track: circuit, theme: "stadium", visualKey: highKey };
+    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
     assert.equal(shouldRebuildTrackScene(cache, canyon, "stadium", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "canyon", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "stadium", lowKey, { sceneBuilt: true }), true);
@@ -32,7 +44,7 @@ describe("track scene cache", () => {
   });
 
   it("rebuilds when nothing is cached or the scene was never built", () => {
-    const cache: TrackSceneCache = { track: circuit, theme: "stadium", visualKey: highKey };
+    const cache: TrackSceneCache = { trackKey: trackSceneContentKey(circuit), theme: "stadium", visualKey: highKey };
     assert.equal(shouldRebuildTrackScene(null, circuit, "stadium", highKey, { sceneBuilt: true }), true);
     assert.equal(shouldRebuildTrackScene(cache, circuit, "stadium", highKey, { sceneBuilt: false }), true);
   });

@@ -709,6 +709,7 @@ export class Game {
     this.lastT = this.countdownAt;
     this.world.snapCamera(this.curr, this.camera);
     useGame.getState().setPhase("countdown");
+    this.input.setResultsScreenOpen(false);
     useGame.getState().setResults(null);
     const gridPace = medalPace(this.trackId, 0, this.track.def.medals);
     useGame.getState().setHud({
@@ -779,6 +780,7 @@ export class Game {
   menu() {
     this.clearPhoto();
     this.clearReplay();
+    this.input.setResultsScreenOpen(false);
     this.phase = "menu";
     this.audio.setScene("menu");
     this.countdown = -1;
@@ -1184,6 +1186,7 @@ export class Game {
     this.world.addTrauma(0.4);
     this.input.rumble("finish");
     this.phase = "results";
+    this.input.setResultsScreenOpen(true);
     useGame.getState().setPhase("results");
     useGame.getState().setResults({
       ...buildResults({

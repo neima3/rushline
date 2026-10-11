@@ -8,8 +8,13 @@ export function trackSceneVisualKey(quality: QualityProfile): string {
   return `${quality.tier}:${budget.size}:${budget.roughnessMap ? 1 : 0}:${budget.anisotropy}`;
 }
 
+/** Geometry / layout identity — ignores lap overrides and object identity. */
+export function trackSceneContentKey(track: BuiltTrack): string {
+  return `${track.def.id}:${track.samples.length}:${track.length.toFixed(3)}`;
+}
+
 export type TrackSceneCache = {
-  track: BuiltTrack;
+  trackKey: string;
   theme: ThemeId;
   visualKey: string;
 };
@@ -23,10 +28,32 @@ export function shouldRebuildTrackScene(
 ): boolean {
   if (opts?.forceRebuild) return true;
   if (!cache || !opts?.sceneBuilt) return true;
-  if (cache.track !== track) return true;
+  if (cache.trackKey !== trackSceneContentKey(track)) return true;
   if (cache.theme !== theme) return true;
   if (cache.visualKey !== visualKey) return true;
   return false;
+}
+
+/** Pure loadTrack cache step for tests (counts rebuild vs reuse). */
+export function advanceTrackSceneCache(
+  cache: TrackSceneCache | null,
+  track: BuiltTrack,
+  theme: ThemeId,
+  visualKey: string,
+  sceneBuilt: boolean,
+  opts?: { forceRebuild?: boolean },
+): { cache: TrackSceneCache; mode: "rebuilt" | "reused" } {
+  const rebuild = shouldRebuildTrackScene(cache, track, theme, visualKey, {
+    forceRebuild: opts?.forceRebuild,
+    sceneBuilt,
+  });
+  if (rebuild) {
+    return {
+      cache: { trackKey: trackSceneContentKey(track), theme, visualKey },
+      mode: "rebuilt",
+    };
+  }
+  return { cache: cache!, mode: "reused" };
 }
 
 /** Tracks canvas textures for the current track load; flat count across switches. */

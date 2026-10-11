@@ -33,6 +33,7 @@ import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
 import {
   shouldRebuildTrackScene,
+  trackSceneContentKey,
   trackSceneVisualKey,
   TrackTextureRegistry,
   type TrackSceneCache,
@@ -664,7 +665,7 @@ export class World {
     if (rebuild) {
       this.disposeTrackSceneAssets();
       this.buildTrackScene(track, theme);
-      this.trackSceneCache = { track, theme, visualKey };
+      this.trackSceneCache = { trackKey: trackSceneContentKey(track), theme, visualKey };
     }
     this.resetRunBoundState(track, theme);
     return rebuild ? "rebuilt" : "reused";

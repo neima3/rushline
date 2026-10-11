@@ -57,7 +57,7 @@ export class Input {
   onCameraHotkey: (() => void) | null = null;
   onPhotoHotkey: (() => void) | null = null;
   onPadChange: ((info: PadInfo, reason: PadHotPlug) => void) | null = null;
-  private queued = { pause: false, camera: false, respawn: false, photo: false, restart: false };
+  private queued = { pause: false, camera: false, respawn: false, photo: false, restart: false, confirm: false };
   private respawnHold = emptyRespawnHold();
   private brakeLatchUntil = 0;
   private edgePrev = {
@@ -72,6 +72,7 @@ export class Input {
   };
   private pauseMenuOpen = false;
   private pauseMenuRoot: HTMLElement | null = null;
+  private resultsScreenOpen = false;
   private surface: HTMLElement | null = null;
   private lastKeyStamp = -1;
   private filtSteer = 0;
@@ -82,6 +83,46 @@ export class Input {
   private onPad: (e?: Event) => void;
   private onPointer: (e: PointerEvent) => void;
 
+  /** Same latch path as the window keydown listener (for tests and hotkeys). */
+  applyGameKeyDown(code: string, repeat = false) {
+    const esc = code === "Escape";
+    if (GAME_CODES.has(code) || esc) {
+      this.keys.add(code);
+      if (repeat) return;
+      if (esc || code === "KeyP") {
+        if (this.onPauseHotkey) {
+          this.onPauseHotkey();
+          this.edgePrev.pause = true;
+        } else {
+          this.queued.pause = true;
+        }
+      }
+      if (code === "KeyC") {
+        if (this.onCameraHotkey) {
+          this.onCameraHotkey();
+          this.edgePrev.camera = true;
+        } else {
+          this.queued.camera = true;
+        }
+      }
+      if (code === "KeyF") {
+        if (this.onPhotoHotkey) {
+          this.onPhotoHotkey();
+          this.edgePrev.photo = true;
+        } else {
+          this.queued.photo = true;
+        }
+      }
+      if (code === "KeyR") this.queued.respawn = true;
+      if (code === "Delete" || code === "Home") this.queued.restart = true;
+      if (code === "Enter" && this.resultsScreenOpen && !this.pauseMenuOpen) this.queued.confirm = true;
+    }
+  }
+
+  applyGameKeyUp(code: string) {
+    this.keys.delete(code);
+  }
+
   constructor() {
     this.onKeyDown = (e) => {
       if (e.timeStamp && e.timeStamp === this.lastKeyStamp) return;
@@ -90,38 +131,11 @@ export class Input {
       const esc = e.code === "Escape" || e.key === "Escape";
       if (GAME_CODES.has(e.code) || esc) {
         e.preventDefault();
-        this.keys.add(e.code);
-        if (e.repeat) return;
-        if (esc || e.code === "KeyP") {
-          if (this.onPauseHotkey) {
-            this.onPauseHotkey();
-            this.edgePrev.pause = true;
-          } else {
-            this.queued.pause = true;
-          }
-        }
-        if (e.code === "KeyC") {
-          if (this.onCameraHotkey) {
-            this.onCameraHotkey();
-            this.edgePrev.camera = true;
-          } else {
-            this.queued.camera = true;
-          }
-        }
-        if (e.code === "KeyF") {
-          if (this.onPhotoHotkey) {
-            this.onPhotoHotkey();
-            this.edgePrev.photo = true;
-          } else {
-            this.queued.photo = true;
-          }
-        }
-        if (e.code === "KeyR") this.queued.respawn = true;
-        if (e.code === "Delete" || e.code === "Home") this.queued.restart = true;
+        this.applyGameKeyDown(e.code, e.repeat);
       }
     };
     this.onKeyUp = (e) => {
-      this.keys.delete(e.code);
+      this.applyGameKeyUp(e.code);
     };
     this.onBlur = () => this.keys.clear();
     this.onPad = (e?: Event) => {
@@ -162,7 +176,16 @@ export class Input {
     this.queued.respawn = false;
     this.queued.photo = false;
     this.queued.restart = false;
+    this.queued.confirm = false;
     this.touchRewind = 0;
+  }
+
+  setResultsScreenOpen(open: boolean) {
+    this.resultsScreenOpen = open;
+    if (open) {
+      const gp = pollPads();
+      this.edgePrev.confirm = this.down("Enter") || Boolean(gp?.a);
+    }
   }
 
   setPauseMenuOpen(open: boolean, root?: HTMLElement | null) {
@@ -184,6 +207,7 @@ export class Input {
     this.queued.respawn = false;
     this.queued.photo = false;
     this.queued.restart = false;
+    this.queued.confirm = false;
     this.respawnHold = emptyRespawnHold();
     this.keys.delete("Enter");
     this.keys.delete("Space");
@@ -351,7 +375,9 @@ export class Input {
     this.queued.respawn = false;
     this.queued.photo = false;
     this.queued.restart = false;
-    const confirm = confirmNow && !this.edgePrev.confirm;
+    const confirmQueued = this.queued.confirm;
+    this.queued.confirm = false;
+    const confirm = confirmQueued || (confirmNow && !this.edgePrev.confirm);
     const back = backNow && !this.edgePrev.back;
     const spaceNow = this.down("Space");
     const spaceMenuEdge = this.pauseMenuOpen && spaceNow && !this.edgePrev.spaceMenu;
