@@ -40,11 +40,16 @@ export type GrokHeadContext = {
   host?: string | null;
   cwd?: string;
   site?: OgSite;
+  allowDisk?: boolean;
+  bakedPublicHostname?: string;
 };
 
 export declare function readOgSite(cwd?: string): OgSite;
 export declare function ogCardPublicPath(cwd?: string): string;
-export declare function snapshotOgIdentity(cwd?: string): { site: OgSite };
+export declare function snapshotOgIdentity(cwd?: string): {
+  site: OgSite;
+  publicHostname: string;
+};
 export declare function customOgAssetPath(cwd?: string): string;
 export declare function resolveOgCardAsset(site?: OgSite, cwd?: string): string;
 export declare function ogServiceUrl(): string;

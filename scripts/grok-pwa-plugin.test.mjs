@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  allowedBakedOgImageRequestHost,
   appNameFromHost,
   createHeadInjector,
   grokXCreatorHeadTags,
@@ -146,6 +147,78 @@ test("baked identity does not need a workspace filesystem", () => {
   assert.doesNotMatch(out, /og\.grok\.me/);
 });
 
+const BAKED_OG_SITE = {
+  title: "RUSHLINE",
+  description: "Precision 3D time-trial racing. Beat the medals.",
+  type: "x:game",
+  card: "custom",
+  image: "/og.jpg",
+  banner: "/x-banner.jpg",
+};
+
+function injectBakedOgHead(host) {
+  const prev = process.env.VITE_PUBLIC_HOSTNAME;
+  delete process.env.VITE_PUBLIC_HOSTNAME;
+  try {
+    return injectGrokPwaHead("<html><head></head></html>", {
+      host,
+      site: BAKED_OG_SITE,
+    });
+  } finally {
+    if (prev === undefined) delete process.env.VITE_PUBLIC_HOSTNAME;
+    else process.env.VITE_PUBLIC_HOSTNAME = prev;
+  }
+}
+
+test("deployed bake: allowlisted vercel hosts emit absolute og and twitter images", () => {
+  for (const host of [
+    "rushline-racer.vercel.app",
+    "rushline-racer-git-main-neima-nakhaees-projects.vercel.app",
+  ]) {
+    const out = injectBakedOgHead(host);
+    const escaped = host.replaceAll(".", "\\.");
+    assert.match(out, new RegExp(`property="og:image" content="https://${escaped}/og.jpg"`));
+    assert.match(out, new RegExp(`name="twitter:image" content="https://${escaped}/og.jpg"`));
+    assert.match(out, /property="og:image:width" content="1200"/);
+    assert.match(out, /property="og:image:height" content="630"/);
+    assert.match(out, new RegExp(`property="x:game:image" content="https://${escaped}/x-banner.jpg"`));
+  }
+});
+
+test("deployed bake: non-allowlisted request hosts emit no image metas", () => {
+  const rejectHosts = [
+    "evil.com",
+    'evil.com"><script>',
+    "a b",
+    "203.0.113.10",
+    "rushline.vercel.app",
+    "rushline-racer.vercel.app.evil.com",
+    "evilrushline-racer.vercel.app",
+    "rushline-racer-x-other-team.vercel.app",
+  ];
+  for (const host of rejectHosts) {
+    assert.equal(allowedBakedOgImageRequestHost(host), "");
+    const out = injectBakedOgHead(host);
+    assert.doesNotMatch(out, /property="og:image"/);
+    assert.doesNotMatch(out, /name="twitter:image"/);
+    assert.doesNotMatch(out, /property="x:game:image"/);
+    assert.doesNotMatch(out, /evil/);
+    assert.doesNotMatch(out, /203\.0\.113/);
+    assert.doesNotMatch(out, /other-team/);
+  }
+});
+
+test("inject without cwd/site does not pick up workspace og assets", () => {
+  const out = injectGrokPwaHead("<html><head></head></html>", {
+    host: "wild-race.grok.me",
+  });
+  assert.doesNotMatch(out, /property="og:image" content="https:\/\/wild-race\.grok\.me\/og\.jpg"/);
+  assert.match(
+    out,
+    /property="og:image" content="https:\/\/og\.grok\.me\/v1\/card\.png\?host=wild-race\.grok\.me/,
+  );
+});
+
 test("a public card file wins over a baked site without card=custom", () => {
   // Deploy middleware always passes a baked `site`. If that snapshot missed
   // the file, public/og.jpg must still beat the og.grok.me placeholder.
@@ -193,10 +266,11 @@ test("snapshotOgIdentity stamps card=custom from a public card file", () => {
   const root = mkdtempSync(join(tmpdir(), "grok-og-snap-"));
   mkdirSync(join(root, "public"));
   writeFileSync(join(root, "public/og.jpg"), "x");
-  const { site } = snapshotOgIdentity(root);
+  const { site, publicHostname } = snapshotOgIdentity(root);
   assert.equal(site.card, "custom");
   assert.equal(site.image, "/og.jpg");
   assert.equal(site.banner, undefined);
+  assert.equal(typeof publicHostname, "string");
 });
 
 test("snapshotOgIdentity stamps banner from public/x-banner.jpg", () => {
