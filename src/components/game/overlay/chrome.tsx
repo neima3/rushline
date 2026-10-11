@@ -1,5 +1,12 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  emptyPauseMenuFreshKeys,
+  isPauseMenuButton,
+  pauseMenuPanelKeyDown,
+  pauseMenuPanelKeyUp,
+  type PauseMenuFreshKeys,
+} from "@/game/pause-menu";
 import type { Medal } from "@/game/types";
 
 export function keepPlayFocus(e: { preventDefault: () => void }) {
@@ -46,16 +53,81 @@ export function Modal({
   extra,
   actions,
   chrome,
+  pauseMenu,
+  onPauseMenuMount,
+  onPauseMenuResume,
 }: {
   title: string;
   subtitle?: string;
   extra?: ReactNode;
   chrome?: boolean;
+  pauseMenu?: boolean;
+  onPauseMenuMount?: (root: HTMLElement | null) => void;
+  onPauseMenuResume?: () => void;
   actions: { label: string; onClick: () => void; primary?: boolean }[];
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const menuFreshKeys = useRef<PauseMenuFreshKeys>(emptyPauseMenuFreshKeys());
+  const mountCb = useRef(onPauseMenuMount);
+  mountCb.current = onPauseMenuMount;
+
+  useEffect(() => {
+    if (!pauseMenu) return;
+    menuFreshKeys.current = emptyPauseMenuFreshKeys();
+    const root = panelRef.current;
+    mountCb.current?.(root);
+    const primary = root?.querySelector<HTMLButtonElement>("button[data-pause-menu-btn='Resume']");
+    primary?.focus({ preventScroll: true });
+    const clearFresh = () => {
+      menuFreshKeys.current = emptyPauseMenuFreshKeys();
+    };
+    window.addEventListener("blur", clearFresh);
+    return () => {
+      window.removeEventListener("blur", clearFresh);
+      mountCb.current?.(null);
+    };
+  }, [pauseMenu]);
+
+  const onPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!pauseMenu || !onPauseMenuResume) return;
+    const root = panelRef.current;
+    const result = pauseMenuPanelKeyDown({
+      code: e.code,
+      key: e.key,
+      repeat: e.repeat,
+      activeElement: document.activeElement,
+      menuRoot: root,
+      freshBefore: menuFreshKeys.current,
+    });
+    menuFreshKeys.current = result.freshKeys;
+    if (!result.preventDefault && !result.resume && !result.activateFocused) return;
+    if (result.preventDefault) e.preventDefault();
+    if (result.resume) {
+      onPauseMenuResume();
+      return;
+    }
+    if (result.activateFocused) {
+      const focused = document.activeElement;
+      if (isPauseMenuButton(focused)) focused.click();
+    }
+  };
+
+  const onPanelKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!pauseMenu) return;
+    const result = pauseMenuPanelKeyUp(e.code, e.key, menuFreshKeys.current);
+    menuFreshKeys.current = result.freshKeys;
+    if (result.preventDefault) e.preventDefault();
+  };
+
   return (
     <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/70 px-4">
       <div
+        ref={panelRef}
+        data-pause-menu={pauseMenu ? "" : undefined}
+        tabIndex={pauseMenu ? -1 : undefined}
+        onKeyDown={pauseMenu ? onPanelKeyDown : undefined}
+        onKeyUp={pauseMenu ? onPanelKeyUp : undefined}
+        onBlur={pauseMenu ? () => { menuFreshKeys.current = emptyPauseMenuFreshKeys(); } : undefined}
         className={cn(
           "overlay-enter w-full max-w-sm p-6",
           chrome
@@ -73,7 +145,8 @@ export function Modal({
             <button
               key={a.label}
               type="button"
-              onMouseDown={keepPlayFocus}
+              data-pause-menu-btn={pauseMenu ? a.label : undefined}
+              onMouseDown={pauseMenu ? undefined : keepPlayFocus}
               onClick={a.onClick}
               className={cn(
                 "h-11 rounded-md text-sm font-medium transition-[transform,filter] duration-150 ease-out enabled:active:scale-[0.98]",

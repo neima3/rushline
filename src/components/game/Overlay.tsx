@@ -314,6 +314,14 @@ export function Overlay({ gameRef }: Props) {
           title="Paused"
           subtitle={getTrackDef(trackId).name}
           chrome
+          pauseMenu
+          onPauseMenuMount={(root) => {
+            g()?.setPauseMenuOpen(Boolean(root), root);
+          }}
+          onPauseMenuResume={() => {
+            g()?.uiClick();
+            g()?.resume();
+          }}
           extra={
             <p className="mt-3 text-xs leading-relaxed text-muted">
               {cupEvent
@@ -334,6 +342,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Photo",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.enterPhoto();
               },
             },
@@ -341,6 +350,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Help",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(false);
                 setHelpOpen(true);
               },
             },
@@ -348,6 +358,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Options",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(false);
                 setSettingsOpen(true);
               },
             },
@@ -355,6 +366,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Restart",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.restartRun();
               },
             },
@@ -362,6 +374,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Menu",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.menu();
               },
             },

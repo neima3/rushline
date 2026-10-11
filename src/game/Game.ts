@@ -762,7 +762,18 @@ export class Game {
     if (next === "race") this.raceClockAt = this.lastT;
     if (next === "countdown") this.countdownAt = countdownPausedAt(this.lastT, this.countdown);
     useGame.getState().setPhase(next);
+    this.input.setPauseMenuOpen(false);
+    this.input.flushAfterResume();
     this.capturePlayFocus();
+  }
+
+  setPauseMenuOpen(open: boolean, root?: HTMLElement | null) {
+    this.input.setPauseMenuOpen(open, root ?? null);
+  }
+
+  dismissPauseMenu(focusPlay = true) {
+    this.input.setPauseMenuOpen(false);
+    if (focusPlay) this.capturePlayFocus();
   }
 
   menu() {
@@ -779,6 +790,7 @@ export class Game {
     useGame.getState().setCupSession(null);
     useGame.getState().setPhase("menu");
     useGame.getState().setHud({ countdown: null });
+    this.capturePlayFocus();
   }
 
   private loop = (now: number) => {
@@ -1238,6 +1250,8 @@ export class Game {
     this.input.touchThrottle = 0;
     this.input.touchBrake = 0;
     this.input.touchSlide = 0;
+    this.input.setPauseMenuOpen(false);
+    this.capturePlayFocus();
   }
 
   exitPhoto() {
@@ -1544,7 +1558,7 @@ export class Game {
     );
   }
 
-  private handleMenuPad(actions: { confirm: boolean; back: boolean; menuY: number }) {
+  private handleMenuPad(actions: { confirm: boolean; back: boolean; menuY: number; pauseMenuConfirm: boolean }) {
     const y = Math.abs(actions.menuY) > 0.5 ? Math.sign(actions.menuY) : 0;
     const yEdge = y !== 0 && y !== this.menuYPrev;
     this.menuYPrev = y;
@@ -1616,7 +1630,7 @@ export class Game {
       return;
     }
     if (this.phase === "paused") {
-      if (actions.confirm) {
+      if (actions.pauseMenuConfirm) {
         this.audio.click();
         this.resume();
       } else if (actions.back) {
