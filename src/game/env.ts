@@ -31,9 +31,16 @@ export type EnvBuild = {
   textures: THREE.Texture[];
 };
 
-export function applyGroundMaterial(mesh: THREE.Mesh, theme: ThemeId, textures: THREE.Texture[], budget?: TextureBudget) {
+export type TextureSink = { push(tex: THREE.Texture): void };
+
+export function applyGroundMaterial(
+  mesh: THREE.Mesh,
+  theme: ThemeId,
+  sink: TextureSink,
+  budget?: TextureBudget,
+) {
   const tex = makeGroundTexture(theme, { size: budget?.size ?? 256, anisotropy: budget?.anisotropy ?? 8 });
-  textures.push(tex);
+  sink.push(tex);
   const mat = mesh.material as THREE.MeshStandardMaterial;
   mat.map = tex;
   mat.color.set(0xffffff);
