@@ -53,6 +53,12 @@ const RIDE = 0.38;
 const GRAVITY = 30;
 const FIXED = 1 / 60;
 const STICK_SPEED = 16;
+/** Post-CP replant gate — matches CarSim.respawn upright / sample reject test. */
+const REPLANT_SAMPLE_UY_MIN = 0.78;
+const REPLANT_REJECT_S_EPS = 0.12;
+const REPLANT_CP_WALK_STEP = 0.5;
+const REPLANT_CP_WALK_MAX = 40;
+
 const TURBO_MINI = 0.32;
 const TURBO_MID = 0.58;
 const TURBO_FULL = 0.92;
@@ -165,7 +171,7 @@ export class CarSim {
   respawn(track: BuiltTrack) {
     const preCp = this.lastCp < 0;
     const keptSpeed = respawnEntrySpeed(this.lastCp, this.cpCrossSpeed);
-    this.s = preCp ? AUTHOR_START_S : pickSafeRespawnS(track, this.lastCp, this.s);
+    this.s = preCp ? AUTHOR_START_S : this.pickPostCpFirstS(track);
     this.n = 0;
     this.heading = 0;
     this.speed = keptSpeed;
@@ -215,17 +221,23 @@ export class CarSim {
     const helixBad =
       track.def.id === "helix" && (planted.uy < 0.9 || helixRibbonOverhead(track, planted) || helixNearGate(track, planted.s));
     if (this.uy < 0.78 || this.airborne || helixBad) {
+      const rejectedS = this.s;
       if (helixBad && this.lastCp >= 0) {
         const cp = track.checkpoints[this.lastCp] ?? 24;
         this.s = pickHelixRespawnS(track, Math.max(24, cp - 18));
       } else {
-        this.s = pickSafeRespawnS(track, -1, this.s);
+        this.s = pickPostCpReplantFallbackS(track, this.lastCp, rejectedS);
       }
       this.airborne = false;
       this.place(track);
       this.flattenRespawn(track);
     }
     this.finishRespawnPace(keptSpeed);
+  }
+
+  /** First post-CP respawn pick; override in tests to force a bad placement. */
+  protected pickPostCpFirstS(track: BuiltTrack) {
+    return pickSafeRespawnS(track, this.lastCp, this.s);
   }
 
   /** After plant/flatten (6–10 clamp), restore TM CP-crossing pace for this respawn only. */
@@ -1127,6 +1139,71 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
     }
   }
   return sampleAt(track, 20).uy >= 0.85 ? 20 : origin;
+}
+
+function sampleIndexAt(track: BuiltTrack, s: number) {
+  const { samples, length, def } = track;
+  if (samples.length === 0) return 0;
+  let ss = s;
+  if (def.closed) ss = ((ss % length) + length) % length;
+  else ss = Math.max(0, Math.min(length, ss));
+  let lo = 0;
+  let hi = samples.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid]!.s < ss) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function postCpReplantSampleOk(track: BuiltTrack, s: number, lastCp: number, rejectedS: number) {
+  if (Math.abs(s - rejectedS) < REPLANT_REJECT_S_EPS) return false;
+  const sm = sampleAt(track, s);
+  if (sm.uy < REPLANT_SAMPLE_UY_MIN) return false;
+
+  if (track.def.id === "helix") {
+    if (sm.uy < 0.9 || helixRibbonOverhead(track, sm) || helixNearGate(track, sm.s)) return false;
+    const i = sampleIndexAt(track, s);
+    return helixIslandOk(track, sm, i);
+  }
+
+  const cp = track.checkpoints[lastCp] ?? 6;
+  const origin = Math.max(2, (cp ?? 6) + 2);
+  const originSm = sampleAt(track, origin);
+  const ox = originSm.tx;
+  const oz = originSm.tz;
+  if (sm.uy < 0.88 || sm.y < -3 || Math.abs(sm.ty) > 0.32) return false;
+  const samples = track.samples;
+  const i = sampleIndexAt(track, s);
+  const prev = samples[(i - 1 + samples.length) % samples.length]!;
+  const next = samples[(i + 1) % samples.length]!;
+  if (prev.uy < 0.7 || next.uy < 0.7) return false;
+  if (sampleNearInvert(samples, i)) return false;
+  if (sm.tx * ox + sm.tz * oz < 0.12) return false;
+  return true;
+}
+
+/** Walk from the last CP gate for a valid replant s distinct from the rejected pick. */
+function walkNearCpValidReplantS(track: BuiltTrack, lastCp: number, rejectedS: number) {
+  const cp = track.checkpoints[lastCp];
+  if (cp == null) return null;
+  for (let d = 0; d <= REPLANT_CP_WALK_MAX; d += REPLANT_CP_WALK_STEP) {
+    if (d > 0) {
+      const back = cp - d;
+      if (postCpReplantSampleOk(track, back, lastCp, rejectedS)) return back;
+    }
+    const fwd = cp + d;
+    if (postCpReplantSampleOk(track, fwd, lastCp, rejectedS)) return fwd;
+  }
+  return null;
+}
+
+/** Post-CP replant fallback: valid sample near CP, else pre-CP island search (-1). */
+export function pickPostCpReplantFallbackS(track: BuiltTrack, lastCp: number, rejectedS: number) {
+  const walked = walkNearCpValidReplantS(track, lastCp, rejectedS);
+  if (walked != null) return walked;
+  return pickSafeRespawnS(track, -1, rejectedS);
 }
 
 /** Pre-CP1 Circuit: stay on the outbound lane, past the start/finish seam. */
