@@ -1121,6 +1121,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
   chevron.setAttribute("position", new THREE.BufferAttribute(cv, 3));
   chevron.computeVertexNormals();
   const padGeo = new THREE.PlaneGeometry(1, 1);
+  const boostPads: { s: number; pad: THREE.Mesh; chevrons: THREE.Mesh[] }[] = [];
   for (const bs of track.boosts) {
     const sm = sampleAt(track, bs);
     const basis = new THREE.Matrix4().makeBasis(
@@ -1134,6 +1135,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     pad.quaternion.setFromRotationMatrix(basis);
     pad.renderOrder = 1;
     group.add(pad);
+    const chevrons: THREE.Mesh[] = [];
     for (let k = 0; k < 3; k++) {
       const mesh = new THREE.Mesh(chevron, boostMat);
       const along = (k - 1) * 1.15;
@@ -1145,7 +1147,9 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
       mesh.scale.set(sm.width * 0.22, 1.1, 1);
       mesh.quaternion.setFromRotationMatrix(basis);
       group.add(mesh);
+      chevrons.push(mesh);
     }
+    boostPads.push({ s: bs, pad, chevrons });
   }
 
   return {
@@ -1153,6 +1157,7 @@ export function buildTrackMeshes(track: BuiltTrack, theme: ThemeId, budget?: Tex
     materials: [...roadMats, curbMat, wallMat, markMat, railMat, postMat, boostMat, boostPadMat, gridMat],
     geos: [...roadGeos, curbGeo, wallGeo, markGeo, railGeo, postGeo, chevron, padGeo, grid.geometry as THREE.BufferGeometry],
     textures: [...roadTexs, checker],
+    boostPads,
   };
 }
 

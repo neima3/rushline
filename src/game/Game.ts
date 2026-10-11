@@ -1685,7 +1685,7 @@ export class Game {
     this.car.snap(this.curr);
     copySnap(this.prev, this.curr);
     this.acc = 0;
-    this.world.snapCamera(this.curr, this.camera);
+    this.world.snapCamera(this.curr, this.camera, true);
   }
 
   dispose() {
