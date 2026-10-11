@@ -128,12 +128,37 @@ function requestHostName(hostHeader) {
   return host;
 }
 
+/** Production Vercel aliases that serve this app (request-host fallback when `site.image` is baked). */
+export const OG_IMAGE_BAKED_REQUEST_HOST_ALLOWLIST = [
+  "rushline-racer.vercel.app",
+  "rushline.vercel.app",
+];
+
+/**
+ * Non-Vercel custom domains for the same fallback (none declared in vercel.json / README / env).
+ * Add hostnames here when the project gains a custom domain in Vercel.
+ */
+export const OG_IMAGE_BAKED_REQUEST_CUSTOM_DOMAINS = [];
+
+/** Git-branch and hash previews: rushline-racer-<slug>-neima-nakhaees-projects.vercel.app */
+export const OG_IMAGE_BAKED_VERCEL_PREVIEW_HOST =
+  /^rushline-racer-[a-z0-9-]+-neima-nakhaees-projects\.vercel\.app$/;
+
+/** Strict allowlist for request-host og:image when the build stamped `site.image`. */
+export function allowedBakedOgImageRequestHost(hostHeader) {
+  const host = requestHostName(hostHeader);
+  if (!host) return "";
+  if (OG_IMAGE_BAKED_REQUEST_HOST_ALLOWLIST.includes(host)) return host;
+  if (OG_IMAGE_BAKED_REQUEST_CUSTOM_DOMAINS.includes(host)) return host;
+  if (OG_IMAGE_BAKED_VERCEL_PREVIEW_HOST.test(host)) return host;
+  return "";
+}
+
 /**
  * Host for absolute og:image / twitter:image URLs. Prefers the published grok.me
  * host (runtime env, then build-time bake). Falls back to the request host for
  * normal domains. When the build stamped `site.image` from public/og.jpg, uses
- * the request host even on *.vercel.app so production previews get a card URL
- * without relying on serverless `process.env.VITE_PUBLIC_HOSTNAME`.
+ * an allowlisted request host (production / team preview Vercel URLs only).
  */
 export function resolveOgImagePublicHost(
   hostHeader,
@@ -143,9 +168,19 @@ export function resolveOgImagePublicHost(
   if (fromEnv) return fromEnv;
   const fromBake = publicAppHost(bakedPublicHostname);
   if (fromBake) return fromBake;
+
+  const hasBakedImage = Boolean(String(site.image ?? "").trim());
+  if (hasBakedImage) {
+    const fromRequest = publicAppHost(hostHeader);
+    if (fromRequest) {
+      if (fromRequest.endsWith(".grok.me")) return fromRequest;
+      if (OG_IMAGE_BAKED_REQUEST_CUSTOM_DOMAINS.includes(fromRequest)) return fromRequest;
+    }
+    return allowedBakedOgImageRequestHost(hostHeader);
+  }
+
   const fromRequest = publicAppHost(hostHeader);
   if (fromRequest) return fromRequest;
-  if (String(site.image ?? "").trim()) return requestHostName(hostHeader);
   return "";
 }
 
