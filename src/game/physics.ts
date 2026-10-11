@@ -36,6 +36,7 @@ import {
   steerSpeedScale,
   surfaceFeel,
 } from "./feel.ts";
+import { AUTHOR_START_S } from "./author-ghost.ts";
 import { respawnEntrySpeed, RESPAWN_SPEED_MAX, RESPAWN_SPEED_MIN } from "./run-flow.ts";
 
 const ACCEL = 28;
@@ -122,7 +123,7 @@ export class CarSim {
   private boostPunch = 0;
 
   reset(track: BuiltTrack) {
-    this.s = 6;
+    this.s = AUTHOR_START_S;
     this.n = 0;
     this.heading = 0;
     this.speed = 0;
@@ -162,8 +163,9 @@ export class CarSim {
   }
 
   respawn(track: BuiltTrack) {
+    const preCp = this.lastCp < 0;
     const keptSpeed = respawnEntrySpeed(this.lastCp, this.cpCrossSpeed);
-    this.s = pickSafeRespawnS(track, this.lastCp, this.s);
+    this.s = preCp ? AUTHOR_START_S : pickSafeRespawnS(track, this.lastCp, this.s);
     this.n = 0;
     this.heading = 0;
     this.speed = keptSpeed;
@@ -193,6 +195,19 @@ export class CarSim {
     this.recoverLock = 0.85;
     this.landLock = 0.2;
     this.place(track);
+    if (preCp) {
+      const planted = sampleAt(track, this.s);
+      const helixBad =
+        track.def.id === "helix" &&
+        (planted.uy < 0.9 || helixRibbonOverhead(track, planted) || helixNearGate(track, planted.s));
+      if (helixBad) {
+        this.s = pickHelixRespawnS(track, AUTHOR_START_S);
+        this.place(track);
+      }
+      this.speed = 0;
+      this.vx = this.vy = this.vz = 0;
+      return;
+    }
     this.flattenRespawn(track);
     // plantUpright always writes world-up, so test the SAMPLE — a ledge /
     // invert / loop-overhang island still needs a second pick.
@@ -215,6 +230,11 @@ export class CarSim {
 
   /** After plant/flatten (6–10 clamp), restore TM CP-crossing pace for this respawn only. */
   private finishRespawnPace(keptSpeed: number) {
+    if (keptSpeed <= 0) {
+      this.speed = 0;
+      this.vx = this.vy = this.vz = 0;
+      return;
+    }
     this.speed = Math.min(RESPAWN_SPEED_MAX, Math.max(RESPAWN_SPEED_MIN, keptSpeed));
     this.vx = this.fx * this.speed;
     this.vy = this.fy * this.speed;
@@ -1109,6 +1129,16 @@ function pickHelixRespawnS(track: BuiltTrack, origin: number) {
   return sampleAt(track, 20).uy >= 0.85 ? 20 : origin;
 }
 
+/** Pre-CP1 Circuit: stay on the outbound lane, past the start/finish seam. */
+function earlyCircuitOrigin(track: BuiltTrack, alongS: number) {
+  const L = track.length || 1;
+  const firstCp = track.checkpoints[0] ?? 80;
+  const raw = Number.isFinite(alongS) ? alongS : 6;
+  const wrapped = track.def.closed ? ((raw % L) + L) % L : Math.max(0, raw);
+  if (wrapped >= firstCp) return 14;
+  return Math.max(14, Math.min(wrapped, firstCp - 8));
+}
+
 function oppositeRibbonGap(samples: BuiltTrack["samples"], i: number) {
   const sm = samples[i]!;
   let best = 24;
@@ -1119,16 +1149,6 @@ function oppositeRibbonGap(samples: BuiltTrack["samples"], i: number) {
     if (d < best) best = d;
   }
   return best;
-}
-
-/** Pre-CP1 Circuit: stay on the outbound lane, past the start/finish seam. */
-function earlyCircuitOrigin(track: BuiltTrack, alongS: number) {
-  const L = track.length || 1;
-  const firstCp = track.checkpoints[0] ?? 80;
-  const raw = Number.isFinite(alongS) ? alongS : 6;
-  const wrapped = track.def.closed ? ((raw % L) + L) % L : Math.max(0, raw);
-  if (wrapped >= firstCp) return 14;
-  return Math.max(14, Math.min(wrapped, firstCp - 8));
 }
 
 export function pickSafeRespawnS(track: BuiltTrack, lastCp: number, alongS = 20) {
