@@ -37,6 +37,7 @@ import {
   TrackTextureRegistry,
   type TrackSceneCache,
 } from "./track-scene-cache";
+import { disposeTrackTexturesKeepingSky, swapSkyEnvRenderTarget } from "./sky-env-handoff";
 
 export type LoadTrackMode = "rebuilt" | "reused";
 
@@ -46,6 +47,10 @@ export const FAST_PATH_WORLD_RESETS = [
   "RaceVfx.resetRun — skid decals, gate flash emissive/rims, finish burst particles, boost pad scroll phase",
   "syncRunThemes — car, ghost, Vfx, RaceVfx theme materials (skid tint path)",
 ] as const;
+
+/** Same-track race restart: chase/countdown camera comes from Game, not buildTrackScene. */
+export const FAST_PATH_RACE_CAMERA =
+  "Game.load() and Game.startRace() call World.snapCamera (chaseSnapPlacement) after car.reset; buildTrackScene grid camera is overwritten on every race start.";
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -665,11 +670,6 @@ export class World {
     return rebuild ? "rebuilt" : "reused";
   }
 
-  private trackTextureSink(): THREE.Texture[] {
-    const reg = this.trackTextures;
-    return { push: (t: THREE.Texture) => reg.add(t) } as THREE.Texture[];
-  }
-
   private pushTrackTextures(list: THREE.Texture[]) {
     for (const t of list) this.trackTextures.add(t);
   }
@@ -682,15 +682,12 @@ export class World {
     this.nightLights = [];
     for (const d of this.trackDisposables) d.dispose();
     this.trackDisposables = [];
-    this.trackTextures.disposeTrackTextures();
+    disposeTrackTexturesKeepingSky(this.trackTextures, this.skyTex);
     if (this.sky) {
       this.scene.remove(this.sky.mesh);
       this.sky.dispose();
       this.sky = null;
     }
-    this.skyEnvRT?.dispose();
-    this.skyEnvRT = null;
-    this.skyTex = null;
     const groundMat = this.ground.material as THREE.MeshStandardMaterial;
     if (groundMat.map) {
       groundMat.map = null;
@@ -733,7 +730,7 @@ export class World {
                       ? -6
                       : -0.6;
     const budget = textureBudget(this.quality.tier);
-    applyGroundMaterial(this.ground, theme, this.trackTextureSink(), budget);
+    applyGroundMaterial(this.ground, theme, this.trackTextures, budget);
 
     const built = buildTrackMeshes(track, theme, budget);
     this.trackRoot.add(built.group);
@@ -841,12 +838,13 @@ export class World {
       this.sky.dispose();
       this.sky = null;
     }
-    this.skyTex = null;
     this.sky = new SkyDome(fog, tint);
     this.sky.setTheme(this.theme, THEMES[this.theme].sunPos);
     this.scene.add(this.sky.mesh);
     if (!url) {
       this.trackTextures.removeAndDispose(prevSkyTex);
+      this.skyTex = null;
+      this.releaseSkyEnvironmentMap();
       this.applyEnvironmentMap();
       return;
     }
@@ -869,6 +867,8 @@ export class World {
       () => {
         if (gen !== this.skyLoadGen) return;
         this.trackTextures.removeAndDispose(prevSkyTex);
+        this.skyTex = null;
+        this.releaseSkyEnvironmentMap();
         this.applyEnvironmentMap();
       },
     );
@@ -1331,17 +1331,32 @@ export class World {
   }
 
   private bakeSkyEnv(tex: THREE.Texture) {
-    if (!this.quality.environment) return;
+    if (!this.quality.environment) {
+      this.releaseSkyEnvironmentMap();
+      this.applyEnvironmentMap();
+      return;
+    }
     if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
     const prev = this.skyEnvRT;
     const rt = bakeSkyEnvironment(this.pmrem, tex);
     this.skyEnvRT = rt;
-    this.scene.environment = rt.texture;
-    prev?.dispose();
+    const swap = swapSkyEnvRenderTarget(this.scene.environment, prev, rt);
+    this.scene.environment = swap.sceneEnvironment;
+    swap.rtToDispose?.dispose();
+  }
+
+  private releaseSkyEnvironmentMap() {
+    const swap = swapSkyEnvRenderTarget(this.scene.environment, this.skyEnvRT, null);
+    this.scene.environment = swap.sceneEnvironment;
+    if (swap.rtToDispose) {
+      swap.rtToDispose.dispose();
+      this.skyEnvRT = null;
+    }
   }
 
   private applyEnvironmentMap() {
     if (!this.quality.environment) {
+      this.releaseSkyEnvironmentMap();
       this.scene.environment = null;
       return;
     }

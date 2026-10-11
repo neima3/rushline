@@ -39,6 +39,19 @@ describe("track scene cache", () => {
 });
 
 describe("TrackTextureRegistry", () => {
+  it("disposeTrackTexturesExcept keeps the sky JPG until loadSky replaces it", () => {
+    const reg = new TrackTextureRegistry();
+    let skyD = 0;
+    let groundD = 0;
+    const sky = { dispose: () => skyD++ } as unknown as import("three").Texture;
+    const ground = { dispose: () => groundD++ } as unknown as import("three").Texture;
+    reg.add(sky);
+    reg.add(ground);
+    assert.equal(reg.disposeTrackTexturesExcept(sky), 1);
+    assert.equal(skyD, 0);
+    assert.equal(groundD, 1);
+  });
+
   it("disposes track textures and keeps the live set flat across switches", () => {
     const reg = new TrackTextureRegistry();
     let disposeCount = 0;

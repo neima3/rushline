@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { FAST_PATH_WORLD_RESETS } from "./scene.ts";
+import { FAST_PATH_RACE_CAMERA, FAST_PATH_WORLD_RESETS } from "./scene.ts";
 import { getTrack } from "./track.ts";
 import { QUALITY_PRESETS } from "./quality.ts";
 import { shouldRebuildTrackScene, trackSceneVisualKey } from "./track-scene-cache.ts";
@@ -17,5 +17,10 @@ describe("same-track restart fast path", () => {
     assert.ok(FAST_PATH_WORLD_RESETS.length >= 3);
     assert.ok(FAST_PATH_WORLD_RESETS.some((l) => l.includes("RaceVfx.resetRun")));
     assert.ok(FAST_PATH_WORLD_RESETS.some((l) => l.includes("syncRunThemes")));
+  });
+
+  it("documents race camera parity: fast path uses Game snapCamera, not buildTrackScene grid pose", () => {
+    assert.ok(FAST_PATH_RACE_CAMERA.includes("snapCamera"));
+    assert.ok(FAST_PATH_RACE_CAMERA.includes("startRace"));
   });
 });

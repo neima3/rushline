@@ -39,13 +39,30 @@ export class TrackTextureRegistry {
     this.live.push(tex);
   }
 
+  push(tex: THREE.Texture) {
+    this.add(tex);
+  }
+
   disposeTrackTextures() {
+    this.disposeTrackTexturesExcept(null);
+  }
+
+  /** Disposes track-owned textures, optionally keeping the current sky JPG for loadSky handoff. */
+  disposeTrackTexturesExcept(keep: THREE.Texture | null): number {
+    let disposed = 0;
+    const remaining: THREE.Texture[] = [];
     for (const tex of this.track) {
+      if (keep && tex === keep) {
+        remaining.push(tex);
+        continue;
+      }
       tex.dispose();
+      disposed++;
       const idx = this.live.indexOf(tex);
       if (idx >= 0) this.live.splice(idx, 1);
     }
-    this.track = [];
+    this.track = remaining;
+    return disposed;
   }
 
   removeAndDispose(tex: THREE.Texture | null | undefined) {
