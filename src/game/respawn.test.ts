@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AUTHOR_START_S } from "./author-ghost.ts";
 import { getTrack, nearestSample, sampleAt } from "./track.ts";
-import { CarSim, helixNearGate, helixRibbonOverhead, pickSafeRespawnS } from "./physics.ts";
+import {
+  CarSim,
+  helixNearGate,
+  helixRibbonOverhead,
+  isForcePostCpReplantForTests,
+  peekPostCpFirstPickOverrideForTests,
+  pickPostCpReplantFallbackS,
+  pickSafeRespawnS,
+  setForcePostCpReplantForTests,
+  setPostCpFirstPickOverrideForTests,
+} from "./physics.ts";
 import { chaseSnapPlacement, clearChaseCamera } from "./scene.ts";
 import { TRACK_ORDER } from "./types.ts";
 
@@ -34,6 +44,22 @@ function leaveTrackAfterCp1() {
   car.py = -8;
   car.airborne = true;
   return { helix, car };
+}
+
+const REPLANT_REJECT_EPS = 0.12;
+const REPLANT_CP_MAX_DIST = 40;
+const GRID_START_MIN_DIST = 25;
+
+/** Bad along-s near CP1 where the walk fallback finds a different valid sample. */
+function forcedBadPostCpPick(track: ReturnType<typeof getTrack>, cp: number) {
+  for (let badS = cp - 8; badS <= cp + 12; badS += 0.25) {
+    const fallbackS = pickPostCpReplantFallbackS(track, 0, badS);
+    if (Math.abs(fallbackS - badS) < REPLANT_REJECT_EPS) continue;
+    if (Math.abs(fallbackS - cp) > REPLANT_CP_MAX_DIST) continue;
+    if (sampleAt(track, fallbackS).uy < 0.78) continue;
+    return badS;
+  }
+  return null;
 }
 
 function portraitChaseAboveRoad(car: CarSim, track: ReturnType<typeof getTrack>) {
@@ -75,38 +101,47 @@ describe("leave-track respawn", () => {
     }
   });
 
-  it("post-CP1 replant fallback searches near the last CP, not the start (-1 island)", () => {
-    const CP_NEAR = 30;
-    const START_NEAR = 25;
-    const fallbackHits: string[] = [];
+  it("post-CP1 CarSim replant fallback walks to a new upright sample near the last CP", () => {
+    const triggered: string[] = [];
 
     for (const id of TRACK_ORDER) {
       const track = getTrack(id);
       const lastCp = 0;
       const cp = track.checkpoints[lastCp];
       assert.ok(cp != null, `${id} missing CP1`);
-      let sawDivergence = false;
-      for (let badS = cp - 8; badS <= cp + 12; badS += 0.25) {
-        const startIsland = pickSafeRespawnS(track, -1, badS);
-        const nearCp = pickSafeRespawnS(track, lastCp, badS);
-        const oldNearStart = Math.abs(startIsland - AUTHOR_START_S) < START_NEAR;
-        const newNearCp = Math.abs(nearCp - cp) < CP_NEAR;
-        if (!oldNearStart || !newNearCp || Math.abs(startIsland - nearCp) < 40) continue;
-        sawDivergence = true;
-        fallbackHits.push(id);
-        assert.ok(
-          Math.abs(nearCp - cp) < CP_NEAR,
-          `${id} replant fallback s=${nearCp} must stay near cp=${cp} (bad along=${badS})`,
-        );
-        assert.ok(
-          Math.abs(nearCp - AUTHOR_START_S) > START_NEAR,
-          `${id} replant must not snap to grid start (got s=${nearCp})`,
-        );
-        break;
-      }
-      assert.ok(sawDivergence, `${id} expected a post-CP replant fallback case near CP1`);
+      const badS = forcedBadPostCpPick(track, cp);
+      assert.ok(badS != null, `${id} expected a constructible bad post-CP1 first pick`);
+
+      setForcePostCpReplantForTests(true);
+      setPostCpFirstPickOverrideForTests(badS);
+
+      const car = new CarSim();
+      car.reset(track);
+      car.lastCp = lastCp;
+      car.cpCrossSpeed = 18;
+      car.s = cp + 12;
+      car.n = 22;
+      car.py = -8;
+      car.airborne = true;
+      car.respawn(track);
+
+      assert.equal(isForcePostCpReplantForTests(), false, `${id} flag cleared`);
+      assert.equal(peekPostCpFirstPickOverrideForTests(), undefined, `${id} override consumed`);
+      assert.ok(Math.abs(car.s - badS) >= REPLANT_REJECT_EPS, `${id} must not keep rejected s=${badS}, got ${car.s}`);
+      assert.ok(Math.abs(car.s - cp) <= REPLANT_CP_MAX_DIST, `${id} s=${car.s} must stay near cp=${cp}`);
+      assert.ok(Math.abs(car.s - AUTHOR_START_S) > GRID_START_MIN_DIST, `${id} must not snap to grid start`);
+      const sm = sampleAt(track, car.s);
+      assert.ok(sm.uy >= 0.78, `${id} sample uy ${sm.uy} at s=${car.s}`);
+      assert.ok(car.uy >= 0.78, `${id} car uy ${car.uy}`);
+      assert.equal(car.airborne, false, `${id} must be planted after replant`);
+      triggered.push(id);
     }
-    assert.ok(fallbackHits.length === TRACK_ORDER.length, `tracks hitting fallback: ${fallbackHits.join(", ")}`);
+
+    assert.equal(
+      triggered.length,
+      TRACK_ORDER.length,
+      `tracks exercising replant fallback: ${triggered.join(", ")}`,
+    );
   });
 
   it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
