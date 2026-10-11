@@ -31,6 +31,21 @@ import { editorFlythroughPose } from "./editor";
 import { sampleGhost } from "./ghost";
 import { canvasToPngBlob, photoOrbitPose, type PhotoOrbit } from "./photo";
 import { bindContextLoss, clampDrawingPixelRatio, drawingPixelBudget, isGlContextLost, preferMsaa } from "./webgl";
+import {
+  shouldRebuildTrackScene,
+  trackSceneVisualKey,
+  TrackTextureRegistry,
+  type TrackSceneCache,
+} from "./track-scene-cache";
+
+export type LoadTrackMode = "rebuilt" | "reused";
+
+/** World-side resets on same-track restart (Game.startRace still resets car, timer, ghosts, replay). */
+export const FAST_PATH_WORLD_RESETS = [
+  "Vfx.resetSkids — wheel skid particle lines",
+  "RaceVfx.resetRun — skid decals, gate flash emissive/rims, finish burst particles, boost pad scroll phase",
+  "syncRunThemes — car, ghost, Vfx, RaceVfx theme materials (skid tint path)",
+] as const;
 
 const _up = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -322,7 +337,10 @@ export class World {
   private viewW = 800;
   private viewH = 600;
   private disposables: { dispose: () => void }[] = [];
-  private textures: THREE.Texture[] = [];
+  private trackDisposables: { dispose: () => void }[] = [];
+  private trackTextures = new TrackTextureRegistry();
+  private trackSceneCache: TrackSceneCache | null = null;
+  private skyLoadGen = 0;
   private camPos = new THREE.Vector3(0, 8, 16);
   private lookPos = new THREE.Vector3();
   private camFwd = new THREE.Vector3(0, 0, -1);
@@ -505,6 +523,10 @@ export class World {
     this.post.setGrade(this.theme);
     this.applyEnvironmentMap();
     if (this.builtTrack) this.applyThemeLights(this.theme);
+    const nextVisualKey = trackSceneVisualKey(this.quality);
+    if (this.trackSceneCache && this.trackSceneCache.visualKey !== nextVisualKey) {
+      this.trackSceneCache = null;
+    }
     const parent = this.renderer.domElement.parentElement || this.renderer.domElement;
     const r = parent.getBoundingClientRect();
     this.resize(Math.max(1, r.width), Math.max(1, r.height));
@@ -628,14 +650,57 @@ export class World {
     this.camera.updateProjectionMatrix();
   }
 
-  loadTrack(track: BuiltTrack, theme: ThemeId) {
-    this.builtTrack = track;
-    this.theme = theme;
+  loadTrack(track: BuiltTrack, theme: ThemeId, opts?: { forceRebuild?: boolean }): LoadTrackMode {
+    const visualKey = trackSceneVisualKey(this.quality);
+    const rebuild = shouldRebuildTrackScene(this.trackSceneCache, track, theme, visualKey, {
+      forceRebuild: opts?.forceRebuild,
+      sceneBuilt: this.trackRoot.children.length > 0,
+    });
+    if (rebuild) {
+      this.disposeTrackSceneAssets();
+      this.buildTrackScene(track, theme);
+      this.trackSceneCache = { track, theme, visualKey };
+    }
+    this.resetRunBoundState(track, theme);
+    return rebuild ? "rebuilt" : "reused";
+  }
+
+  private trackTextureSink(): THREE.Texture[] {
+    const reg = this.trackTextures;
+    return { push: (t: THREE.Texture) => reg.add(t) } as THREE.Texture[];
+  }
+
+  private pushTrackTextures(list: THREE.Texture[]) {
+    for (const t of list) this.trackTextures.add(t);
+  }
+
+  private disposeTrackSceneAssets() {
+    this.skyLoadGen++;
     this.clearGroup(this.trackRoot);
     this.clearGroup(this.envRoot);
     for (const o of this.nightLights) this.scene.remove(o);
     this.nightLights = [];
-    this.resetRunSkidMarks();
+    for (const d of this.trackDisposables) d.dispose();
+    this.trackDisposables = [];
+    this.trackTextures.disposeTrackTextures();
+    if (this.sky) {
+      this.scene.remove(this.sky.mesh);
+      this.sky.dispose();
+      this.sky = null;
+    }
+    this.skyEnvRT?.dispose();
+    this.skyEnvRT = null;
+    this.skyTex = null;
+    const groundMat = this.ground.material as THREE.MeshStandardMaterial;
+    if (groundMat.map) {
+      groundMat.map = null;
+      groundMat.needsUpdate = true;
+    }
+  }
+
+  private buildTrackScene(track: BuiltTrack, theme: ThemeId) {
+    this.builtTrack = track;
+    this.theme = theme;
     this.raceVfx.bindTrack(track, theme);
     this.raceVfx.setQuality(this.quality, this.knobs?.particleDensity);
 
@@ -668,7 +733,7 @@ export class World {
                       ? -6
                       : -0.6;
     const budget = textureBudget(this.quality.tier);
-    applyGroundMaterial(this.ground, theme, this.textures, budget);
+    applyGroundMaterial(this.ground, theme, this.trackTextureSink(), budget);
 
     const built = buildTrackMeshes(track, theme, budget);
     this.trackRoot.add(built.group);
@@ -677,24 +742,18 @@ export class World {
         this.raceVfx.registerBoostPad(bp.s, bp.pad, bp.chevrons);
       }
     }
-    this.disposables.push(...built.geos, ...built.materials);
+    this.trackDisposables.push(...built.geos, ...built.materials);
     if ("textures" in built && Array.isArray(built.textures)) {
-      this.textures.push(...(built.textures as THREE.Texture[]));
+      this.pushTrackTextures(built.textures as THREE.Texture[]);
     }
 
     this.addGates(track, theme);
     const env = buildEnvironment(track, theme);
     this.envRoot.add(env.group);
-    this.disposables.push(...env.geos, ...env.mats);
-    this.textures.push(...env.textures);
+    this.trackDisposables.push(...env.geos, ...env.mats);
+    this.pushTrackTextures(env.textures);
     this.nightLights = env.lights;
     this.applyThemeLights(theme);
-    this.car.setTheme(theme);
-    this.ghost.setTheme(theme);
-    this.car.setLivery(this.livery);
-    this.car.setHeadlights(theme === "night" || theme === "grove" || theme === "storm");
-    this.vfx.setTheme(theme);
-    this.raceVfx.setTheme(theme);
     this.loadSky(pack.sky, pack.fog, pack.skyTint);
 
     const start = sampleAt(track, 6);
@@ -708,10 +767,26 @@ export class World {
     this.camera.lookAt(this.lookPos);
   }
 
-  /** Clears tire-skid decals and skid particle lines (restart / respawn / track bind). */
+  private resetRunBoundState(track: BuiltTrack, theme: ThemeId) {
+    this.builtTrack = track;
+    this.theme = theme;
+    this.resetRunSkidMarks();
+    this.syncRunThemes(theme);
+  }
+
+  private syncRunThemes(theme: ThemeId) {
+    this.car.setTheme(theme);
+    this.ghost.setTheme(theme);
+    this.car.setLivery(this.livery);
+    this.car.setHeadlights(theme === "night" || theme === "grove" || theme === "storm");
+    this.vfx.setTheme(theme);
+    this.raceVfx.setTheme(theme);
+  }
+
+  /** Clears tire-skid decals and race VFX run state (restart / respawn / track bind). */
   resetRunSkidMarks() {
     this.vfx.resetSkids();
-    this.raceVfx.clearMarks();
+    this.raceVfx.resetRun();
   }
 
   snapCamera(snap: CarSnap, mode: CameraMode, resetSkidMarks = false) {
@@ -759,33 +834,41 @@ export class World {
   }
 
   private loadSky(url: string, fog: number, tint: number) {
+    const gen = ++this.skyLoadGen;
+    const prevSkyTex = this.skyTex;
     if (this.sky) {
       this.scene.remove(this.sky.mesh);
       this.sky.dispose();
       this.sky = null;
     }
-    this.skyEnvRT?.dispose();
-    this.skyEnvRT = null;
     this.skyTex = null;
     this.sky = new SkyDome(fog, tint);
     this.sky.setTheme(this.theme, THEMES[this.theme].sunPos);
     this.scene.add(this.sky.mesh);
     if (!url) {
+      this.trackTextures.removeAndDispose(prevSkyTex);
       this.applyEnvironmentMap();
       return;
     }
     this.loader.load(
       url,
       (tex) => {
+        if (gen !== this.skyLoadGen) {
+          tex.dispose();
+          return;
+        }
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = Math.min(6, this.quality.anisotropy);
+        this.trackTextures.removeAndDispose(prevSkyTex);
         this.skyTex = tex;
         this.sky?.setMap(tex);
-        this.textures.push(tex);
+        this.trackTextures.add(tex);
         this.bakeSkyEnv(tex);
       },
       undefined,
       () => {
+        if (gen !== this.skyLoadGen) return;
+        this.trackTextures.removeAndDispose(prevSkyTex);
         this.applyEnvironmentMap();
       },
     );
@@ -795,8 +878,8 @@ export class World {
     const add = (s: number, finish: boolean) => {
       const built = buildGate(sampleAt(track, s), theme, finish);
       this.trackRoot.add(built.group);
-      this.disposables.push(...built.mats);
-      this.textures.push(...built.textures);
+      this.trackDisposables.push(...built.mats);
+      this.pushTrackTextures(built.textures);
       this.raceVfx.registerGate(s, finish, built.group, built.mats);
     };
     // Spawn is s=6. The gantry sits ahead of the grid so chase cam reads
@@ -1173,7 +1256,7 @@ export class World {
 
   private applyTextureAnisotropy() {
     const aniso = this.quality.anisotropy;
-    for (const t of this.textures) {
+    for (const t of this.trackTextures.live) {
       if (t.anisotropy !== aniso) {
         t.anisotropy = aniso;
         t.needsUpdate = true;
@@ -1250,10 +1333,11 @@ export class World {
   private bakeSkyEnv(tex: THREE.Texture) {
     if (!this.quality.environment) return;
     if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    const prev = this.skyEnvRT;
     const rt = bakeSkyEnvironment(this.pmrem, tex);
-    this.skyEnvRT?.dispose();
     this.skyEnvRT = rt;
     this.scene.environment = rt.texture;
+    prev?.dispose();
   }
 
   private applyEnvironmentMap() {
@@ -1314,7 +1398,8 @@ export class World {
     this.pmrem?.dispose();
     this.renderer.dispose();
     for (const d of this.disposables) d.dispose();
-    for (const t of this.textures) t.dispose();
+    for (const d of this.trackDisposables) d.dispose();
+    for (const t of this.trackTextures.live) t.dispose();
     this.car.disposeMaps();
     this.ghost.disposeMaps();
     this.car.mats.forEach((m) => m.dispose());
