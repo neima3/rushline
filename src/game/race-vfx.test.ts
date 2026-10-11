@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import * as THREE from "three";
+import { GRADE } from "./presentation.ts";
+import { themeLightLevels } from "./quality.ts";
+import type { SurfaceKind, ThemeId } from "./types.ts";
 import {
   SKID_MAX_AGE as SKID_FADE_SECONDS,
   SKID_BLACK_POINT,
@@ -8,7 +11,6 @@ import {
   skidMarkColorLinear,
   skidMarkMode,
   SKID_ALPHA_ATTR,
-  RaceVfx,
   SKID_MAX_SEGMENT,
   SKID_MIN_SEGMENT,
   SKID_SEGMENT_OVERLAP,
@@ -20,6 +22,7 @@ import {
   createSkidDecalMaterial,
   gateFlashPulse,
   gateLookForTheme,
+  RaceVfx,
   raceVfxDensity,
   skidFadeAlpha,
   skidFadeTintColor,
@@ -27,9 +30,9 @@ import {
   skidSurfaceTint,
   SKID_MAX_AGE,
 } from "./race-vfx.ts";
-import { GATE_LOOK, GRADE } from "./presentation.ts";
-import { QUALITY_PRESETS, themeLightLevels } from "./quality.ts";
-import type { SurfaceKind, ThemeId } from "./types.ts";
+import { getTrack } from "./track.ts";
+import { QUALITY_PRESETS } from "./quality.ts";
+import { GATE_LOOK } from "./presentation.ts";
 
 describe("race vfx helpers", () => {
   it("wraps skid ring indices", () => {
@@ -118,87 +121,6 @@ describe("race vfx materials", () => {
   it("faded skid colour is white so premultiplied multiply leaves the road untouched", () => {
     assert.equal(skidFadeTintColor(0x202020, 0.7, 0), 0xffffff);
     assert.notEqual(skidFadeTintColor(0x202020, 0.7, 1), 0xffffff);
-  });
-});
-
-describe("skid segment length", () => {
-  it("30 m/s at 60 fps gives a ~0.55 m segment", () => {
-    const len = skidSegmentLength(
-      30 / 60,
-      SKID_MAX_SEGMENT,
-      SKID_MIN_SEGMENT,
-      SKID_SEGMENT_OVERLAP,
-    );
-    assert.ok(Math.abs(len - 0.55) < 1e-9, `len=${len}`);
-    assert.equal(skidShouldBridge(30 / 60, SKID_MAX_SEGMENT), true);
-  });
-
-  it("a gap over the cap gives the minimum stub and is not bridged", () => {
-    const gap = SKID_MAX_SEGMENT + 0.01;
-    assert.equal(
-      skidSegmentLength(gap, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
-      SKID_MIN_SEGMENT,
-    );
-    assert.equal(
-      skidSegmentLength(40, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
-      SKID_MIN_SEGMENT,
-    );
-    assert.equal(skidShouldBridge(gap, SKID_MAX_SEGMENT), false);
-    assert.equal(
-      skidSegmentLength(Number.NaN, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
-      SKID_MIN_SEGMENT,
-    );
-  });
-
-  it("never shorter than the stub and caps at max + overlap", () => {
-    assert.equal(
-      skidSegmentLength(0.01, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
-      SKID_MIN_SEGMENT,
-    );
-    assert.ok(
-      Math.abs(
-        skidSegmentLength(
-          SKID_MAX_SEGMENT,
-          SKID_MAX_SEGMENT,
-          SKID_MIN_SEGMENT,
-          SKID_SEGMENT_OVERLAP,
-        ) -
-          (SKID_MAX_SEGMENT + SKID_SEGMENT_OVERLAP),
-      ) < 1e-9,
-    );
-  });
-
-  it("decal world length equals the helper length (no double scale) and width is unchanged", () => {
-    const geo = createSkidDecalGeometry();
-    const m = new THREE.Matrix4();
-    const pos = geo.getAttribute("position");
-    const v = new THREE.Vector3();
-    const dir = new THREE.Vector3(3, 0, 4).normalize();
-    const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    for (const widthScale of [0.42, 0.6]) {
-      const len = skidSegmentLength(0.5, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP);
-      composeSkidDecalMatrix(m, 10, 2, -5, dir.x, dir.z, len, widthScale);
-      let minA = Infinity,
-        maxA = -Infinity,
-        minW = Infinity,
-        maxW = -Infinity;
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i)
-          .applyMatrix4(m)
-          .sub(new THREE.Vector3(10, 2, -5));
-        const a = v.dot(dir);
-        const w = v.dot(side);
-        minA = Math.min(minA, a);
-        maxA = Math.max(maxA, a);
-        minW = Math.min(minW, w);
-        maxW = Math.max(maxW, w);
-        assert.ok(Math.abs(v.y) < 1e-9);
-      }
-      assert.ok(Math.abs(maxA - minA - len) < 1e-6, `world length ${maxA - minA} vs ${len}`);
-      assert.ok(Math.abs(maxA + minA) < 1e-6, "centred on the midpoint");
-      assert.ok(Math.abs(maxW - minW - 0.52 * widthScale) < 1e-6, `width ${maxW - minW}`);
-    }
-    geo.dispose();
   });
 });
 
@@ -448,5 +370,136 @@ describe("skid mark visibility on screen (High)", () => {
     assert.equal((low as unknown as { skidMesh: THREE.InstancedMesh | null }).skidMesh, null, "Low has no skids");
     vfx.dispose();
     low.dispose();
+  });
+});
+
+describe("skid segment length", () => {
+  it("30 m/s at 60 fps gives a ~0.55 m segment", () => {
+    const len = skidSegmentLength(
+      30 / 60,
+      SKID_MAX_SEGMENT,
+      SKID_MIN_SEGMENT,
+      SKID_SEGMENT_OVERLAP,
+    );
+    assert.ok(Math.abs(len - 0.55) < 1e-9, `len=${len}`);
+    assert.equal(skidShouldBridge(30 / 60, SKID_MAX_SEGMENT), true);
+  });
+
+  it("a gap over the cap gives the minimum stub and is not bridged", () => {
+    const gap = SKID_MAX_SEGMENT + 0.01;
+    assert.equal(
+      skidSegmentLength(gap, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.equal(
+      skidSegmentLength(40, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.equal(skidShouldBridge(gap, SKID_MAX_SEGMENT), false);
+    assert.equal(
+      skidSegmentLength(Number.NaN, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+  });
+
+  it("never shorter than the stub and caps at max + overlap", () => {
+    assert.equal(
+      skidSegmentLength(0.01, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP),
+      SKID_MIN_SEGMENT,
+    );
+    assert.ok(
+      Math.abs(
+        skidSegmentLength(
+          SKID_MAX_SEGMENT,
+          SKID_MAX_SEGMENT,
+          SKID_MIN_SEGMENT,
+          SKID_SEGMENT_OVERLAP,
+        ) -
+          (SKID_MAX_SEGMENT + SKID_SEGMENT_OVERLAP),
+      ) < 1e-9,
+    );
+  });
+
+  it("decal world length equals the helper length (no double scale) and width is unchanged", () => {
+    const geo = createSkidDecalGeometry();
+    const m = new THREE.Matrix4();
+    const pos = geo.getAttribute("position");
+    const v = new THREE.Vector3();
+    const dir = new THREE.Vector3(3, 0, 4).normalize();
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    for (const widthScale of [0.42, 0.6]) {
+      const len = skidSegmentLength(0.5, SKID_MAX_SEGMENT, SKID_MIN_SEGMENT, SKID_SEGMENT_OVERLAP);
+      composeSkidDecalMatrix(m, 10, 2, -5, dir.x, dir.z, len, widthScale);
+      let minA = Infinity,
+        maxA = -Infinity,
+        minW = Infinity,
+        maxW = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i)
+          .applyMatrix4(m)
+          .sub(new THREE.Vector3(10, 2, -5));
+        const a = v.dot(dir);
+        const w = v.dot(side);
+        minA = Math.min(minA, a);
+        maxA = Math.max(maxA, a);
+        minW = Math.min(minW, w);
+        maxW = Math.max(maxW, w);
+        assert.ok(Math.abs(v.y) < 1e-9);
+      }
+      assert.ok(Math.abs(maxA - minA - len) < 1e-6, `world length ${maxA - minA} vs ${len}`);
+      assert.ok(Math.abs(maxA + minA) < 1e-6, "centred on the midpoint");
+      assert.ok(Math.abs(maxW - minW - 0.52 * widthScale) < 1e-6, `width ${maxW - minW}`);
+    }
+    geo.dispose();
+  });
+});
+
+describe("RaceVfx resetRun", () => {
+  it("clears gate flash, finish burst, and boost scroll without unregistering gates", () => {
+    const rv = new RaceVfx();
+    rv.setQuality(QUALITY_PRESETS.high, 1);
+    const track = getTrack("circuit");
+    rv.bindTrack(track, "stadium");
+    const cpLook = gateLookForTheme("stadium", false);
+    const cpMat = new THREE.MeshStandardMaterial({ emissive: new THREE.Color(cpLook.emissive) });
+    cpMat.emissiveIntensity = cpLook.emissiveBase;
+    const cpRim = new THREE.MeshBasicMaterial({ transparent: true, color: 0xffffff, opacity: 0.8 });
+    const finMat = new THREE.MeshStandardMaterial({
+      emissive: new THREE.Color(gateLookForTheme("stadium", true).emissive),
+    });
+    finMat.emissiveIntensity = gateLookForTheme("stadium", true).emissiveBase;
+    rv.registerGate(48, false, new THREE.Group(), [cpMat, cpRim]);
+    rv.registerGate(11.2, true, new THREE.Group(), [finMat]);
+
+    rv.onTimingGate(48, "cp");
+    rv.step(0.05);
+    assert.ok(cpMat.emissiveIntensity > cpLook.emissiveBase + 0.01, "gate mid-flash");
+
+    rv.onTimingGate(11.2, "finish");
+    const burstLife = (rv as unknown as { burstLife: Float32Array }).burstLife;
+    assert.ok([...burstLife].some((l) => l > 0), "finish burst spawned");
+
+    rv.resetRun();
+    assert.ok([...burstLife].every((l) => l <= 0), "finish burst cleared");
+    assert.equal(cpMat.emissiveIntensity, cpLook.emissiveBase);
+    assert.equal(cpRim.color.getHex(), 0xffffff);
+    assert.equal(cpRim.opacity, 0.8);
+
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    const chevron = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    rv.registerBoostPad(20, pad, [chevron]);
+    const boosts = (rv as unknown as { boosts: { scroll: number }[] }).boosts;
+    boosts[0]!.scroll = 2.75;
+    rv.resetRun();
+    assert.equal(boosts[0]!.scroll, 0);
+    rv.step(0.01);
+    rv.dispose();
+    cpMat.dispose();
+    cpRim.dispose();
+    finMat.dispose();
+    pad.geometry.dispose();
+    (pad.material as THREE.Material).dispose();
+    chevron.geometry.dispose();
+    (chevron.material as THREE.Material).dispose();
   });
 });
