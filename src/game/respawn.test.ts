@@ -60,13 +60,31 @@ describe("leave-track respawn", () => {
     assert.equal(invertedFlats, 0);
   });
 
-  it("pre-CP1 pickSafeRespawnS is always the grid start line", () => {
+  it("pre-CP1 CarSim.respawn always returns to the grid start line", () => {
     for (const id of TRACK_ORDER) {
       const track = getTrack(id);
-      const s = pickSafeRespawnS(track, -1, track.length * 0.4);
-      assert.equal(s, AUTHOR_START_S, `${id} pre-CP s`);
-      assert.ok(sampleAt(track, s).uy > 0.9, `${id} uy`);
+      const car = new CarSim();
+      car.reset(track);
+      car.lastCp = -1;
+      car.s = track.checkpoints[0]! * 0.35;
+      car.speed = 22;
+      car.respawn(track);
+      assert.equal(car.s, AUTHOR_START_S, `${id} pre-CP s`);
+      assert.equal(car.speed, 0, `${id} pre-CP speed`);
+      assert.ok(sampleAt(track, car.s).uy > 0.9, `${id} uy`);
     }
+  });
+
+  it("post-CP1 replant fallback still uses pickSafeRespawnS(-1) island search (main contract)", () => {
+    const circuit = getTrack("circuit");
+    const helix = getTrack("helix");
+    const nearStart = pickSafeRespawnS(circuit, -1, 8);
+    const midSector = pickSafeRespawnS(circuit, -1, 140);
+    const helixEarly = pickSafeRespawnS(helix, -1, 8);
+    assert.ok(nearStart >= 12 && nearStart < 50, `circuit fallback near s ${nearStart}`);
+    assert.ok(midSector > 120 && midSector < 160, `circuit fallback mid s ${midSector}`);
+    assert.ok(helixEarly >= 16, `helix fallback s ${helixEarly}`);
+    assert.notEqual(nearStart, AUTHOR_START_S, "fallback -1 is not the grid shortcut");
   });
 
   it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
@@ -111,7 +129,7 @@ describe("leave-track respawn", () => {
     const circuit = getTrack("circuit");
     const pre = pickSafeRespawnS(circuit, -1, 8);
     const post = pickSafeRespawnS(circuit, 0, circuit.checkpoints[0]! + 8);
-    assert.equal(pre, AUTHOR_START_S, `circuit pre-CP s ${pre}`);
+    assert.ok(pre >= 12 && pre < 50, `circuit fallback pre s ${pre}`);
     assert.ok(post > 160 && post < 180, `circuit post-CP1 s ${post}`);
     assert.ok(sampleAt(circuit, pre).uy > 0.9);
     assert.ok(sampleAt(circuit, post).uy > 0.9);
@@ -148,13 +166,9 @@ describe("leave-track respawn", () => {
 
   it("pre-CP1 R returns to the start grid from mid-sector, not a nearby island", () => {
     const circuit = getTrack("circuit");
-    const start = pickSafeRespawnS(circuit, -1, 8);
-    const startSm = sampleAt(circuit, start);
-    assert.equal(start, AUTHOR_START_S, `start s ${start}`);
-    assert.ok(Math.abs(startSm.x) < 0.45, `start x ${startSm.x}`);
-    assert.ok(startSm.tz < -0.9, `start tz ${startSm.tz}`);
-
-    assert.equal(pickSafeRespawnS(circuit, -1, 140), AUTHOR_START_S);
+    const gridSm = sampleAt(circuit, AUTHOR_START_S);
+    assert.ok(Math.abs(gridSm.x) < 0.45, `start x ${gridSm.x}`);
+    assert.ok(gridSm.tz < -0.9, `start tz ${gridSm.tz}`);
 
     const car = new CarSim();
     car.reset(circuit);
