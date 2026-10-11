@@ -219,7 +219,7 @@ export class CarSim {
         const cp = track.checkpoints[this.lastCp] ?? 24;
         this.s = pickHelixRespawnS(track, Math.max(24, cp - 18));
       } else {
-        this.s = pickSafeRespawnS(track, -1, this.s);
+        this.s = pickSafeRespawnS(track, this.lastCp, this.s);
       }
       this.airborne = false;
       this.place(track);

@@ -75,16 +75,38 @@ describe("leave-track respawn", () => {
     }
   });
 
-  it("post-CP1 replant fallback still uses pickSafeRespawnS(-1) island search (main contract)", () => {
-    const circuit = getTrack("circuit");
-    const helix = getTrack("helix");
-    const nearStart = pickSafeRespawnS(circuit, -1, 8);
-    const midSector = pickSafeRespawnS(circuit, -1, 140);
-    const helixEarly = pickSafeRespawnS(helix, -1, 8);
-    assert.ok(nearStart >= 12 && nearStart < 50, `circuit fallback near s ${nearStart}`);
-    assert.ok(midSector > 120 && midSector < 160, `circuit fallback mid s ${midSector}`);
-    assert.ok(helixEarly >= 16, `helix fallback s ${helixEarly}`);
-    assert.notEqual(nearStart, AUTHOR_START_S, "fallback -1 is not the grid shortcut");
+  it("post-CP1 replant fallback searches near the last CP, not the start (-1 island)", () => {
+    const CP_NEAR = 30;
+    const START_NEAR = 25;
+    const fallbackHits: string[] = [];
+
+    for (const id of TRACK_ORDER) {
+      const track = getTrack(id);
+      const lastCp = 0;
+      const cp = track.checkpoints[lastCp];
+      assert.ok(cp != null, `${id} missing CP1`);
+      let sawDivergence = false;
+      for (let badS = cp - 8; badS <= cp + 12; badS += 0.25) {
+        const startIsland = pickSafeRespawnS(track, -1, badS);
+        const nearCp = pickSafeRespawnS(track, lastCp, badS);
+        const oldNearStart = Math.abs(startIsland - AUTHOR_START_S) < START_NEAR;
+        const newNearCp = Math.abs(nearCp - cp) < CP_NEAR;
+        if (!oldNearStart || !newNearCp || Math.abs(startIsland - nearCp) < 40) continue;
+        sawDivergence = true;
+        fallbackHits.push(id);
+        assert.ok(
+          Math.abs(nearCp - cp) < CP_NEAR,
+          `${id} replant fallback s=${nearCp} must stay near cp=${cp} (bad along=${badS})`,
+        );
+        assert.ok(
+          Math.abs(nearCp - AUTHOR_START_S) > START_NEAR,
+          `${id} replant must not snap to grid start (got s=${nearCp})`,
+        );
+        break;
+      }
+      assert.ok(sawDivergence, `${id} expected a post-CP replant fallback case near CP1`);
+    }
+    assert.ok(fallbackHits.length === TRACK_ORDER.length, `tracks hitting fallback: ${fallbackHits.join(", ")}`);
   });
 
   it("parks Helix post-CP1 R on the post-loop island, not the CP arch", () => {
