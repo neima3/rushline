@@ -771,6 +771,11 @@ export class Game {
     this.input.setPauseMenuOpen(open, root ?? null);
   }
 
+  dismissPauseMenu(focusPlay = true) {
+    this.input.setPauseMenuOpen(false);
+    if (focusPlay) this.capturePlayFocus();
+  }
+
   menu() {
     this.clearPhoto();
     this.clearReplay();
@@ -785,6 +790,7 @@ export class Game {
     useGame.getState().setCupSession(null);
     useGame.getState().setPhase("menu");
     useGame.getState().setHud({ countdown: null });
+    this.capturePlayFocus();
   }
 
   private loop = (now: number) => {
@@ -1244,6 +1250,8 @@ export class Game {
     this.input.touchThrottle = 0;
     this.input.touchBrake = 0;
     this.input.touchSlide = 0;
+    this.input.setPauseMenuOpen(false);
+    this.capturePlayFocus();
   }
 
   exitPhoto() {

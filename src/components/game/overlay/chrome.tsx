@@ -75,11 +75,6 @@ export function Modal({
 
   const onPanelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!pauseMenu || !onPauseMenuResume) return;
-    if (e.code === "Escape" || e.key === "Escape") {
-      e.preventDefault();
-      onPauseMenuResume();
-      return;
-    }
     const root = panelRef.current;
     const action = pauseMenuKeyAction(e.code, e.key, document.activeElement, root);
     if (action === "ignore") return;

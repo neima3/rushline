@@ -342,6 +342,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Photo",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.enterPhoto();
               },
             },
@@ -349,6 +350,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Help",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(false);
                 setHelpOpen(true);
               },
             },
@@ -356,6 +358,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Options",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(false);
                 setSettingsOpen(true);
               },
             },
@@ -363,6 +366,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Restart",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.restartRun();
               },
             },
@@ -370,6 +374,7 @@ export function Overlay({ gameRef }: Props) {
               label: "Menu",
               onClick: () => {
                 g()?.uiClick();
+                g()?.dismissPauseMenu(true);
                 g()?.menu();
               },
             },

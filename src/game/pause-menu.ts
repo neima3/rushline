@@ -44,3 +44,25 @@ export function shouldBypassGameKeyCapture(code: string, target: EventTarget | n
   if (!menuRoot.contains(target as Node)) return false;
   return code === "Enter" || code === "Space";
 }
+
+/** Models Game Esc: synchronous hotkey resume, then loop pause edge (keyboard Esc sets edge consumed). */
+export function resumeCallsFromEscWhilePaused(input: {
+  hotkeyResumed: boolean;
+  pauseActionFromSample: boolean;
+}): { phase: "paused" | "race"; resumeCalls: number } {
+  let phase: "paused" | "race" = "paused";
+  let resumeCalls = 0;
+  const resume = () => {
+    if (phase !== "paused") return;
+    phase = "race";
+    resumeCalls++;
+  };
+  if (input.hotkeyResumed) resume();
+  if (input.pauseActionFromSample && phase === "paused") resume();
+  return { phase, resumeCalls };
+}
+
+/** Pause menu actions that leave driving need canvas focus; sub-panels keep overlay focus. */
+export function shouldCapturePlayFocusAfterPauseMenuAction(label: string): boolean {
+  return label !== "Options" && label !== "Help";
+}

@@ -168,7 +168,13 @@ export class Input {
   setPauseMenuOpen(open: boolean, root?: HTMLElement | null) {
     this.pauseMenuOpen = open;
     this.pauseMenuRoot = open ? (root ?? this.pauseMenuRoot) : null;
-    if (!open) this.edgePrev.spaceMenu = false;
+    if (open) {
+      const gp = pollPads();
+      this.edgePrev.confirm = this.down("Enter") || Boolean(gp?.a);
+      this.edgePrev.spaceMenu = this.down("Space");
+    } else {
+      this.edgePrev.spaceMenu = false;
+    }
   }
 
   /** Drop resume-key latch so Space / Enter cannot leak into the next race frame. */

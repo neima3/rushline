@@ -148,6 +148,31 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("held Space through pause menu open does not edge-resume until released and pressed again", () => {
+    const input = new Input();
+    input.setKeys(["Space"]);
+    input.sample();
+    input.setPauseMenuOpen(true, null);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.setKeys([]);
+    input.sample();
+    input.setKeys(["Space"]);
+    const fresh = input.sample();
+    assert.equal(fresh.pauseMenuConfirm, true);
+    input.detach();
+  });
+
+  it("seeds Enter confirm edge when the pause menu opens", () => {
+    const input = new Input();
+    input.setKeys(["Enter"]);
+    input.sample();
+    input.setPauseMenuOpen(true, null);
+    const held = input.sample();
+    assert.equal(held.pauseMenuConfirm, false);
+    input.detach();
+  });
+
   it("edges Space as pause menu confirm while the overlay is open", () => {
     const input = new Input();
     input.setPauseMenuOpen(true);

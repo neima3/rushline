@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   isResumeKey,
   pauseMenuKeyAction,
+  resumeCallsFromEscWhilePaused,
   shouldBypassGameKeyCapture,
+  shouldCapturePlayFocusAfterPauseMenuAction,
 } from "./pause-menu.ts";
 
 function menuButton(label: string) {
@@ -49,6 +51,29 @@ describe("pauseMenuKeyAction", () => {
   it("resumes when focus is on the card but not a button", () => {
     const root = menuRoot();
     assert.equal(pauseMenuKeyAction("Enter", "Enter", root, root), "resume");
+  });
+});
+
+describe("resumeCallsFromEscWhilePaused", () => {
+  it("one Esc press resumes once when the hotkey consumes the pause edge", () => {
+    const out = resumeCallsFromEscWhilePaused({ hotkeyResumed: true, pauseActionFromSample: false });
+    assert.equal(out.resumeCalls, 1);
+    assert.equal(out.phase, "race");
+  });
+
+  it("does not resume twice when hotkey and loop pause edge both fire", () => {
+    const buggy = resumeCallsFromEscWhilePaused({ hotkeyResumed: true, pauseActionFromSample: true });
+    assert.equal(buggy.resumeCalls, 1);
+    assert.equal(buggy.phase, "race");
+  });
+});
+
+describe("shouldCapturePlayFocusAfterPauseMenuAction", () => {
+  it("returns focus to the play surface for driving actions but not sub-panels", () => {
+    assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Restart"), true);
+    assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Menu"), true);
+    assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Options"), false);
+    assert.equal(shouldCapturePlayFocusAfterPauseMenuAction("Help"), false);
   });
 });
 
