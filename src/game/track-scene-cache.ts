@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import type { BuiltTrack, ThemeId } from "./types.ts";
+import type { BuiltTrack, ThemeId, TrackId } from "./types.ts";
 import { textureBudget, type QualityProfile } from "./quality.ts";
 
 /** Canvas texture budget key — rebuild track meshes when this changes. */
@@ -8,8 +8,14 @@ export function trackSceneVisualKey(quality: QualityProfile): string {
   return `${quality.tier}:${budget.size}:${budget.roughnessMap ? 1 : 0}:${budget.anisotropy}`;
 }
 
+/** Compiled ribbon identity — shared by lap clones (`withRaceLaps` shallow-spreads samples). */
+export function trackSceneGeometryRef(track: BuiltTrack): BuiltTrack["samples"] {
+  return track.samples;
+}
+
 export type TrackSceneCache = {
-  track: BuiltTrack;
+  trackId: TrackId;
+  geometry: BuiltTrack["samples"];
   theme: ThemeId;
   visualKey: string;
 };
@@ -23,10 +29,38 @@ export function shouldRebuildTrackScene(
 ): boolean {
   if (opts?.forceRebuild) return true;
   if (!cache || !opts?.sceneBuilt) return true;
-  if (cache.track !== track) return true;
+  if (cache.trackId !== track.def.id) return true;
+  if (cache.geometry !== trackSceneGeometryRef(track)) return true;
   if (cache.theme !== theme) return true;
   if (cache.visualKey !== visualKey) return true;
   return false;
+}
+
+/** loadTrack cache decision — used by World.loadTrack and restart tests. */
+export function advanceTrackSceneCache(
+  cache: TrackSceneCache | null,
+  track: BuiltTrack,
+  theme: ThemeId,
+  visualKey: string,
+  sceneBuilt: boolean,
+  opts?: { forceRebuild?: boolean },
+): { cache: TrackSceneCache; mode: "rebuilt" | "reused" } {
+  const rebuild = shouldRebuildTrackScene(cache, track, theme, visualKey, {
+    forceRebuild: opts?.forceRebuild,
+    sceneBuilt,
+  });
+  if (rebuild) {
+    return {
+      cache: {
+        trackId: track.def.id,
+        geometry: trackSceneGeometryRef(track),
+        theme,
+        visualKey,
+      },
+      mode: "rebuilt",
+    };
+  }
+  return { cache: cache!, mode: "reused" };
 }
 
 /** Tracks canvas textures for the current track load; flat count across switches. */

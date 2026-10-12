@@ -260,6 +260,30 @@ describe("keyboard stays live with a resting pad", () => {
     input.detach();
   });
 
+  it("latches a single-frame Enter on the results screen exactly once", () => {
+    const input = new Input();
+    input.setResultsScreenOpen(true);
+    input.applyGameKeyDown("Enter");
+    input.applyGameKeyUp("Enter");
+    const tap = input.sample();
+    assert.equal(tap.confirm, true);
+    const again = input.sample();
+    assert.equal(again.confirm, false);
+    input.detach();
+  });
+
+  it("ignores OS Enter repeat on the results screen", () => {
+    const input = new Input();
+    input.setResultsScreenOpen(true);
+    input.applyGameKeyDown("Enter");
+    const first = input.sample();
+    assert.equal(first.confirm, true);
+    input.applyGameKeyDown("Enter", true);
+    const repeat = input.sample();
+    assert.equal(repeat.confirm, false);
+    input.detach();
+  });
+
   it("notifies hot-plug on connect", () => {
     let connected = false;
     setPadPoller(() => axes({ throttle: 0.2 }));
