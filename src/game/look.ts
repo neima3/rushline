@@ -185,13 +185,17 @@ export function bannerDarkLook(theme: ThemeId, accent: number): BannerDarkLook {
  *  barrier slate so the plate and its white pin both read. Red Mesa (0x1c140c)
  *  and Storm Dock (0x111318) plates also rendered solid black on day roads, so
  *  mesa uses a dark sandstone under its gold pin and storm a dock slate under
- *  its white pin. The plate is unlit (MeshBasic), so this colour is what shows. */
+ *  its white pin. Green Circuit's 0x111318 graded to pure 0,0,0 at CP1, so
+ *  stadium uses a slate from the #76 banner family (a touch lighter than the
+ *  banner's 0x363c46 since the plate has no emissive). The plate is unlit
+ *  (MeshBasic), so this colour is what shows. */
 export function gatePlateColor(theme: ThemeId): number {
   if (theme === "night") return 0x0c1020;
   if (theme === "works") return 0x161210;
   if (theme === "grove") return 0x0c1410;
   if (theme === "mesa") return 0x5a4632;
   if (theme === "storm") return 0x3e4a56;
+  if (theme === "stadium") return 0x4a5260;
   if (theme === "alpine") return 0x4a5868;
   return 0x111318;
 }

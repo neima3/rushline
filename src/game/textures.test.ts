@@ -298,9 +298,17 @@ describe("near-black art surfaces (Green CP1 banner, White Pass gate plate)", ()
     assert.equal(gatePlateColor("storm"), 0x3e4a56);
   });
 
+  it("Green Circuit CP plate is a slate from the #76 banner family, under its white pin", () => {
+    const plate = gatePlateColor("stadium");
+    assert.equal(plate, 0x4a5260);
+    assert.ok(lum(plate) > lum(bannerDarkLook("stadium", 0xef5a24).color), "plate must not be darker than the banner slate");
+    assert.ok(lum(plate) < lum(0xf4f4f2) * 0.45, "white pin must still read on the plate");
+    const r = (plate >> 16) & 255, g = (plate >> 8) & 255, b = plate & 255;
+    assert.ok(b > r && b - r <= 32, "cool slate, not a colour");
+  });
+
   it("other themes keep their CP plate colour", () => {
     const expected = {
-      stadium: 0x111318,
       canyon: 0x111318,
       night: 0x0c1020,
       works: 0x161210,

@@ -35,7 +35,7 @@ describe("CP gate plate", () => {
 
   it("every theme's plate is double-sided with its pinned colour", () => {
     const expected: Record<ThemeId, number> = {
-      stadium: 0x111318,
+      stadium: 0x4a5260,
       canyon: 0x111318,
       night: 0x0c1020,
       alpine: 0x4a5868,
@@ -52,8 +52,8 @@ describe("CP gate plate", () => {
     }
   });
 
-  it("Red Mesa and Storm Dock plates are double-sided and not near-black", () => {
-    for (const theme of ["mesa", "storm"] as const) {
+  it("Green Circuit, Red Mesa and Storm Dock plates are double-sided and not near-black", () => {
+    for (const theme of ["stadium", "mesa", "storm"] as const) {
       const { mat } = cpPlate(theme);
       assert.equal(mat.side, THREE.DoubleSide, theme);
       const c = mat.color;
