@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ASPHALT_BASE,
+  bannerDarkLook,
+  gatePlateColor,
   contrastBarrierDarkLook,
   presentMaps,
   curbBlockHigh,
@@ -240,6 +242,65 @@ describe("contrast barrier dark panel", () => {
       assert.equal(look.color, 0x14161c);
       assert.equal(look.metalness, 0.2);
       assert.equal(look.emissiveIntensity, 0.14);
+    }
+  });
+});
+
+describe("near-black art surfaces (Green CP1 banner, White Pass gate plate)", () => {
+  const lum = (hex: number) =>
+    (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
+  const others = ["canyon", "night", "works", "mesa", "grove", "ember", "storm"] as const;
+
+  it("Green Circuit dark banner is self-lit warm slate, still darker than the light board", () => {
+    const look = bannerDarkLook("stadium", 0xef5a24);
+    assert.ok(lum(look.color) > 0.15, `banner albedo luminance ${lum(look.color)}`);
+    assert.ok(lum(look.color) < lum(0xf4f4f2) * 0.4, "two-tone sponsor look must stay");
+    // Muted orange accent: the glow leans warm (R > G, R > B) but stays a grey, not orange/red.
+    const r = (look.emissive >> 16) & 255;
+    const g = (look.emissive >> 8) & 255;
+    const b = look.emissive & 255;
+    assert.ok(r > g && r > b, `emissive ${look.emissive.toString(16)} should carry the orange accent`);
+    assert.ok(r - Math.min(g, b) <= 24, `emissive ${look.emissive.toString(16)} must stay greyish`);
+    // The road-facing face is lit by its own glow: linear self-lit luminance must
+    // clear the near-black floor (#76 at 0x363c46@0.3 was ~0.013 -> ~4,8,17 on screen)
+    // yet stay far under the High bloom threshold.
+    const lin = (c: number) => {
+      const x = c / 255;
+      return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    const selfLit =
+      (0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)) * look.emissiveIntensity;
+    assert.ok(selfLit > 0.04, `self-lit luminance ${selfLit}`);
+    assert.ok(selfLit < 0.15, `self-lit luminance ${selfLit} must not bloom`);
+  });
+
+  it("other themes keep the original dark banner", () => {
+    for (const theme of [...others, "alpine"] as const) {
+      assert.deepEqual(bannerDarkLook(theme, 0xc4a574), {
+        color: 0x111318,
+        emissive: 0xc4a574,
+        emissiveIntensity: 0.18,
+      });
+    }
+  });
+
+  it("White Pass CP plate is lifted off black", () => {
+    assert.ok(lum(gatePlateColor("alpine")) > 0.25, `plate luminance ${lum(gatePlateColor("alpine"))}`);
+  });
+
+  it("other themes keep their CP plate colour", () => {
+    const expected = {
+      stadium: 0x111318,
+      canyon: 0x111318,
+      night: 0x0c1020,
+      works: 0x161210,
+      mesa: 0x1c140c,
+      grove: 0x0c1410,
+      ember: 0x111318,
+      storm: 0x111318,
+    } as const;
+    for (const [theme, hex] of Object.entries(expected)) {
+      assert.equal(gatePlateColor(theme as keyof typeof expected), hex, theme);
     }
   });
 });

@@ -164,6 +164,34 @@ export function contrastBarrierDarkLook(theme: ThemeId): ContrastPanelLook {
   };
 }
 
+/** Roadside sponsor banner dark board. Stadium's old 0x111318 + 0xef5a24@0.18
+ *  emissive graded to a flat dark red (~86,0,0), and a slate-only 0.3 glow left
+ *  the road-facing (unlit) face near-black. The board is lit almost entirely by
+ *  its own emissive from the road, so Green Circuit uses a warm slate glow (the
+ *  slate tinted with a muted share of the orange accent) strong enough to read
+ *  as dark grey (~54,48,50 at High) while staying far below the bloom threshold
+ *  and clearly darker than the 0xf4f4f2 light board. */
+export type BannerDarkLook = { color: number; emissive: number; emissiveIntensity: number };
+
+export function bannerDarkLook(theme: ThemeId, accent: number): BannerDarkLook {
+  if (theme === "stadium") {
+    return { color: 0x363c46, emissive: 0x524a48, emissiveIntensity: 0.8 };
+  }
+  return { color: 0x111318, emissive: accent, emissiveIntensity: 0.18 };
+}
+
+/** CP arch plate (1.45×0.42 MeshBasic panel under the top bar). White Pass got
+ *  0x111318, which reads as RGB ~3,4,6 against snow; alpine now uses the #70
+ *  barrier slate so the plate and its white pin both read. */
+export function gatePlateColor(theme: ThemeId): number {
+  if (theme === "night") return 0x0c1020;
+  if (theme === "works") return 0x161210;
+  if (theme === "grove") return 0x0c1410;
+  if (theme === "mesa") return 0x1c140c;
+  if (theme === "alpine") return 0x4a5868;
+  return 0x111318;
+}
+
 export function surfaceSpec(theme: ThemeId, surface: SurfaceKind): SurfaceSpec {
   if (surface === "dirt") {
     return {

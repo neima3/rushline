@@ -2,7 +2,8 @@ import * as THREE from "three";
 import type { BuiltTrack, ThemeId } from "./types";
 import { sampleAt } from "./track";
 import { makeGroundTexture } from "./textures";
-import { contrastBarrierDarkLook, terrainGroundFill } from "./look";
+import { bannerDarkLook, contrastBarrierDarkLook, terrainGroundFill } from "./look";
+import type { BannerDarkLook } from "./look";
 import type { TextureBudget } from "./quality";
 import { gondolaCableTs, gondolaPosition, horizontalCableLayout } from "./alpine-gantry";
 
@@ -226,7 +227,7 @@ function buildStadium(
   mats.push(poleMat, lampMat);
 
   addTrees(group, geos, mats, 36, ring + 8, ring + 70, 0x3f6b38);
-  addBanners(track, group, geos, mats, 0xf4f4f2, 0x111318, 0xef5a24);
+  addBanners(track, group, geos, mats, 0xf4f4f2, bannerDarkLook("stadium", 0xef5a24), 0xef5a24);
   addNearStands(track, group, geos, mats);
 }
 
@@ -1344,7 +1345,7 @@ function addBanners(
   geos: THREE.BufferGeometry[],
   mats: THREE.Material[],
   a: number,
-  b: number,
+  dark: BannerDarkLook,
   accent = 0xc4a574,
 ) {
   const geo = new THREE.PlaneGeometry(4.8, 1.25);
@@ -1357,11 +1358,11 @@ function addBanners(
     emissiveIntensity: 0.08,
   });
   const mat2 = new THREE.MeshStandardMaterial({
-    color: b,
+    color: dark.color,
     roughness: 0.42,
     side: THREE.DoubleSide,
-    emissive: accent,
-    emissiveIntensity: 0.18,
+    emissive: dark.emissive,
+    emissiveIntensity: dark.emissiveIntensity,
   });
   const edgeGeo = new THREE.BoxGeometry(4.9, 0.06, 0.06);
   const edgeMat = new THREE.MeshStandardMaterial({
