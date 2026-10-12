@@ -29,7 +29,7 @@ import {
 import { resolveRaceLaps, withRaceLaps } from "./laps";
 import { getTrack, invalidateCustomTrack, medalFor, medalPace, sampleAt, validateCustomBuild } from "./track";
 import { raceValidated } from "./validate";
-import { cpPbSplitMs, livePbSplitMs } from "./run-flow";
+import { countdownPhysicsDrive, cpPbSplitMs, livePbSplitMs } from "./run-flow";
 import { playtestMark } from "./playtest";
 import { touchRespawnSuppressed } from "./touch-respawn-gesture";
 import {
@@ -902,11 +902,12 @@ export class Game {
     }
 
     if (simulate) {
+      const simActions = countdownPhysicsDrive(this.phase, actions);
       this.acc = Math.min(this.acc + dt, MAX_PHYS_STEPS * FIXED_DT);
       let steps = 0;
       while (this.acc >= FIXED_DT && steps < MAX_PHYS_STEPS) {
         this.car.snap(this.prev);
-        this.car.step(this.track, actions, FIXED_DT);
+        this.car.step(this.track, simActions, FIXED_DT);
         this.car.speed = clampTouchSpeed(this.car.speed, this.input.touchMode);
         if (this.car.justBoost) {
           this.audio.boost();

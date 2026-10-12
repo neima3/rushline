@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  countdownPhysicsDrive,
   cpPbSplitMs,
   livePbSplitMs,
   respawnEntrySpeed,
@@ -43,6 +44,16 @@ describe("cpPbSplitMs", () => {
 
   it("returns null without a PB tape", () => {
     assert.equal(cpPbSplitMs(1000, null, 10, 200, true), null);
+  });
+});
+
+describe("countdownPhysicsDrive", () => {
+  it("zeros throttle and brake during countdown", () => {
+    const drive = countdownPhysicsDrive("countdown", { ...cruise, brake: 0.5 });
+    assert.equal(drive.throttle, 0);
+    assert.equal(drive.brake, 0);
+    const race = countdownPhysicsDrive("race", cruise);
+    assert.equal(race.throttle, 1);
   });
 });
 

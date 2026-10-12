@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
+import { RESTART_HOLD_MS } from "./camera.ts";
 import { setPadPoller, type PadAxes } from "./gamepad.ts";
 import { Input } from "./input.ts";
 
@@ -245,6 +246,116 @@ describe("keyboard stays live with a resting pad", () => {
     const held = input.sample();
     assert.equal(held.respawn, false);
     assert.equal(held.restart, true);
+    input.detach();
+  });
+
+  /** Mirrors Game.prepareRunRestart → Input.resetForRun after a hold-restart fires. */
+  function simulateHoldRRestartFrames(
+    input: Input,
+    holdMs: number,
+    fps = 60,
+    onRestart: () => void,
+  ): { restarts: number; respawns: number } {
+    const dt = 1000 / fps;
+    let t = 0;
+    let restarts = 0;
+    let respawns = 0;
+    input.setKeys(["KeyR"]);
+    input.applyGameKeyDown("KeyR");
+    const frames = Math.ceil(holdMs / dt) + 2;
+    for (let i = 0; i < frames; i++) {
+      t += dt;
+      input.nowMs = () => t;
+      const a = input.sample();
+      if (a.restart) {
+        restarts++;
+        onRestart();
+      }
+      if (a.respawn) respawns++;
+    }
+    return { restarts, respawns };
+  }
+
+  it("BUG-1: 2.0s held R at 60fps fires exactly one restart and zero respawns after release", () => {
+    const input = new Input();
+    input.holdRestartMs = RESTART_HOLD_MS;
+    const during = simulateHoldRRestartFrames(input, 2000, 60, () => input.resetForRun());
+    assert.equal(during.restarts, 1, `during hold restarts=${during.restarts}`);
+    assert.equal(during.respawns, 1, "tap edge respawn on keydown only");
+
+    let t = 2500;
+    input.nowMs = () => t;
+    input.applyGameKeyUp("KeyR");
+    input.setKeys([]);
+    const afterUp = input.sample();
+    assert.equal(afterUp.restart, false);
+    assert.equal(afterUp.respawn, false);
+    input.detach();
+  });
+
+  it("BUG-1: 3.5s held R at 60fps still fires only one restart", () => {
+    const input = new Input();
+    input.holdRestartMs = RESTART_HOLD_MS;
+    const during = simulateHoldRRestartFrames(input, 3500, 60, () => input.resetForRun());
+    assert.equal(during.restarts, 1);
+    input.applyGameKeyUp("KeyR");
+    input.setKeys([]);
+    input.detach();
+  });
+
+  it("BUG-1: release then a fresh hold gives a second restart", () => {
+    const input = new Input();
+    input.holdRestartMs = RESTART_HOLD_MS;
+    let t = 1000;
+    input.nowMs = () => t;
+    input.setKeys(["KeyR"]);
+    input.applyGameKeyDown("KeyR");
+    input.sample();
+    t += RESTART_HOLD_MS + 20;
+    input.nowMs = () => t;
+    const first = input.sample();
+    assert.equal(first.restart, true);
+    input.resetForRun();
+    input.applyGameKeyUp("KeyR");
+    input.setKeys([]);
+    input.sample();
+    t += 200;
+    input.setKeys(["KeyR"]);
+    input.applyGameKeyDown("KeyR");
+    const tHoldStart = t;
+    input.nowMs = () => tHoldStart;
+    input.sample();
+    t = tHoldStart + RESTART_HOLD_MS + 20;
+    input.nowMs = () => t;
+    const second = input.sample();
+    assert.equal(second.restart, true);
+    input.detach();
+  });
+
+  it("BUG-1: five hold-release cycles at 60fps yield exactly five restarts", () => {
+    const input = new Input();
+    input.holdRestartMs = RESTART_HOLD_MS;
+    let t = 0;
+    input.nowMs = () => t;
+    let restarts = 0;
+    for (let cycle = 0; cycle < 5; cycle++) {
+      input.setKeys(["KeyR"]);
+      input.applyGameKeyDown("KeyR");
+      for (let f = 0; f < 40; f++) {
+        t += 1000 / 60;
+        input.nowMs = () => t;
+        const a = input.sample();
+        if (a.restart) {
+          restarts++;
+          input.resetForRun();
+        }
+      }
+      input.applyGameKeyUp("KeyR");
+      input.setKeys([]);
+      input.sample();
+      t += 120;
+    }
+    assert.equal(restarts, 5);
     input.detach();
   });
 
