@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ASPHALT_BASE,
+  bannerDarkLook,
+  gatePlateColor,
   contrastBarrierDarkLook,
   presentMaps,
   curbBlockHigh,
@@ -240,6 +242,50 @@ describe("contrast barrier dark panel", () => {
       assert.equal(look.color, 0x14161c);
       assert.equal(look.metalness, 0.2);
       assert.equal(look.emissiveIntensity, 0.14);
+    }
+  });
+});
+
+describe("near-black art surfaces (Green CP1 banner, White Pass gate plate)", () => {
+  const lum = (hex: number) =>
+    (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
+  const others = ["canyon", "night", "works", "mesa", "grove", "ember", "storm"] as const;
+
+  it("Green Circuit dark banner is lifted to self-lit charcoal, still darker than the light board", () => {
+    const look = bannerDarkLook("stadium", 0xef5a24);
+    assert.ok(lum(look.color) > 0.15, `banner albedo luminance ${lum(look.color)}`);
+    assert.ok(lum(look.color) < lum(0xf4f4f2) * 0.4, "two-tone sponsor look must stay");
+    assert.equal(look.emissive, look.color);
+    assert.ok(look.emissiveIntensity >= 0.25, `emissive ${look.emissiveIntensity}`);
+  });
+
+  it("other themes keep the original dark banner", () => {
+    for (const theme of [...others, "alpine"] as const) {
+      assert.deepEqual(bannerDarkLook(theme, 0xc4a574), {
+        color: 0x111318,
+        emissive: 0xc4a574,
+        emissiveIntensity: 0.18,
+      });
+    }
+  });
+
+  it("White Pass CP plate is lifted off black", () => {
+    assert.ok(lum(gatePlateColor("alpine")) > 0.25, `plate luminance ${lum(gatePlateColor("alpine"))}`);
+  });
+
+  it("other themes keep their CP plate colour", () => {
+    const expected = {
+      stadium: 0x111318,
+      canyon: 0x111318,
+      night: 0x0c1020,
+      works: 0x161210,
+      mesa: 0x1c140c,
+      grove: 0x0c1410,
+      ember: 0x111318,
+      storm: 0x111318,
+    } as const;
+    for (const [theme, hex] of Object.entries(expected)) {
+      assert.equal(gatePlateColor(theme as keyof typeof expected), hex, theme);
     }
   });
 });

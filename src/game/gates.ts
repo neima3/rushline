@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Sample, ThemeId } from "./types";
 import { makeCheckerTexture } from "./textures";
 import { GATE_LOOK } from "./presentation";
+import { gatePlateColor } from "./look";
 
 const _fwd = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -135,7 +136,7 @@ export function buildGate(sm: Sample, theme: ThemeId, finish: boolean): GateBuil
     plane(w * 1.2, 0.24, plateMat, h - 1.02, 0.05);
   } else {
     const panelMat = new THREE.MeshBasicMaterial({
-      color: night ? 0x0c1020 : works ? 0x161210 : grove ? 0x0c1410 : mesa ? 0x1c140c : 0x111318,
+      color: gatePlateColor(theme),
       fog: true,
       side: THREE.DoubleSide,
     });
