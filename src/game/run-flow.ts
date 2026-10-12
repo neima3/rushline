@@ -17,6 +17,17 @@ export const RESPAWN_SPEED_MIN = 6;
 export const RESPAWN_SPEED_MAX = 38;
 export const RESPAWN_SPEED_KEEP = 0.78;
 
+/** Race loop: no longitudinal input during lights-out (restart mid-race included). */
+export function countdownPhysicsDrive<T extends { throttle: number; brake: number }>(
+  phase: string,
+  actions: T,
+): T {
+  if (phase === "countdown") {
+    return { ...actions, throttle: 0, brake: 0 };
+  }
+  return actions;
+}
+
 /** TM-style last-CP respawn: keep most pace, clamped — not a flat 9 m/s every time. */
 export function respawnKeepSpeed(speed: number): number {
   if (!Number.isFinite(speed)) return 9;

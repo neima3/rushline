@@ -168,9 +168,16 @@ export class Input {
 
   /** Clear latch / filter state so a new run cannot inherit brake or steer from the last one. */
   resetForRun() {
+    const holdRestartLatched = this.respawnHold.restartFired;
+    const gp = pollPads();
+    const respawnHeld = (this.down("KeyR") || Boolean(gp?.y && !gp?.lb)) && !this.down("Backspace") && !(gp?.lb && gp?.y);
     this.brakeLatchUntil = 0;
     this.filtSteer = 0;
-    this.respawnHold = emptyRespawnHold();
+    // Hold-restart while R/Y stays down: do not clear restartFired or the hold re-arms (#BUG-1).
+    this.respawnHold =
+      holdRestartLatched && respawnHeld
+        ? { startedAt: this.nowMs(), restartFired: true }
+        : emptyRespawnHold();
     this.queued.pause = false;
     this.queued.camera = false;
     this.queued.respawn = false;
