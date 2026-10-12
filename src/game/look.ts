@@ -164,15 +164,18 @@ export function contrastBarrierDarkLook(theme: ThemeId): ContrastPanelLook {
   };
 }
 
-/** Roadside sponsor banner dark board. Stadium's old 0x111318 + faint orange
- *  emissive crushed to pure black under the High grade (the "black board" on the
- *  CP1 approach), so Green Circuit lifts it to a self-lit charcoal slate that
- *  still reads clearly darker than the 0xf4f4f2 light board. */
+/** Roadside sponsor banner dark board. Stadium's old 0x111318 + 0xef5a24@0.18
+ *  emissive graded to a flat dark red (~86,0,0), and a slate-only 0.3 glow left
+ *  the road-facing (unlit) face near-black. The board is lit almost entirely by
+ *  its own emissive from the road, so Green Circuit uses a warm slate glow (the
+ *  slate tinted with a muted share of the orange accent) strong enough to read
+ *  as dark grey (~54,48,50 at High) while staying far below the bloom threshold
+ *  and clearly darker than the 0xf4f4f2 light board. */
 export type BannerDarkLook = { color: number; emissive: number; emissiveIntensity: number };
 
 export function bannerDarkLook(theme: ThemeId, accent: number): BannerDarkLook {
   if (theme === "stadium") {
-    return { color: 0x363c46, emissive: 0x363c46, emissiveIntensity: 0.3 };
+    return { color: 0x363c46, emissive: 0x524a48, emissiveIntensity: 0.8 };
   }
   return { color: 0x111318, emissive: accent, emissiveIntensity: 0.18 };
 }

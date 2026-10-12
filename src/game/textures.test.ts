@@ -251,12 +251,27 @@ describe("near-black art surfaces (Green CP1 banner, White Pass gate plate)", ()
     (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255;
   const others = ["canyon", "night", "works", "mesa", "grove", "ember", "storm"] as const;
 
-  it("Green Circuit dark banner is lifted to self-lit charcoal, still darker than the light board", () => {
+  it("Green Circuit dark banner is self-lit warm slate, still darker than the light board", () => {
     const look = bannerDarkLook("stadium", 0xef5a24);
     assert.ok(lum(look.color) > 0.15, `banner albedo luminance ${lum(look.color)}`);
     assert.ok(lum(look.color) < lum(0xf4f4f2) * 0.4, "two-tone sponsor look must stay");
-    assert.equal(look.emissive, look.color);
-    assert.ok(look.emissiveIntensity >= 0.25, `emissive ${look.emissiveIntensity}`);
+    // Muted orange accent: the glow leans warm (R > G, R > B) but stays a grey, not orange/red.
+    const r = (look.emissive >> 16) & 255;
+    const g = (look.emissive >> 8) & 255;
+    const b = look.emissive & 255;
+    assert.ok(r > g && r > b, `emissive ${look.emissive.toString(16)} should carry the orange accent`);
+    assert.ok(r - Math.min(g, b) <= 24, `emissive ${look.emissive.toString(16)} must stay greyish`);
+    // The road-facing face is lit by its own glow: linear self-lit luminance must
+    // clear the near-black floor (#76 at 0x363c46@0.3 was ~0.013 -> ~4,8,17 on screen)
+    // yet stay far under the High bloom threshold.
+    const lin = (c: number) => {
+      const x = c / 255;
+      return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    const selfLit =
+      (0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)) * look.emissiveIntensity;
+    assert.ok(selfLit > 0.04, `self-lit luminance ${selfLit}`);
+    assert.ok(selfLit < 0.15, `self-lit luminance ${selfLit} must not bloom`);
   });
 
   it("other themes keep the original dark banner", () => {
