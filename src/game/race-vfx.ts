@@ -295,6 +295,9 @@ export class RaceVfx {
   private burstPos: Float32Array = new Float32Array(0);
   private burstVel: Float32Array = new Float32Array(0);
   private burstLife: Float32Array = new Float32Array(0);
+  /** Render buffer: live particles packed at the front; dead slots are never drawn. */
+  private burstDraw: Float32Array = new Float32Array(0);
+  private burstLive = 0;
   private burstCap = 0;
   private burstPoints: THREE.Points | null = null;
   private burstMat: THREE.PointsMaterial | null = null;
@@ -314,7 +317,7 @@ export class RaceVfx {
     const burstCap =
       this.density <= 0.02 ? 0 : Math.max(12, Math.floor(FINISH_BURST_MAX * this.density));
     this.ensureBurstPool(burstCap);
-    if (this.burstPoints) this.burstPoints.visible = burstCap > 0;
+    if (this.burstPoints) this.burstPoints.visible = burstCap > 0 && this.burstLive > 0;
   }
 
   setTheme(theme: ThemeId) {
@@ -376,9 +379,7 @@ export class RaceVfx {
       for (let i = 0; i < this.skidCap; i++) this.skidAge[i] = -1;
     }
     for (let i = 0; i < this.burstCap; i++) this.burstLife[i] = 0;
-    if (this.burstPoints) {
-      (this.burstPoints.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-    }
+    this.syncBurstDraw();
   }
 
   skid(snap: CarSnap, active: boolean) {
@@ -484,19 +485,25 @@ export class RaceVfx {
       this.burstMat?.dispose();
     }
     this.burstCap = cap;
+    this.burstLive = 0;
     if (cap <= 0) {
       this.burstPoints = null;
       this.burstMat = null;
       this.burstPos = new Float32Array(0);
       this.burstVel = new Float32Array(0);
       this.burstLife = new Float32Array(0);
+      this.burstDraw = new Float32Array(0);
       return;
     }
     this.burstPos = new Float32Array(cap * 3);
     this.burstVel = new Float32Array(cap * 3);
     this.burstLife = new Float32Array(cap);
+    this.burstDraw = new Float32Array(cap * 3);
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(this.burstPos, 3));
+    const drawAttr = new THREE.BufferAttribute(this.burstDraw, 3);
+    drawAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute("position", drawAttr);
+    geo.setDrawRange(0, 0);
     this.burstMat = new THREE.PointsMaterial({
       color: 0xffe8a8,
       size: 0.38,
@@ -508,6 +515,7 @@ export class RaceVfx {
     });
     this.burstPoints = new THREE.Points(geo, this.burstMat);
     this.burstPoints.frustumCulled = false;
+    this.burstPoints.visible = false;
     this.root.add(this.burstPoints);
     this.geos.push(geo);
     this.disposables.push(this.burstMat);
@@ -671,7 +679,7 @@ export class RaceVfx {
       this.burstVel[slot * 3 + 1] = 2.5 + Math.random() * 5.5;
       this.burstVel[slot * 3 + 2] = Math.sin(a) * Math.cos(pitch) * spd;
     }
-    (this.burstPoints.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    this.syncBurstDraw();
     if (this.burstMat) {
       const look = gateLookForTheme(this.theme, true);
       this.burstMat.color.setHex(look.rim);
@@ -693,10 +701,34 @@ export class RaceVfx {
       this.burstPos[i * 3 + 2]! += this.burstVel[i * 3 + 2]! * dt;
       this.burstVel[i * 3 + 1]! -= 9.5 * dt;
     }
-    if (live > 0) {
-      (this.burstPoints.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-      if (this.burstMat) this.burstMat.opacity = Math.min(0.95, 0.35 + live / this.burstCap);
+    // Skip the pack when nothing was live before or now (idle frames stay cheap).
+    if (live > 0 || this.burstLive > 0) this.syncBurstDraw();
+    if (live > 0 && this.burstMat) this.burstMat.opacity = Math.min(0.95, 0.35 + live / this.burstCap);
+  }
+
+  /**
+   * Pack live burst particles to the front of the render buffer and draw only those.
+   * Dead slots never render, and with nothing live the Points object is hidden, so
+   * no frozen burst survives a finish / same-track restart. No allocations.
+   */
+  private syncBurstDraw() {
+    if (!this.burstPoints) {
+      this.burstLive = 0;
+      return;
     }
+    let n = 0;
+    for (let i = 0; i < this.burstCap; i++) {
+      if (this.burstLife[i]! <= 0) continue;
+      this.burstDraw[n * 3] = this.burstPos[i * 3]!;
+      this.burstDraw[n * 3 + 1] = this.burstPos[i * 3 + 1]!;
+      this.burstDraw[n * 3 + 2] = this.burstPos[i * 3 + 2]!;
+      n++;
+    }
+    this.burstLive = n;
+    const geo = this.burstPoints.geometry;
+    geo.setDrawRange(0, n);
+    (geo.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    this.burstPoints.visible = n > 0;
   }
 
   private pickBurstSlot() {
