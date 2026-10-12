@@ -288,16 +288,24 @@ describe("near-black art surfaces (Green CP1 banner, White Pass gate plate)", ()
     assert.ok(lum(gatePlateColor("alpine")) > 0.25, `plate luminance ${lum(gatePlateColor("alpine"))}`);
   });
 
+  it("Red Mesa and Storm Dock CP plates are lifted off black but stay under their pins", () => {
+    for (const [theme, pin] of [["mesa", 0xffd070], ["storm", 0xf4f4f2]] as const) {
+      const plate = gatePlateColor(theme);
+      assert.ok(lum(plate) > 0.2, `${theme} plate luminance ${lum(plate)}`);
+      assert.ok(lum(plate) < lum(pin) * 0.45, `${theme} pin must still read on the plate`);
+    }
+    assert.equal(gatePlateColor("mesa"), 0x5a4632);
+    assert.equal(gatePlateColor("storm"), 0x3e4a56);
+  });
+
   it("other themes keep their CP plate colour", () => {
     const expected = {
       stadium: 0x111318,
       canyon: 0x111318,
       night: 0x0c1020,
       works: 0x161210,
-      mesa: 0x1c140c,
       grove: 0x0c1410,
       ember: 0x111318,
-      storm: 0x111318,
     } as const;
     for (const [theme, hex] of Object.entries(expected)) {
       assert.equal(gatePlateColor(theme as keyof typeof expected), hex, theme);

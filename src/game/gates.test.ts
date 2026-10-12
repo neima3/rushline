@@ -33,22 +33,32 @@ describe("CP gate plate", () => {
     assert.equal(mat.color.getHex(), 0x4a5868);
   });
 
-  it("every theme's plate is double-sided; non-alpine colours unchanged", () => {
+  it("every theme's plate is double-sided with its pinned colour", () => {
     const expected: Record<ThemeId, number> = {
       stadium: 0x111318,
       canyon: 0x111318,
       night: 0x0c1020,
       alpine: 0x4a5868,
       works: 0x161210,
-      mesa: 0x1c140c,
+      mesa: 0x5a4632,
       grove: 0x0c1410,
       ember: 0x111318,
-      storm: 0x111318,
+      storm: 0x3e4a56,
     };
     for (const [theme, hex] of Object.entries(expected) as [ThemeId, number][]) {
       const { mat } = cpPlate(theme);
       assert.equal(mat.side, THREE.DoubleSide, theme);
       assert.equal(mat.color.getHex(), hex, theme);
+    }
+  });
+
+  it("Red Mesa and Storm Dock plates are double-sided and not near-black", () => {
+    for (const theme of ["mesa", "storm"] as const) {
+      const { mat } = cpPlate(theme);
+      assert.equal(mat.side, THREE.DoubleSide, theme);
+      const c = mat.color;
+      const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+      assert.ok(lum > 0.04, `${theme} plate linear luminance ${lum}`);
     }
   });
 
